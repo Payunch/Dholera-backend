@@ -29,6 +29,30 @@ be.
 
   For now: Push the changes to GitHub, and your site will at least go "Online"!
 
+2 be 
+
+The code on your GitHub is now correct, but Render is still trying to use MySQL because you have set "Environment Variables" in the Render
+  dashboard that are overriding the code.
+
+  How to fix this on Render:
+
+   1. Go to your Render Dashboard.
+   2. Select your Dholera-backend service.
+   3. Click on the Environment tab.
+   4. Delete the following variables if they exist:
+       * DB_DIALECT
+       * DB_HOST
+       * DB_NAME
+       * DB_USER
+  Why this is happening:
+  Even though the code says "use SQLite", Render sees a variable like DB_DIALECT=mysql in your settings and forces the app to try and connect to a
+  MySQL server at your_host. Since your_host doesn't exist, it crashes.
+
+  Once you delete those variables, the app will see that DB_DIALECT is missing and will correctly fall back to the database.sqlite file included in
+  your code.
+
+
+
 fe
 
   Diagnosing Production Admin Issue: Investigating the deployment logs to understand why the admin endpoint is disabled in production.
