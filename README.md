@@ -185,6 +185,15 @@ ALLOWED_ORIGINS=https://your-frontend.up.railway.app,https://yourdomain.com,http
 
 `https://*.up.railway.app` is useful when Railway preview or regenerated domains change between deployments.
 
+**CORS deployment note:** If you deploy the frontend while the backend still only allows `http://localhost:5173`, the live site (for example the Planning page) will show the same error. The correct order to fix this is:
+
+- Add your real frontend URL to the backend CORS allowlist.
+- Redeploy or restart the backend.
+- Deploy the frontend.
+- Open the site and hard refresh once, or clear the service worker cache.
+
+Do not manually edit `dist/` to fix this — the root cause is backend CORS configuration, not `dist/index.html`. If you want, I can help you make the exact backend CORS change next.
+
 ## Frontend routes
 
 - `/` — Home with Project PDFs, Nakhsa Maps, and DP Maps (lazy loaded with skeleton screens)

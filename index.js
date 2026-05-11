@@ -16,7 +16,14 @@ const { buildOriginMatcher } = require('./utils/originMatcher');
 const app = express();
 const bootAt = new Date().toISOString();
 
-const originMatcher = buildOriginMatcher(process.env.ALLOWED_ORIGINS);
+// Build the origin matcher from configured sources. Prefer an explicit
+// `ALLOWED_ORIGINS` env var but also include `VITE_SITE_URL` when present
+// so frontend deployments that set that variable work without an extra
+// ALLOWED_ORIGINS edit in the environment.
+const allowedSources = [];
+if (process.env.ALLOWED_ORIGINS) allowedSources.push(process.env.ALLOWED_ORIGINS);
+if (process.env.VITE_SITE_URL) allowedSources.push(process.env.VITE_SITE_URL);
+const originMatcher = buildOriginMatcher(allowedSources.join(','));
 const allowedOrigins = originMatcher.allowedOrigins;
 
 const globalLimiter = rateLimit({
