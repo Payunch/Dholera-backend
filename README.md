@@ -47,6 +47,17 @@ The API will be available at `http://localhost:3000`.
 - `node scripts/seed.js`: Seed the database with initial data.
 - `node scripts/clean-db.js`: Wipe the database (use with caution).
 
+---
+
+## 🗺️ Backend Roadmap
+- [ ] **Admin MFA:** Multi-factor authentication for admin login.
+- [ ] **JWT Refresh Tokens:** Secure long-lived sessions.
+- [ ] **WhatsApp Cloud API:** Fully automated lead notifications.
+- [ ] **Email Alerts:** Instant notifications for high-interest leads.
+- [ ] **PostgreSQL Migration:** Transition from SQLite for production scalability.
+- [ ] **S3 Integration:** Complete local storage migration to AWS S3.
+- [ ] **Sentry Logging:** Integrated error tracking and monitoring.
+
 ## ✅ Final Clean Status
 - Removed redundant `cookies.txt` and `csrf.txt`.
 - Removed old `database.sqlite.sql` dumps.
