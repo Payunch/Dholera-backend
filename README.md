@@ -166,6 +166,25 @@ VITE_SITE_URL=http://localhost:5173
 VITE_WHATSAPP_NUMBER=919999999999
 ```
 
+### Backend (`.env`)
+
+Use [.env.example](/home/prs/Documents/dholera-backend/.env.example) as the starting point for local and hosted environments.
+
+```env
+PORT=3000
+NODE_ENV=development
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173
+SESSION_SECRET=replace-me
+```
+
+For hosted deploys, `ALLOWED_ORIGINS` accepts comma-separated exact origins and wildcard patterns.
+
+```env
+ALLOWED_ORIGINS=https://your-frontend.up.railway.app,https://yourdomain.com,https://*.up.railway.app
+```
+
+`https://*.up.railway.app` is useful when Railway preview or regenerated domains change between deployments.
+
 ## Frontend routes
 
 - `/` — Home with Project PDFs, Nakhsa Maps, and DP Maps (lazy loaded with skeleton screens)
@@ -213,7 +232,7 @@ VITE_WHATSAPP_NUMBER=919999999999
 ### Runtime diagnostics
 
 - `GET /healthz` — basic liveness
-- `GET /healthz/runtime` — active runtime info (configured port, allowed origins, PID, uptime)
+- `GET /healthz/runtime` — active runtime info (configured port, exact and wildcard allowed origins, PID, uptime)
 
 ## Build and production
 

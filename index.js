@@ -11,14 +11,13 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const { sequelize } = require('./models');
 const { testConnection } = require('./config/database');
+const { buildOriginMatcher } = require('./utils/originMatcher');
 
 const app = express();
 const bootAt = new Date().toISOString();
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175')
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean);
+const originMatcher = buildOriginMatcher(process.env.ALLOWED_ORIGINS);
+const allowedOrigins = originMatcher.allowedOrigins;
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -35,10 +34,12 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow same-origin (no origin) or any of the whitelisted origins
-    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+    // Allow same-origin (no origin), local development, exact matches, and wildcard allowlist entries.
+    if (originMatcher.isAllowedOrigin(origin)) {
       return callback(null, true);
     }
+
+    console.warn(`[CORS] Blocked origin: ${origin}`);
     return callback(null, false);
   },
   credentials: true,
@@ -154,6 +155,8 @@ app.get('/healthz/runtime', (req, res) => {
     nodeEnv: process.env.NODE_ENV || 'development',
     configuredPort,
     allowedOrigins,
+    exactAllowedOrigins: originMatcher.exactOrigins,
+    wildcardAllowedOrigins: originMatcher.wildcardOrigins,
     uptimeSec: Math.round(process.uptime())
   });
 });
