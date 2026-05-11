@@ -173,7 +173,7 @@ Use [.env.example](/home/prs/Documents/dholera-backend/.env.example) as the star
 ```env
 PORT=3000
 NODE_ENV=development
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173
+ALLOWED_ORIGINS=https://dholera-frontend-production.up.railway.app,http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173
 SESSION_SECRET=replace-me
 ```
 
