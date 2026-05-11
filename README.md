@@ -1,65 +1,54 @@
-# Dholera Backend
+# Dholera Backend API
 
-Node.js backend for the Dholera project. It handles admin authentication, leads, updates, PDF viewing, WhatsApp integration, and file uploads.
+This is the standalone Node.js Express API for the Dholera Growth Evidence Platform.
 
-## What was completed
+## 🏗️ Architecture
+- **Engine:** Node.js + Express
+- **ORM:** Sequelize
+- **Database:** SQLite (local development)
+- **Security:** JWT Authentication, Helmet, Rate Limiting
+- **Integrations:** Cloudinary (Storage), Nodemailer (Email), WhatsApp Links
 
-- Cloudinary integration for image uploads and PDF storage.
-- Shared Cloudinary helper to keep credentials out of code.
-- PDF viewer support for Cloudinary-hosted documents.
-- PDF migration tooling to move existing files to Cloudinary.
-- Auto-seed script for PDF records on a fresh database.
-- Git safety updates so `.env` and local database files stay out of the repo.
-- Health endpoints for runtime checks.
-
-## What remains
-
-- One oversized PDF is still stored locally because Cloudinary rejected it above the upload limit.
-- Decide whether to keep that single file local, replace it with a smaller source file, or change the Cloudinary plan/settings.
-- Optional future cleanup: simplify the PDF viewer flow so internal testing is easier when a lead token is not available.
-
-## Current bug
-
-- The large PDF is still not visible remotely because it never uploaded successfully.
-- The secure PDF viewer also requires a valid lead token, so opening the viewer without a token returns `403`.
-- The old README content was stale and did not match the actual Node backend.
-
-## Local setup
-
-```bash
-npm install
-npm start
+## 📂 Structure
+```text
+dholera-backend/
+├── config/             # Database connection & Sequelize config
+├── controllers/        # Request handlers (Lead, Update, Auth, etc.)
+├── middleware/         # Auth guards, upload validation, security
+├── models/             # Database schemas
+├── routes/             # Express route definitions
+├── scripts/            # Database seeding, migration, cleanup
+├── services/           # External logic (Cloudinary, WhatsApp, Audit)
+├── tests/              # API & basic unit tests
+├── uploads/            # Local persistent storage (fallback for Cloudinary)
+├── index.js            # Server entry point
+└── package.json        # Dependencies & scripts
 ```
 
-The server runs on `http://localhost:3000` by default.
+## 🚀 Getting Started
 
-## Environment variables
+### 1. Install Dependencies
+```bash
+npm install
+```
 
-Copy [.env.example](.env.example) to `.env` and fill in the values you need.
+### 2. Configure Environment
+Copy `.env.example` to `.env` and configure your credentials.
 
-Important values:
+### 3. Run Development Server
+```bash
+npm run dev
+```
+The API will be available at `http://localhost:3000`.
 
-- `PORT`
-- `NODE_ENV`
-- `ALLOWED_ORIGINS`
-- `SESSION_SECRET`
-- `JWT_SECRET`
-- `ADMIN_USER`
-- `ADMIN_PASS`
-- `CLOUDINARY_URL` or the individual `CLOUDINARY_*` values
+## 📜 Key Scripts
+- `npm start`: Run in production mode.
+- `npm run dev`: Run in development mode with nodemon.
+- `node scripts/seed.js`: Seed the database with initial data.
+- `node scripts/clean-db.js`: Wipe the database (use with caution).
 
-## Key routes
-
-- `GET /healthz` - basic liveness
-- `GET /healthz/runtime` - runtime diagnostics
-- `GET /api/pdf/view/:id` - secure PDF viewer
-- `POST /api/admin/uploads/image` - upload image
-- `POST /api/admin/uploads/pdf` - upload PDF
-- `POST /api/auth/login` - admin login
-- `GET /api/auth/me` - current admin session
-
-## Notes
-
-- PDFs can come from Cloudinary or local storage depending on the record.
-- Local PDFs are still served from `uploads/pdfs` when the record points to a local file.
-- `database.sqlite` is local-only and ignored by Git.
+## ✅ Final Clean Status
+- Removed redundant `cookies.txt` and `csrf.txt`.
+- Removed old `database.sqlite.sql` dumps.
+- Removed scratch files (`scratch_sync.js`, etc.).
+- Standardized project layout.
