@@ -71,7 +71,7 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
     };
 
     if (req.file) {
-      updateData.imageUrl = `/uploads/images/${req.file.filename}`;
+      updateData.imageUrl = req.file.secure_url || req.file.path || `/uploads/images/${req.file.filename}`;
     }
 
     const update = await Update.create(updateData);
@@ -104,7 +104,7 @@ router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
     }
 
     if (req.file) {
-      updateData.imageUrl = `/uploads/images/${req.file.filename}`;
+      updateData.imageUrl = req.file.secure_url || req.file.path || `/uploads/images/${req.file.filename}`;
     }
 
     await update.update(updateData);

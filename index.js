@@ -9,9 +9,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const { sequelize } = require('./models');
+const { sequelize, PdfDocument } = require('./models');
 const { testConnection } = require('./config/database');
 const { buildOriginMatcher } = require('./utils/originMatcher');
+const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
 
 const app = express();
 const bootAt = new Date().toISOString();
@@ -201,6 +202,8 @@ const shouldAlterSchema = process.env.DB_SYNC_ALTER === 'true';
   try {
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log('[DB] Tables synced successfully.');
+    // Auto-seed PDFs from Cloudinary URLs on first boot (no-op if table already populated)
+    await seedPdfsIfEmpty(PdfDocument);
   } catch (err) {
     console.error('[DB] ❌ Failed to sync tables:', err.message);
     console.error('[DB] Try setting DB_SYNC_ALTER=true in .env to auto-migrate columns.');

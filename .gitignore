@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.*
+!.env.example
 database.sqlite
 public/uploads/*
 !public/uploads/.gitkeep
@@ -11,3 +13,4 @@ backend/.env
 frontend/.env
 backend/.venv/
 __pycache__/
+uploads/pdfs/*-mutool.pdf

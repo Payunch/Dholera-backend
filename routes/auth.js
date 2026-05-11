@@ -27,7 +27,7 @@ const LOGIN_LOCKOUT_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_MS || `${30 *
 const failedLoginState = new Map();
 
 if (!process.env.ADMIN_USER || !process.env.ADMIN_PASS || !process.env.JWT_SECRET) {
-  console.warn('Missing ADMIN_USER/ADMIN_PASS/JWT_SECRET environment variables. Using default development credentials (admin/admin).');
+  console.warn('Missing ADMIN_USER/ADMIN_PASS/JWT_SECRET environment variables. Using default development credentials (admin/admin123).');
 }
 
 const safeEqual = (a, b) => {
