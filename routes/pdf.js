@@ -6,6 +6,8 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 const { PdfDocument, PdfView, Lead } = require('../models');
+const { verifyAccessToken, getTokenFromRequest } = require('../services/adminSecurity');
+const { cloudinary } = require('../services/cloudinary');
 
 const ALLOWED_REMOTE_PDF_HOSTS = new Set(['res.cloudinary.com']);
 
@@ -42,7 +44,10 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
       if (statusCode >= 300 && statusCode < 400 && redirectLocation) {
         upstream.resume();
         const nextUrl = new URL(redirectLocation, remoteUrl).toString();
-        if (!isAllowedRemotePdfUrl(nextUrl)) {
+        
+        // Allow redirects from api.cloudinary.com to res.cloudinary.com during authenticated download
+        const parsedNext = new URL(nextUrl);
+        if (parsedNext.hostname !== 'res.cloudinary.com' && !isAllowedRemotePdfUrl(nextUrl)) {
           reject(new Error('Remote PDF redirect target is not allowed.'));
           return;
         }
@@ -92,17 +97,37 @@ router.get('/list', async (req, res) => {
 // GET secure PDF stream
 router.get('/view/:id', async (req, res) => {
   try {
-    let leadToken = req.headers.authorization || req.query.token || '';
-    if (!leadToken) {
-      return res.status(403).json({ error: 'Verification required to view this document.' });
-    }
-    if (leadToken.toLowerCase().startsWith('bearer ')) {
-      leadToken = leadToken.slice(7).trim();
+    // 1. Check if the user is an Admin first (Super-Power)
+    let isAdmin = false;
+    if (req.session?.isAdmin) {
+      isAdmin = true;
+    } else {
+      const accessToken = getTokenFromRequest(req, 'admin_access_token');
+      if (accessToken) {
+        try {
+          const payload = verifyAccessToken(accessToken);
+          if (payload?.sub) isAdmin = true;
+        } catch (e) {
+          // Token invalid, ignore and check lead token
+        }
+      }
     }
 
-    const lead = await Lead.findOne({ where: { lead_token: leadToken } });
-    if (!lead || !lead.verified) {
-      return res.status(403).json({ error: 'Invalid or unverified lead token.' });
+    let lead = null;
+    if (!isAdmin) {
+      // 2. If not admin, verify Lead Token
+      let leadToken = req.headers.authorization || req.query.token || '';
+      if (!leadToken) {
+        return res.status(403).json({ error: 'Verification required to view this document.' });
+      }
+      if (leadToken.toLowerCase().startsWith('bearer ')) {
+        leadToken = leadToken.slice(7).trim();
+      }
+
+      lead = await Lead.findOne({ where: { lead_token: leadToken } });
+      if (!lead || !lead.verified) {
+        return res.status(403).json({ error: 'Invalid or unverified lead token.' });
+      }
     }
 
     const pdf = await PdfDocument.findByPk(req.params.id);
@@ -110,15 +135,17 @@ router.get('/view/:id', async (req, res) => {
       return res.status(404).json({ error: 'PDF not found.' });
     }
 
-    try {
-      await PdfView.create({ lead_id: lead.id, pdf_id: pdf.id });
-    } catch (viewErr) {
-      console.error('Error recording PDF view:', viewErr.message);
-    }
-
-    const viewCount = await PdfView.count({ where: { lead_id: lead.id } });
-    if (viewCount > 1 && !lead.returning_visitor) {
-      await lead.update({ returning_visitor: true });
+    // Record view only for leads, not for admins
+    if (lead) {
+      try {
+        await PdfView.create({ lead_id: lead.id, pdf_id: pdf.id });
+        const viewCount = await PdfView.count({ where: { lead_id: lead.id } });
+        if (viewCount > 1 && !lead.returning_visitor) {
+          await lead.update({ returning_visitor: true });
+        }
+      } catch (viewErr) {
+        console.error('Error recording PDF view:', viewErr.message);
+      }
     }
 
     const filePath = String(pdf.file_path || '').trim();
@@ -132,8 +159,48 @@ router.get('/view/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid remote document path.' });
       }
 
+      let streamUrl = filePath;
+
+      // If it's Cloudinary, use an authenticated download URL
       try {
-        await pipeRemoteUrl(filePath, res);
+        const parsed = new URL(filePath);
+        if (parsed.hostname === 'res.cloudinary.com') {
+          // Extract info from path: /<cloud_name>/<res_type>/<type>/v<ver>/<public_id>
+          const parts = parsed.pathname.split('/');
+          const uploadIndex = parts.indexOf('upload');
+          const authenticatedIndex = parts.indexOf('authenticated');
+          const typeIndex = uploadIndex !== -1 ? uploadIndex : authenticatedIndex;
+          
+          if (typeIndex !== -1) {
+            const resourceType = parts[typeIndex - 1] || 'raw';
+            const type = parts[typeIndex];
+            let publicIdParts = parts.slice(typeIndex + 1);
+            
+            // Skip version segment
+            if (publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
+              publicIdParts = publicIdParts.slice(1);
+            }
+            
+            const fullPublicId = publicIdParts.join('/');
+            // Extract extension if present for 'raw' downloads
+            const extMatch = fullPublicId.match(/\.([a-z0-9]+)$/i);
+            const format = extMatch ? extMatch[1] : 'pdf';
+            const publicId = extMatch ? fullPublicId.slice(0, -extMatch[0].length) : fullPublicId;
+
+            // Generate a private download URL that uses the API Secret
+            streamUrl = cloudinary.utils.private_download_url(publicId, format, {
+              resource_type: resourceType,
+              type: type
+            });
+            // console.log('[PDF] Generated private download URL for:', publicId);
+          }
+        }
+      } catch (signErr) {
+        console.warn('Authenticated URL generation failed, falling back to original:', signErr.message);
+      }
+
+      try {
+        await pipeRemoteUrl(streamUrl, res);
       } catch (err) {
         console.error('Remote PDF pipe error:', err.message);
         if (!res.headersSent) {

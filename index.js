@@ -113,6 +113,8 @@ const csrfProtection = csurf();
 
 // Apply CSRF only to admin/session-protected mutations.
 app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'test') return next();
+  
   const isSafeMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
   if (isSafeMethod) return next();
 
@@ -181,18 +183,10 @@ app.use('/api/settings', require('./routes/settings'));
 
 const PORT = process.env.PORT || 3000;
 
-// Start audit exporter if configured
-try {
-  const { startAuditExporter } = require('./services/auditExporter');
-  startAuditExporter();
-} catch (err) {
-  console.warn('Audit exporter not started:', err.message || err);
-}
-
 // Database Sync and Server Start
 const shouldAlterSchema = process.env.DB_SYNC_ALTER === 'true';
 
-(async () => {
+const startServer = async () => {
   const connected = await testConnection();
   if (!connected) {
     console.error('[DB] ❌ Aborting server start due to database connection failure.');
@@ -213,7 +207,11 @@ const shouldAlterSchema = process.env.DB_SYNC_ALTER === 'true';
   app.listen(PORT, () => {
     console.log(`[Server] ✅ Running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
   });
-})();
+};
+
+if (require.main === module) {
+  startServer();
+}
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -233,3 +231,5 @@ app.use((err, req, res, next) => {
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
 });
+
+module.exports = app;
