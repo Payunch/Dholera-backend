@@ -109,13 +109,23 @@ router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: 'PDF file is required' });
     }
 
-    const pdfData = {
+    // Save relative path for local storage so static server can find it
+    let filePath = req.file.secure_url || req.file.path;
+    if (!isRemotePdfPath(filePath)) {
+      // Convert absolute path to relative for static serving
+      // req.file.path is usually .../uploads/pdfs/filename.pdf
+      // We want /uploads/pdfs/filename.pdf
+      const uploadsBase = path.resolve(__dirname, '..');
+      filePath = '/' + path.relative(uploadsBase, filePath).replace(/\\/g, '/');
+    }
+
+    const pdf = await PdfDocument.create({
       title: title.trim(),
       category: category ? category.trim() : 'General',
-      file_path: req.file.secure_url || req.file.path || `/uploads/${req.file.filename}`
-    };
+      file_path: filePath,
+      is_protected: true
+    });
 
-    const pdf = await PdfDocument.create(pdfData);
     res.status(201).json(pdf);
   } catch (err) {
     console.error('Error uploading PDF:', err);
@@ -240,7 +250,7 @@ router.get('/view/:id', async (req, res) => {
     }
 
     const uploadsDir = path.resolve(__dirname, '..', 'uploads');
-    const resolved = path.resolve(__dirname, '..', filePath);
+    const resolved = path.resolve(__dirname, '..', filePath.startsWith('/') ? filePath.substring(1) : filePath);
 
     if (!isPathInsideDir(uploadsDir, resolved)) {
       console.error('Attempted access outside uploads dir:', resolved);
