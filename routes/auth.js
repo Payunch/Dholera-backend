@@ -202,7 +202,12 @@ router.post('/login', loginLimiter, async (req, res) => {
         }
       });
 
-      res.json({ ok: true, username, mfaEnabled: isMfaEnabled() });
+      res.json({ 
+        ok: true, 
+        username, 
+        mfaEnabled: isMfaEnabled(),
+        token: tokens.accessToken // Added for mobile app compatibility
+      });
     });
   } else {
     const failure = registerLoginFailure(lockKey);
