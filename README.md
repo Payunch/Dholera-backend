@@ -63,3 +63,10 @@ The API will be available at `http://localhost:3000`.
 - Removed old `database.sqlite.sql` dumps.
 - Removed scratch files (`scratch_sync.js`, etc.).
 - Standardized project layout.
+
+## 🗺️ What was added to the Roadmaps
+
+	2. Backend API
+		 - Technical logic: Focus on MFA implementation, JWT refresh tokens, automated email alerts, and Sentry monitoring.
+		 - Scalability: Detailed the transition path to a production-grade database.
+

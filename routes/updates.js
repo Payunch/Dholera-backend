@@ -8,7 +8,7 @@ const upload = require('../middleware/upload');
 
 // GET all updates (Public, only published)
 router.get('/', async (req, res) => {
-  const { all } = req.query;
+  const { all, category } = req.query;
   const search = cleanText(req.query?.search, 120).replace(/[%_]/g, '');
   const where = {};
 
@@ -18,6 +18,10 @@ router.get('/', async (req, res) => {
       { content: { [Op.like]: `%${search}%` } },
       { category: { [Op.like]: `%${search}%` } }
     ];
+  }
+
+  if (category && category !== 'All') {
+    where.category = category;
   }
 
   if (all === 'true') {
