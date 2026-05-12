@@ -35,12 +35,13 @@ if (dialect === 'mysql') {
     `[DB] MySQL → ${process.env.DB_HOST || '127.0.0.1'}:3306 / ${process.env.DB_NAME || 'dholera'} (SSL: ${!sslDisabled})`
   );
 } else {
+  const storagePath = process.env.DATABASE_URL || path.join(__dirname, '../database.sqlite');
   sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: path.join(__dirname, '../database.sqlite'),
+    storage: storagePath,
     logging: false
   });
-  console.log('[DB] SQLite → database.sqlite');
+  console.log(`[DB] SQLite → ${storagePath}`);
 }
 
 /**
