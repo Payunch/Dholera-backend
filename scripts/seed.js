@@ -6,32 +6,27 @@ const seedData = async () => {
 
   // Real PDFs moved from frontend
   const pdfData = [
-    // DP Maps
-    { title: 'New DP Plan 2026', category: 'DP Maps', file_path: 'uploads/pdfs/New_DP.pdf' },
-    { title: 'Dholera DP Map - Zone Hath', category: 'DP Maps', file_path: 'uploads/pdfs/d.p zone hath and resurwey number ok-Model.pdf' },
-    { title: 'New Development Plan Layout', category: 'DP Maps', file_path: 'uploads/pdfs/DHOLERA New DP Plan-MAP.pdf' },
-    
-    // Naksha (TP Maps)
-    { title: 'TP 1A1 Final Naksha', category: 'Naksha', file_path: 'uploads/pdfs/TP 1A1_.pdf' },
-    { title: 'TP 1A2 Final Naksha', category: 'Naksha', file_path: 'uploads/pdfs/2___DHOLERA TP 1A2 FINAL.pdf' },
-    { title: 'TP 2B1 Naksha', category: 'Naksha', file_path: 'uploads/pdfs/TP.2B1 (1).pdf' },
-    { title: 'TP 2B-1 Layout', category: 'Naksha', file_path: 'uploads/pdfs/3____2b-1.pdf' },
-    { title: 'TP 2B-2 Layout', category: 'Naksha', file_path: 'uploads/pdfs/4____2B-2.pdf' },
-    { title: 'TP 2B3 Layout', category: 'Naksha', file_path: 'uploads/pdfs/5____2B3.pdf' },
-    { title: 'TP 3B 2021', category: 'Naksha', file_path: 'uploads/pdfs/7_______3B_2021.pdf' },
-    { title: 'TP 4B1 2024', category: 'Naksha', file_path: 'uploads/pdfs/TP 4B1 2024.pdf' },
-    { title: 'TP 4B-1 After TR', category: 'Naksha', file_path: 'uploads/pdfs/12       TP 4B-1_Aftfter TR final-portrai.pdf' },
-    { title: 'TP 4B-2 Layout', category: 'Naksha', file_path: 'uploads/pdfs/10_TP-4B_2.pdf' },
-    { title: 'TP 5 O.P. F.P.', category: 'Naksha', file_path: 'uploads/pdfs/T.P. - 5 O.P. - F.P.  (1).pdf' },
-    { title: 'TP 5A 2021', category: 'Naksha', file_path: 'uploads/pdfs/9_______5A_2021.pdf' },
-    { title: 'TP 5A After TR', category: 'Naksha', file_path: 'uploads/pdfs/14       TP5A ater TR final-Model.pdf' },
-    { title: 'TP 5B 2021', category: 'Naksha', file_path: 'uploads/pdfs/10_______5B_2021.pdf' },
-    { title: 'TP 6A 2021', category: 'Naksha', file_path: 'uploads/pdfs/11________6A_2021.pdf' },
-    
-    // Official PDFs (Paramarsh/Authority)
-    { title: 'TP 3A Authority Paramarsh', category: 'PDFs', file_path: 'uploads/pdfs/08        TP3A Authority Paramarsh before Avord sudhara (authority paramars-Layout1.pdf' },
-    { title: 'TP 3C-1 CTP TR Paramarsh', category: 'PDFs', file_path: 'uploads/pdfs/10        TP 3C-1 CTP TR  Paramarsh-Layout1.pdf' },
-    { title: 'Infrastructure Update April 2026', category: 'PDFs', file_path: 'uploads/pdfs/14-04-2026   150238.pdf' }
+    { title: 'New DP Plan 2026', category: 'DP Maps', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562836/DHOLERA_New_DP_Plan-MAP_ljwm9e.pdf' },
+    { title: 'Dholera DP Map - Zone Hath', category: 'DP Maps', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562842/d.p_zone_hath_and_resurwey_number_ok-Model_nq4zjv.pdf' },
+    { title: 'New Development Plan Layout', category: 'DP Maps', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562840/New_DP_aumanp.pdf' },
+    { title: 'TP 1A1 Final Naksha', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562838/TP_1A1__famaqj.pdf' },
+    { title: 'TP 1A2 Final Naksha', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562818/2___DHOLERA_TP_1A2_FINAL_nx7cni.pdf' },
+    { title: 'TP 2B1 Naksha', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562835/TP.2B1_1_bi8jzj.pdf' },
+    { title: 'TP 2B-1 Layout', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562819/3____2b-1_geydp4.pdf' },
+    { title: 'TP 2B-2 Layout', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562820/4____2B-2_gmf2xg.pdf' },
+    { title: 'TP 2B3 Layout', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562820/5____2B3_cekq5n.pdf' },
+    { title: 'TP 3B 2021', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562821/7_______3B_2021.pdf' },
+    { title: 'TP 4B1 2024', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562837/TP_4B1_2024_tzokyd.pdf' },
+    { title: 'TP 4B-1 After TR', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562829/12_TP_4B-1_Aftfter_TR_final-portrai_wbvxqi.pdf' },
+    { title: 'TP 4B-2 Layout', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562827/10_TP-4B_2_q0taco.pdf' },
+    { title: 'TP 5 O.P. F.P.', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562845/T.P._-_5_O.P._-_F.P._1_-mutool_zxrjwf.pdf' },
+    { title: 'TP 5A 2021', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562824/9_______5A_2021_gargeh.pdf' },
+    { title: 'TP 5A After TR', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562832/14_TP5A_ater_TR_final-Model_von3x4.pdf' },
+    { title: 'TP 5B 2021', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562825/10_______5B_2021_rhd2oe.pdf' },
+    { title: 'TP 6A 2021', category: 'Naksha', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562829/11________6A_2021_ukhfx9.pdf' },
+    { title: 'TP 3A Authority Paramarsh', category: 'PDFs', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562822/08_TP3A_Authority_Paramarsh_before_Avord_sudhara_authority_paramars-Layout1_ituq98.pdf' },
+    { title: 'TP 3C-1 CTP TR Paramarsh', category: 'PDFs', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562826/10_TP_3C-1_CTP_TR_Paramarsh-Layout1_vla2g4.pdf' },
+    { title: 'Infrastructure Update April 2026', category: 'PDFs', file_path: 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1778562830/14-04-2026_150238_f84p0d.pdf' }
   ];
 
   await PdfDocument.bulkCreate(pdfData);
