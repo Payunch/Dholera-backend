@@ -79,26 +79,38 @@ function loadGeneratedSeedData() {
 
 async function seedPdfsIfEmpty(PdfDocument) {
   try {
-    const count = await PdfDocument.count();
-    if (count > 0) {
-      console.log(`[Seed] PdfDocument table already has ${count} records. Skipping seed.`);
-      return;
-    }
-
+    const existingPdfs = await PdfDocument.findAll();
     const pdfsToSeed = loadGeneratedSeedData();
     const hasPlaceholders = pdfsToSeed.some((pdf) => pdf.file_path === PLACEHOLDER_VALUE);
 
     if (hasPlaceholders) {
-      console.warn('[Seed] PdfDocument table is empty but Cloudinary seed URLs are not ready yet.');
-      console.warn('[Seed] Run scripts/migrate_pdfs_to_cloudinary.js locally first.');
-      console.warn('[Seed] That script will generate scripts/cloudinary_pdfs.json automatically.');
+      console.warn('[Seed] Cloudinary seed URLs are not ready yet.');
       return;
     }
 
-    await PdfDocument.bulkCreate(pdfsToSeed);
-    console.log(`[Seed] Seeded ${pdfsToSeed.length} PDF records from Cloudinary URLs.`);
+    if (existingPdfs.length === 0) {
+      await PdfDocument.bulkCreate(pdfsToSeed);
+      console.log(`[Seed] Seeded ${pdfsToSeed.length} PDF records from Cloudinary URLs.`);
+    } else {
+      console.log(`[Seed] PdfDocument table has ${existingPdfs.length} records. Checking for local paths...`);
+      let updatedCount = 0;
+      
+      for (const target of pdfsToSeed) {
+        const record = existingPdfs.find(r => r.title === target.title);
+        if (record && !record.file_path.startsWith('http')) {
+          await record.update({ file_path: target.file_path });
+          updatedCount++;
+        }
+      }
+      
+      if (updatedCount > 0) {
+        console.log(`[Seed] Updated ${updatedCount} records from local paths to Cloudinary URLs.`);
+      } else {
+        console.log('[Seed] All existing records already use remote URLs.');
+      }
+    }
   } catch (err) {
-    console.error('[Seed] Failed to seed PDFs:', err.message);
+    console.error('[Seed] Failed to sync/seed PDFs:', err.message);
   }
 }
 
