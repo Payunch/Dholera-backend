@@ -61,7 +61,7 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
     console.log('POST /api/updates - body:', req.body);
     console.log('POST /api/updates - file:', req.file);
 
-    const { title, content, category, published } = req.body;
+    const { title, content, category, published, imageUrl } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -71,7 +71,8 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
       title: cleanText(title, 255),
       content: cleanText(content, 50000),
       category: cleanText(category, 100) || 'General',
-      published: published === 'true' || published === true || published === '1'
+      published: published === 'true' || published === true || published === '1',
+      imageUrl: cleanText(imageUrl, 500) || null
     };
 
     if (req.file) {

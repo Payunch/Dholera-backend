@@ -132,6 +132,12 @@ router.get('/', verifyToken, async (req, res) => {
     const source = cleanText(req.query?.source, 80);
     const search = cleanText(req.query?.search, 80).replace(/[%_]/g, '');
     const days = parsePositiveInt(req.query?.days, 0, 3650);
+    
+    // Pagination
+    const page = parsePositiveInt(req.query?.page, 1, 1000);
+    const limit = parsePositiveInt(req.query?.limit, 1, 100);
+    const offset = (page - 1) * limit;
+
     const where = {};
     
     if (status && ALLOWED_LEAD_STATUSES.has(status)) where.status = status;
@@ -149,13 +155,15 @@ router.get('/', verifyToken, async (req, res) => {
       ];
     }
 
-    const leads = await Lead.findAll({ 
+    const { count, rows: leads } = await Lead.findAndCountAll({ 
       where, 
       include: [{
         model: PdfView,
         include: [PdfDocument]
       }],
-      order: [['createdAt', 'DESC']] 
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
     });
 
     // Manually attach VisitorSession data for each lead based on fingerprint
@@ -170,10 +178,9 @@ router.get('/', verifyToken, async (req, res) => {
         plainLead.total_sessions = sessions.length;
         
         // Re-calculate total time spent including anonymous sessions
-        // Lead.timeSpent is now intended to only store authenticated engagement time
         plainLead.totalTimeSpent = (plainLead.timeSpent || 0) + sessions.reduce((acc, s) => acc + (s.timeSpent || 0), 0);
 
-        // Merge visited pages from Lead and all associated sessions for a complete journey pathway
+        // Merge visited pages from Lead and all associated sessions
         const sessionPages = sessions.flatMap((s) => safeJsonParse(s.visitedPages, []));
         const leadPages = safeJsonParse(plainLead.visited_pages, []);
         plainLead.visited_pages = JSON.stringify([...new Set([...leadPages, ...sessionPages])]);

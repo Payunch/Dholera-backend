@@ -5,7 +5,26 @@ const dialect = process.env.DB_DIALECT || 'sqlite';
 
 let sequelize;
 
-if (dialect === 'mysql') {
+if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+  // Production PostgreSQL (Railway/Render/etc)
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    logging: false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    },
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  });
+  console.log('[DB] PostgreSQL → Connection via DATABASE_URL');
+} else if (dialect === 'mysql') {
   const sslDisabled = process.env.DB_SSL === 'false' || process.env.DB_SSL === '0';
 
   sequelize = new Sequelize(
@@ -17,8 +36,6 @@ if (dialect === 'mysql') {
       dialect: 'mysql',
       logging: false,
       dialectOptions: {
-        // Disable SSL for local dev MySQL (required when MySQL requires SSL but
-        // does not have a proper cert configured)
         ssl: sslDisabled ? false : undefined,
         connectTimeout: 10000
       },
@@ -34,6 +51,24 @@ if (dialect === 'mysql') {
   console.log(
     `[DB] MySQL → ${process.env.DB_HOST || '127.0.0.1'}:3306 / ${process.env.DB_NAME || 'dholera'} (SSL: ${!sslDisabled})`
   );
+} else if (dialect === 'postgres') {
+  sequelize = new Sequelize(
+    process.env.DB_NAME || 'dholera',
+    process.env.DB_USER || 'postgres',
+    process.env.DB_PASS || '',
+    {
+      host: process.env.DB_HOST || '127.0.0.1',
+      dialect: 'postgres',
+      logging: false,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+      }
+    }
+  );
+  console.log(`[DB] PostgreSQL → ${process.env.DB_HOST || '127.0.0.1'}:5432 / ${process.env.DB_NAME || 'dholera'}`);
 } else {
   const storagePath = process.env.DATABASE_URL || path.join(__dirname, '../database.sqlite');
   sequelize = new Sequelize({
@@ -56,7 +91,7 @@ async function testConnection() {
   } catch (err) {
     console.error('[DB] ❌ Unable to connect to the database:');
     console.error('   ', err.message);
-    console.error('[DB] Check DB_HOST, DB_USER, DB_PASS, DB_NAME in backend/.env');
+    console.error('[DB] Check DATABASE_URL or DB_HOST, DB_USER, DB_PASS, DB_NAME in backend/.env');
     return false;
   }
 }

@@ -8,6 +8,8 @@ const { URL } = require('url');
 const { PdfDocument, PdfView, Lead } = require('../models');
 const { verifyAccessToken, getTokenFromRequest } = require('../services/adminSecurity');
 const { cloudinary } = require('../services/cloudinary');
+const { verifyToken } = require('./auth');
+const upload = require('../middleware/upload');
 
 const ALLOWED_REMOTE_PDF_HOSTS = new Set(['res.cloudinary.com']);
 
@@ -91,6 +93,33 @@ router.get('/list', async (req, res) => {
     res.json(pdfs);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST upload a new PDF (Admin)
+router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
+  try {
+    const { title, category } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'PDF file is required' });
+    }
+
+    const pdfData = {
+      title: title.trim(),
+      category: category ? category.trim() : 'General',
+      file_path: req.file.secure_url || req.file.path || `/uploads/${req.file.filename}`
+    };
+
+    const pdf = await PdfDocument.create(pdfData);
+    res.status(201).json(pdf);
+  } catch (err) {
+    console.error('Error uploading PDF:', err);
+    res.status(400).json({ error: err.message || 'Failed to upload PDF' });
   }
 });
 
