@@ -6,39 +6,31 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-const isGmail = (SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com')) && 
-                (!process.env.SMTP_PORT || SMTP_PORT === 587 || SMTP_PORT === 465);
+const isGmail = (SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com'));
 
-const transporterConfig = isGmail 
-  ? {
-      service: 'gmail',
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
-      },
-      // Force IPv4 for stability in cloud environments
-      family: 4 
-    }
-  : {
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_PORT === 465,
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
-      },
-      tls: {
-        // Essential for modern SMTP connections; avoid SSLv3
-        rejectUnauthorized: false
-      }
-    };
+// Use explicit configuration for better control on restricted networks like Railway
+const transporterConfig = {
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465, // Use SSL for port 465
+  auth: {
+    user: SMTP_USER,
+    pass: SMTP_PASS,
+  },
+  tls: {
+    // Essential for modern SMTP connections
+    rejectUnauthorized: false
+  },
+  // Force IPv4 for stability in cloud environments
+  family: 4 
+};
 
 const transporter = nodemailer.createTransport({
   ...transporterConfig,
-  pool: process.env.SMTP_POOL === 'true' || (isGmail && !process.env.SMTP_POOL), // Default pool true for Gmail
-  connectionTimeout: 15000, // Reduced from 45s for faster bypass
-  greetingTimeout: 15000,   // Reduced from 45s
-  socketTimeout: 15000,     // Reduced from 45s
+  pool: process.env.SMTP_POOL === 'true', // Disable pooling by default on Railway
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 15000,
 });
 
 // Diagnostic log
