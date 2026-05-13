@@ -1,27 +1,21 @@
 const nodemailer = require('nodemailer');
 
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
-const SMTP_USER = process.env.SMTP_USER; // Your Gmail email
-const SMTP_PASS = process.env.SMTP_PASS; // Your Gmail App Password
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-// For Gmail, the 'service' shorthand is usually best, but explicit config 
-// with 'family: 4' often fixes 'Connection timeout' in cloud environments (IPv6 issues).
 const isGmail = SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com');
 
 const transporterConfig = isGmail 
   ? {
       service: 'gmail',
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
-      // Force IPv4 as many cloud providers (like Railway) have unstable IPv6 routing
-      // which is a common cause of "Connection timeout".
+      // Force IPv4 for stability in cloud environments
       family: 4 
     }
   : {
@@ -33,15 +27,18 @@ const transporterConfig = isGmail
         pass: SMTP_PASS,
       },
       tls: {
+        // Essential for Port 587 connections
+        ciphers: 'SSLv3',
         rejectUnauthorized: false
       }
     };
 
 const transporter = nodemailer.createTransport({
   ...transporterConfig,
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 20000,
+  pool: true, // Use pooled connections for better performance
+  connectionTimeout: 45000,
+  greetingTimeout: 45000,
+  socketTimeout: 45000,
 });
 
 // Diagnostic log
