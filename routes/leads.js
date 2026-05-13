@@ -1016,6 +1016,29 @@ router.post('/verify-registration-otp', otpVerifyLimiter, async (req, res) => {
 
     const lead = await Lead.findOne({ where: { phone: localPhone } });
 
+    // --- BYPASS LOGIC ---
+    const isBypassEnabled = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
+    if (isBypassEnabled && otp === '123456') {
+      console.log(`[AuthBypass] Manually verifying lead: ${localPhone}`);
+      const verificationToken = crypto.randomBytes(24).toString('hex');
+      const verificationExpiry = new Date(Date.now() + PASSCODE_SETUP_TTL_MS);
+      
+      if (lead) {
+        await lead.update({
+          verified: true,
+          otp: hashSetupToken(verificationToken),
+          otp_expiry: verificationExpiry
+        });
+      }
+      
+      return res.json({
+        success: true,
+        verification_token: verificationToken,
+        message: 'Bypass active: Verification successful.'
+      });
+    }
+    // --- END BYPASS LOGIC ---
+
     if (!lead || !lead.otp || hashOtp(otp) !== lead.otp) {
       return res.status(400).json({ error: 'Invalid or expired OTP.' });
     }

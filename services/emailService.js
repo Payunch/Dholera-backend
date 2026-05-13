@@ -18,22 +18,25 @@ const transporterConfig = (SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes
   : {
       host: SMTP_HOST,
       port: SMTP_PORT,
-      secure: SMTP_PORT === 465,
+      secure: SMTP_PORT === 465, // True for 465, false for 587/25
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
+      tls: {
+        rejectUnauthorized: false // Helps with some cloud network restrictions
+      }
     };
 
 const transporter = nodemailer.createTransport({
   ...transporterConfig,
-  connectionTimeout: 20000, // Increased to 20 seconds
-  greetingTimeout: 20000,
-  socketTimeout: 30000,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 20000,
 });
 
 // Diagnostic log (runs on module load)
-console.log(`[EmailService] Initialized for ${SMTP_USER ? SMTP_USER : 'MISSING USER'}. Using ${transporterConfig.service ? 'Gmail service' : 'SMTP host ' + SMTP_HOST}`);
+console.log(`[EmailService] Initialized for ${SMTP_USER || 'MISSING USER'}. Port: ${SMTP_PORT}, Host: ${SMTP_HOST}`);
 
 /**
  * Send OTP Email to Lead
@@ -43,14 +46,15 @@ console.log(`[EmailService] Initialized for ${SMTP_USER ? SMTP_USER : 'MISSING U
  * @param {string} params.name - Lead name
  */
 async function sendOtpEmail({ email, otp, name }) {
+  // Always log the OTP to the console so the owner can find it in Railway logs if email fails
+  console.log(`[EmailService] >>> Verification code for ${email} (${name}) is: ${otp} <<<`);
+
   if (!SMTP_USER || !SMTP_PASS) {
-    console.warn('[EmailService] SMTP credentials missing. Skipping email.');
-    return { sent: false, error: 'SMTP credentials (USER/PASS) are not set in environment.' };
+    console.warn('[EmailService] SMTP credentials missing. Code logged to console above.');
+    return { sent: false, error: 'SMTP credentials not configured. Check server logs for the code.' };
   }
 
   try {
-    console.log(`[EmailService] Attempting to send OTP to ${email}...`);
-    
     const mailOptions = {
       from: `"Dholera Growth Evidence" <${SMTP_FROM}>`,
       to: email,
@@ -75,11 +79,14 @@ async function sendOtpEmail({ email, otp, name }) {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('[EmailService] OTP sent to %s: %s', email, info.messageId);
+    console.log('[EmailService] OTP sent successfully to %s', email);
     return { sent: true, messageId: info.messageId };
   } catch (error) {
-    console.error('[EmailService] Error sending email:', error);
-    return { sent: false, error: error.message };
+    console.error('[EmailService] SMTP Error:', error.message);
+    return { 
+      sent: false, 
+      error: `Connection issue (${error.message}). Please check server logs for your code.` 
+    };
   }
 }
 
