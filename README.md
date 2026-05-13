@@ -1,49 +1,72 @@
 # Dholera Backend API
 
-## Executive Summary
+Node.js/Express API for the Dholera platform. It powers authentication, leads, updates/blogs, analytics, exports, PDF access, WhatsApp activity, and platform settings.
 
-The **Dholera Backend** is a Node.js Express REST API that powers the entire Dholera Growth platform ecosystem. It manages authentication, lead data, infrastructure updates, document storage, and analytics for both the admin mobile app and web frontend.
+## Status
 
-**Current Status:**
-- ✅ Production-ready Node.js/Express server
-- ✅ SQLite database with Sequelize ORM
-- ✅ JWT authentication with session support
-- ✅ Cloudinary integration for document storage
-- ✅ Email and WhatsApp integration capabilities
-- ⚠️ PostgreSQL migration needed for production scalability
-- ⚠️ Redis caching layer recommended for high traffic
+- Production-ready Express server
+- Sequelize ORM with SQLite currently in use
+- JWT/session auth with CSRF protection
+- Real analytics summary and detailed analytics endpoints
+- Persistent updates/blogs stored in the database
+- Excel export for lead data
 
----
+## Core Endpoints
 
-## Platform Architecture
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/auth/csrf-token`
+- `GET /api/analytics`
+- `GET /api/analytics/detailed`
+- `GET /api/leads`
+- `GET /api/leads/export`
+- `POST /api/leads`
+- `GET /api/updates`
+- `POST /api/updates`
+- `DELETE /api/updates/:id`
+- `GET /api/settings`
+- `POST /api/settings`
 
-### Core Technology Stack
+## Environment
 
-| Layer | Technology | Purpose |
-|-------|-----------|----------|
-| **Runtime** | Node.js 20+ | JavaScript server runtime |
-| **Framework** | Express 5.x | RESTful API routing and middleware |
-| **ORM** | Sequelize 6.x | Database schema and queries |
-| **Database** | SQLite (dev) | Local development database |
-| **Auth** | JWT + bcrypt | Token-based authentication |
-| **Security** | Helmet, CORS, Rate Limit | Request security and protection |
-| **File Storage** | Cloudinary + Local | Document and image storage |
-| **Email** | Nodemailer | Transactional email delivery |
-| **Sessions** | express-session + Redis | Stateful session management |
-| **Logging** | Morgan | Request and error logging |
+```env
+PORT=3000
+NODE_ENV=production
+ALLOWED_ORIGINS=https://dholeraplatform.com,https://www.dholeraplatform.com,https://dholera-frontend-production.up.railway.app
+DATABASE_URL=./database.sqlite
+DB_SYNC_ALTER=true
+JWT_SECRET=your-secret
+SESSION_SECRET=your-session-secret
+ADMIN_USER=admin
+ADMIN_PASS=your-admin-password
+```
 
-### Core Responsibilities
+## Local Development
 
-1. **Authentication & Authorization**
-   - Admin login with JWT tokens
-   - CSRF protection for form submissions
-   - Session persistence across requests
-   - Role-based access control (RBAC)
+```bash
+cd Dholera-backend
+npm install
+npm start
+```
 
-2. **Lead Management**
-   - Lead creation and tracking
-   - Source attribution
-   - Engagement history
+## Verification Commands
+
+```bash
+curl http://localhost:3000/healthz
+curl "http://localhost:3000/api/analytics/detailed?start=2026-05-01&end=2026-05-13"
+```
+
+## Excel Export
+
+The export route is admin-protected and returns an `.xlsx` workbook with lead details, visitor sessions, and document views.
+
+## Operational Notes
+
+- Do not commit `database.sqlite`.
+- CSRF is required for admin login and protected mutations.
+- PostgreSQL migration is the next major backend infrastructure step.
+ Engagement history
    - Contact interaction logging
 
 3. **Infrastructure Updates (Blog)**
@@ -372,3 +395,71 @@ Dholera-backend/
 
 **Built with Node.js + Express | Managed by Dholera Backend Team | Last Updated: May 2026**
 
+# Dholera Backend API
+
+Node.js/Express API for the Dholera platform. It powers authentication, leads, updates/blogs, analytics, exports, PDF access, WhatsApp activity, and platform settings.
+
+## Status
+
+- Production-ready Express server
+- Sequelize ORM with SQLite currently in use
+- JWT/session auth with CSRF protection
+- Real analytics summary and detailed analytics endpoints
+- Persistent updates/blogs stored in the database
+- Excel export for lead data
+
+## Core Endpoints
+
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/auth/csrf-token`
+- `GET /api/analytics`
+- `GET /api/analytics/detailed`
+- `GET /api/leads`
+- `GET /api/leads/export`
+- `POST /api/leads`
+- `GET /api/updates`
+- `POST /api/updates`
+- `DELETE /api/updates/:id`
+- `GET /api/settings`
+- `POST /api/settings`
+
+## Environment
+
+```env
+PORT=3000
+NODE_ENV=production
+ALLOWED_ORIGINS=https://dholeraplatform.com,https://www.dholeraplatform.com,https://dholera-frontend-production.up.railway.app
+DATABASE_URL=./database.sqlite
+DB_SYNC_ALTER=true
+JWT_SECRET=your-secret
+SESSION_SECRET=your-session-secret
+ADMIN_USER=admin
+ADMIN_PASS=your-admin-password
+```
+
+## Local Development
+
+```bash
+cd Dholera-backend
+npm install
+npm start
+```
+
+## Verification Commands
+
+```bash
+curl http://localhost:3000/healthz
+curl "http://localhost:3000/api/analytics/detailed?start=2026-05-01&end=2026-05-13"
+```
+
+## Excel Export
+
+The export route is admin-protected and returns an `.xlsx` workbook with lead details, visitor sessions, and document views.
+
+## Operational Notes
+
+- Do not commit `database.sqlite`.
+- CSRF is required for admin login and protected mutations.
+- PostgreSQL migration is the next major backend infrastructure step.

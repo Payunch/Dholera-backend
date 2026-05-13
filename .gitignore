@@ -3,6 +3,9 @@ node_modules/
 .env.*
 !.env.example
 database.sqlite
+e2e_db.sqlite
+e2e_export_db.sqlite
+e2e_leads_export.xlsx
 public/uploads/*
 !public/uploads/.gitkeep
 .DS_Store

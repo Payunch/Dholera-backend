@@ -1,0 +1,35 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: ":memory:"
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:4173
+      JWT_SECRET: ci-test-secret
+      SESSION_SECRET: ci-test-session-secret
+      ADMIN_USER: admin
+      ADMIN_PASS: admin123
+      BYPASS_EMAIL_VERIFICATION: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
