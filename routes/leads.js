@@ -1137,6 +1137,7 @@ router.post('/setup-passcode', async (req, res) => {
 
     await lead.update({
       passcode: hashedPasscode,
+      passcode_raw: passcode,
       is_registered: true,
       lead_token: leadToken,
       otp: null,
