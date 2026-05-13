@@ -6,25 +6,34 @@ const SMTP_USER = process.env.SMTP_USER; // Your Gmail email
 const SMTP_PASS = process.env.SMTP_PASS; // Your Gmail App Password
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-// For Gmail, the 'service' shorthand is more reliable in cloud environments like Railway
-const transporterConfig = (SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com')) 
+// For Gmail, the 'service' shorthand is usually best, but explicit config 
+// with 'family: 4' often fixes 'Connection timeout' in cloud environments (IPv6 issues).
+const isGmail = SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com');
+
+const transporterConfig = isGmail 
   ? {
       service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
+      // Force IPv4 as many cloud providers (like Railway) have unstable IPv6 routing
+      // which is a common cause of "Connection timeout".
+      family: 4 
     }
   : {
       host: SMTP_HOST,
       port: SMTP_PORT,
-      secure: SMTP_PORT === 465, // True for 465, false for 587/25
+      secure: SMTP_PORT === 465,
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
       tls: {
-        rejectUnauthorized: false // Helps with some cloud network restrictions
+        rejectUnauthorized: false
       }
     };
 
@@ -35,8 +44,8 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 20000,
 });
 
-// Diagnostic log (runs on module load)
-console.log(`[EmailService] Initialized for ${SMTP_USER || 'MISSING USER'}. Port: ${SMTP_PORT}, Host: ${SMTP_HOST}`);
+// Diagnostic log
+console.log(`[EmailService] SMTP Initialized. Provider: ${isGmail ? 'Gmail' : SMTP_HOST}, User: ${SMTP_USER || 'MISSING'}`);
 
 /**
  * Send OTP Email to Lead
@@ -46,12 +55,11 @@ console.log(`[EmailService] Initialized for ${SMTP_USER || 'MISSING USER'}. Port
  * @param {string} params.name - Lead name
  */
 async function sendOtpEmail({ email, otp, name }) {
-  // Always log the OTP to the console so the owner can find it in Railway logs if email fails
-  console.log(`[EmailService] >>> Verification code for ${email} (${name}) is: ${otp} <<<`);
+  // Always log the OTP to the console so it's findable in Railway logs
+  console.log(`[EmailService] >>> Verification code for ${email} is: ${otp} <<<`);
 
   if (!SMTP_USER || !SMTP_PASS) {
-    console.warn('[EmailService] SMTP credentials missing. Code logged to console above.');
-    return { sent: false, error: 'SMTP credentials not configured. Check server logs for the code.' };
+    return { sent: false, error: 'SMTP credentials (USER/PASS) are missing.' };
   }
 
   try {
@@ -83,10 +91,7 @@ async function sendOtpEmail({ email, otp, name }) {
     return { sent: true, messageId: info.messageId };
   } catch (error) {
     console.error('[EmailService] SMTP Error:', error.message);
-    return { 
-      sent: false, 
-      error: `Connection issue (${error.message}). Please check server logs for your code.` 
-    };
+    return { sent: false, error: error.message };
   }
 }
 

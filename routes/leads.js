@@ -974,17 +974,18 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
       details: { email }
     });
 
-    const isBypassEnabled = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
-
     if (!emailResult.sent) {
+      // If real email fails, we check if bypass is explicitly enabled as a backup
+      const isBypassEnabled = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
       if (isBypassEnabled) {
         return res.json({ 
           success: true, 
-          message: 'Bypass active: Please enter 123456 to continue.' 
+          message: 'Email delivery delayed. Use test code 123456 to continue.' 
         });
       }
+
       return res.status(500).json({ 
-        error: `Failed to send verification email: ${emailResult.error || 'Unknown error'}. Please try again.` 
+        error: `Email delivery failed (${emailResult.error}). Please check your settings.` 
       });
     }
 
