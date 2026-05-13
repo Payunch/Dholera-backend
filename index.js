@@ -29,7 +29,7 @@ const allowedOrigins = originMatcher.allowedOrigins;
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 2000, // Increased from 500 to accommodate frequent tracking pings
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
