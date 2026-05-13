@@ -36,9 +36,9 @@ const transporterConfig = isGmail
 const transporter = nodemailer.createTransport({
   ...transporterConfig,
   pool: process.env.SMTP_POOL === 'true' || (isGmail && !process.env.SMTP_POOL), // Default pool true for Gmail
-  connectionTimeout: 45000,
-  greetingTimeout: 45000,
-  socketTimeout: 45000,
+  connectionTimeout: 15000, // Reduced from 45s for faster bypass
+  greetingTimeout: 15000,   // Reduced from 45s
+  socketTimeout: 15000,     // Reduced from 45s
 });
 
 // Diagnostic log
