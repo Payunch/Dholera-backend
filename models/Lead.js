@@ -70,6 +70,10 @@ const Lead = sequelize.define('Lead', {
     type: DataTypes.DATE,
     allowNull: true
   },
+  otp_raw: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   high_interest_whatsapp_notified_at: {
     type: DataTypes.DATE,
     allowNull: true

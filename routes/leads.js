@@ -408,6 +408,7 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
         name: name || lead.name,
         email: email || lead.email,
         otp: otpHash,
+        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint: browserFingerprint || lead.browserFingerprint
       });
@@ -418,6 +419,7 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
         email,
         source: 'OTP Verification',
         otp: otpHash,
+        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint,
         verified: false
@@ -944,6 +946,7 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
         name: name || lead.name,
         email: email || lead.email,
         otp: otpHash,
+        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint: browserFingerprint || lead.browserFingerprint
       });
@@ -954,6 +957,7 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
         email,
         source: 'Email Registration',
         otp: otpHash,
+        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint,
         verified: false,

@@ -158,6 +158,10 @@ const getBearerToken = (authHeader = '') => {
 const getTokenFromRequest = (req, cookieName, headerName = 'authorization') => {
   const headerToken = getBearerToken(req.headers?.[headerName] || '');
   if (headerToken) return headerToken;
+  
+  const queryToken = req.query?.token;
+  if (queryToken) return queryToken;
+
   return req.cookies?.[cookieName] || '';
 };
 

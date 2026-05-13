@@ -1,5 +1,6 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
+const fs = require('fs');
 
 const dialect = process.env.DB_DIALECT || 'sqlite';
 
@@ -70,7 +71,13 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   );
   console.log(`[DB] PostgreSQL → ${process.env.DB_HOST || '127.0.0.1'}:5432 / ${process.env.DB_NAME || 'dholera'}`);
 } else {
-  const storagePath = process.env.DATABASE_URL || path.join(__dirname, '../database.sqlite');
+  let storagePath = process.env.DATABASE_URL || path.join(__dirname, '../database.sqlite');
+  
+  if (fs.existsSync('/app/data')) {
+    storagePath = '/app/data/database.sqlite';
+    console.log(`[DB] Using persistent volume storage at ${storagePath}`);
+  }
+
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: storagePath,
