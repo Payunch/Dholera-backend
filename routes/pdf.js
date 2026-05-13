@@ -100,6 +100,9 @@ router.get('/list', async (req, res) => {
 router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
   try {
     const { title, category } = req.body;
+    const isProtected = req.body.is_protected === undefined
+      ? true
+      : ['true', true, '1', 1].includes(req.body.is_protected);
     
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -123,7 +126,7 @@ router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
       title: title.trim(),
       category: category ? category.trim() : 'General',
       file_path: filePath,
-      is_protected: true
+      is_protected: isProtected
     });
 
     res.status(201).json(pdf);

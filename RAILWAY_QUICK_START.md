@@ -44,7 +44,7 @@ In Railway Dashboard, go to **Variables** tab and add:
 NODE_ENV=production
 JWT_SECRET=<generate using: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
 SESSION_SECRET=<generate using: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
-ALLOWED_ORIGINS=<your-frontend-domain.com or https://localhost:3000 for testing>
+ALLOWED_ORIGINS=https://dholeraplatform.com,https://www.dholeraplatform.com,https://dholerafrontend.onrender.com,http://localhost:5173
 ```
 
 **Optional but Recommended**:

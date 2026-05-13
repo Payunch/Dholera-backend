@@ -5,6 +5,12 @@ const fs = require('fs');
 const dialect = process.env.DB_DIALECT || 'sqlite';
 
 let sequelize;
+let databaseInfo = {
+  mode: 'unknown',
+  source: 'unknown',
+  storagePath: null,
+  persistent: false
+};
 
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
   // Production PostgreSQL (Railway/Render/etc)
@@ -24,6 +30,12 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
       idle: 10000
     }
   });
+  databaseInfo = {
+    mode: 'postgresql',
+    source: 'DATABASE_URL',
+    storagePath: null,
+    persistent: true
+  };
   console.log('[DB] PostgreSQL → Connection via DATABASE_URL');
 } else if (dialect === 'mysql') {
   const sslDisabled = process.env.DB_SSL === 'false' || process.env.DB_SSL === '0';
@@ -48,6 +60,12 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
       }
     }
   );
+  databaseInfo = {
+    mode: 'mysql',
+    source: 'DB_DIALECT=mysql',
+    storagePath: null,
+    persistent: true
+  };
 
   console.log(
     `[DB] MySQL → ${process.env.DB_HOST || '127.0.0.1'}:3306 / ${process.env.DB_NAME || 'dholera'} (SSL: ${!sslDisabled})`
@@ -69,13 +87,28 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
       }
     }
   );
+  databaseInfo = {
+    mode: 'postgresql',
+    source: 'DB_DIALECT=postgres',
+    storagePath: null,
+    persistent: true
+  };
   console.log(`[DB] PostgreSQL → ${process.env.DB_HOST || '127.0.0.1'}:5432 / ${process.env.DB_NAME || 'dholera'}`);
 } else {
   let storagePath = process.env.DATABASE_URL || path.join(__dirname, '../database.sqlite');
-  
-  if (fs.existsSync('/app/data')) {
-    storagePath = '/app/data/database.sqlite';
+
+  const persistentCandidates = [
+    process.env.RAILWAY_VOLUME_MOUNT_PATH ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'database.sqlite') : null,
+    '/app/data/database.sqlite',
+    '/data/database.sqlite'
+  ].filter(Boolean);
+
+  const persistentStoragePath = persistentCandidates.find((candidate) => fs.existsSync(path.dirname(candidate)));
+  if (persistentStoragePath) {
+    storagePath = persistentStoragePath;
     console.log(`[DB] Using persistent volume storage at ${storagePath}`);
+  } else if (process.env.NODE_ENV === 'production') {
+    console.warn('[DB] Production is using SQLite without a persistent volume or DATABASE_URL. Redeploys will lose data.');
   }
 
   sequelize = new Sequelize({
@@ -83,6 +116,12 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
     storage: storagePath,
     logging: false
   });
+  databaseInfo = {
+    mode: 'sqlite',
+    source: persistentStoragePath ? 'persistent-volume' : 'local-fallback',
+    storagePath,
+    persistent: Boolean(persistentStoragePath)
+  };
   console.log(`[DB] SQLite → ${storagePath}`);
 }
 
@@ -105,3 +144,4 @@ async function testConnection() {
 
 module.exports = sequelize;
 module.exports.testConnection = testConnection;
+module.exports.getDatabaseInfo = () => databaseInfo;

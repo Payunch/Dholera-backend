@@ -112,6 +112,7 @@ Copy `.env.example` to `.env` and configure:
 
 ```env
 # Server
+# Local development only. Set `NODE_ENV=production` in Railway.
 NODE_ENV=development
 PORT=3000
 API_BASE_URL=http://localhost:3000

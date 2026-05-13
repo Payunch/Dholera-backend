@@ -40,8 +40,8 @@ Railway will detect the following variables. Set them in the Railway dashboard u
 | `SESSION_SECRET` | Same or different strong string | Session encryption; can match JWT_SECRET |
 | `ADMIN_JWT_SECRET` | `<random-32+ chars>` | Optional; overrides JWT_SECRET for admin auth if set |
 | `ADMIN_MFA_SECRET` | `<32-char base32>` | Optional; if set, enables 2FA for admin login (use authenticator app) |
-| `ALLOWED_ORIGINS` | `https://your-frontend-domain.com` | CORS whitelist; comma-separated for multiple |
-| `VITE_SITE_URL` | `https://your-frontend-domain.com` | Alias for ALLOWED_ORIGINS; either can be used |
+| `ALLOWED_ORIGINS` | `https://dholeraplatform.com,https://www.dholeraplatform.com,https://dholerafrontend.onrender.com,http://localhost:5173` | CORS whitelist; comma-separated for multiple |
+| `VITE_SITE_URL` | `https://dholeraplatform.com` | Canonical frontend URL; optional alias for the allowlist |
 | `PORT` | `3000` (auto-assigned by Railway) | Railway sets this automatically; leave unset |
 | `CLOUDINARY_URL` | `cloudinary://key:secret@cloudname` | **Optional**: If using Cloudinary for PDF/image storage |
 

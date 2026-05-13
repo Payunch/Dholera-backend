@@ -10,7 +10,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const { sequelize, PdfDocument } = require('./models');
-const { testConnection } = require('./config/database');
+const { testConnection, getDatabaseInfo } = require('./config/database');
 const { buildOriginMatcher } = require('./utils/originMatcher');
 const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
 
@@ -168,6 +168,7 @@ app.get('/healthz/runtime', (req, res) => {
     pid: process.pid,
     nodeEnv: process.env.NODE_ENV || 'development',
     configuredPort,
+    database: getDatabaseInfo(),
     allowedOrigins,
     exactAllowedOrigins: originMatcher.exactOrigins,
     wildcardAllowedOrigins: originMatcher.wildcardOrigins,
