@@ -93,6 +93,10 @@ async function sendOtpEmail({ email, otp, name }) {
         console.log('[EmailService] OTP sent successfully via Resend API');
         return { sent: true, messageId: data.id };
       } else {
+        // Special handling for Resend "onboarding" restriction
+        if (data.message && data.message.includes('testing emails')) {
+          console.warn('[EmailService] RESEND RESTRICTION: You must verify your domain to send to others. Using bypass.');
+        }
         throw new Error(data.message || 'Resend API Error');
       }
     } catch (apiError) {
