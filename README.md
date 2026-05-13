@@ -224,6 +224,10 @@ Dholera-backend/
 - `GET /api/auth/me` – Get current user info
 - `POST /api/auth/csrf-token` – Get CSRF token for forms
 
+### Analytics (Admin only)
+- `GET /api/analytics` – Get analytics summary
+- `GET /api/analytics/detailed` – Get detailed analytics with daily metrics, top days, and lead trend. Requires `start` and `end` query parameters (YYYY-MM-DD).
+
 ### Leads
 - `GET /api/leads` – List all leads (paginated)
 - `POST /api/leads` – Create new lead
