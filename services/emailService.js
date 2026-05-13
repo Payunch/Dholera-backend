@@ -1,21 +1,39 @@
 const nodemailer = require('nodemailer');
 
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true'; // false for 587, true for 465
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
 const SMTP_USER = process.env.SMTP_USER; // Your Gmail email
 const SMTP_PASS = process.env.SMTP_PASS; // Your Gmail App Password
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
+// For Gmail, the 'service' shorthand is more reliable in cloud environments like Railway
+const transporterConfig = (SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com')) 
+  ? {
+      service: 'gmail',
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    }
+  : {
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    };
+
 const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_SECURE,
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
+  ...transporterConfig,
+  connectionTimeout: 20000, // Increased to 20 seconds
+  greetingTimeout: 20000,
+  socketTimeout: 30000,
 });
+
+// Diagnostic log (runs on module load)
+console.log(`[EmailService] Initialized for ${SMTP_USER ? SMTP_USER : 'MISSING USER'}. Using ${transporterConfig.service ? 'Gmail service' : 'SMTP host ' + SMTP_HOST}`);
 
 /**
  * Send OTP Email to Lead
@@ -27,10 +45,12 @@ const transporter = nodemailer.createTransport({
 async function sendOtpEmail({ email, otp, name }) {
   if (!SMTP_USER || !SMTP_PASS) {
     console.warn('[EmailService] SMTP credentials missing. Skipping email.');
-    return { sent: false, error: 'SMTP credentials missing' };
+    return { sent: false, error: 'SMTP credentials (USER/PASS) are not set in environment.' };
   }
 
-  const mailOptions = {
+  try {
+    console.log(`[EmailService] Attempting to send OTP to ${email}...`);
+    const mailOptions = {
     from: `"Dholera Growth Evidence" <${SMTP_FROM}>`,
     to: email,
     subject: 'Your Verification Code - Dholera Platform',
