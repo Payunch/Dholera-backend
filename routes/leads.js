@@ -19,10 +19,13 @@ const { maybeNotifyHighInterestLead, isHighInterestLead } = require('../services
 const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('../utils/sanitize');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
+const PASSCODE_SETUP_TTL_MS = Number.parseInt(process.env.PASSCODE_SETUP_TTL_MS || `${10 * 60 * 1000}`, 10);
 const OTP_SEND_WINDOW_MS = Number.parseInt(process.env.OTP_SEND_WINDOW_MS || `${15 * 60 * 1000}`, 10);
 const OTP_SEND_MAX = Number.parseInt(process.env.OTP_SEND_MAX || '5', 10);
 const OTP_VERIFY_WINDOW_MS = Number.parseInt(process.env.OTP_VERIFY_WINDOW_MS || `${15 * 60 * 1000}`, 10);
 const OTP_VERIFY_MAX = Number.parseInt(process.env.OTP_VERIFY_MAX || '15', 10);
+const PASSCODE_LOGIN_WINDOW_MS = Number.parseInt(process.env.PASSCODE_LOGIN_WINDOW_MS || `${15 * 60 * 1000}`, 10);
+const PASSCODE_LOGIN_MAX = Number.parseInt(process.env.PASSCODE_LOGIN_MAX || '10', 10);
 
 const otpSendLimiter = rateLimit({
   windowMs: OTP_SEND_WINDOW_MS,
@@ -40,7 +43,16 @@ const otpVerifyLimiter = rateLimit({
   message: { error: 'Too many verification attempts. Please wait and try again.' }
 });
 
+const passcodeLoginLimiter = rateLimit({
+  windowMs: PASSCODE_LOGIN_WINDOW_MS,
+  max: PASSCODE_LOGIN_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please wait and try again.' }
+});
+
 const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
+const hashSetupToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 const isValidPhone = (phone) => /^[6-9]\d{9}$/.test(phone);
 const ALLOWED_LEAD_STATUSES = new Set(['New', 'Contacted', 'Converted', 'Follow-up', 'Not Interested', 'Closed']);
 
@@ -998,14 +1010,23 @@ router.post('/verify-registration-otp', otpVerifyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'OTP has expired.' });
     }
 
-    // Mark as verified but not yet registered (still need passcode)
+    const verificationToken = crypto.randomBytes(24).toString('hex');
+    const verificationExpiry = new Date(Date.now() + PASSCODE_SETUP_TTL_MS);
+
+    // Replace the OTP with a short-lived setup token. The frontend must
+    // present this token when creating the passcode, which prevents
+    // unauthenticated passcode resets on any verified lead.
     await lead.update({
       verified: true,
-      otp: null,
-      otp_expiry: null
+      otp: hashSetupToken(verificationToken),
+      otp_expiry: verificationExpiry
     });
 
-    res.json({ success: true, message: 'Email verified. Please set your 6-digit passcode.' });
+    res.json({
+      success: true,
+      verification_token: verificationToken,
+      message: 'Email verified. Please set your 6-digit passcode.'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1016,19 +1037,32 @@ router.post('/setup-passcode', async (req, res) => {
   try {
     const phone = cleanText(req.body?.phone, 20);
     const passcode = cleanText(req.body?.passcode, 6);
+    const verificationToken = cleanText(req.body?.verificationToken, 80);
 
     const normalizedPhone = normalizePhone(phone);
     const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
       ? normalizedPhone.slice(2)
       : normalizedPhone;
 
-    if (!localPhone || !/^\d{6}$/.test(passcode)) {
-      return res.status(400).json({ error: '6-digit passcode is required.' });
+    if (!localPhone || !/^\d{6}$/.test(passcode) || !verificationToken) {
+      return res.status(400).json({ error: 'Verification token and 6-digit passcode are required.' });
     }
 
     const lead = await Lead.findOne({ where: { phone: localPhone, verified: true } });
     if (!lead) {
       return res.status(403).json({ error: 'Verification required before setting passcode.' });
+    }
+
+    if (lead.is_registered && lead.passcode) {
+      return res.status(409).json({ error: 'User already registered. Please login.' });
+    }
+
+    if (!lead.otp || hashSetupToken(verificationToken) !== lead.otp) {
+      return res.status(403).json({ error: 'Verification expired. Please request a new OTP.' });
+    }
+
+    if (!lead.otp_expiry || new Date() > lead.otp_expiry) {
+      return res.status(403).json({ error: 'Verification expired. Please request a new OTP.' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -1038,7 +1072,9 @@ router.post('/setup-passcode', async (req, res) => {
     await lead.update({
       passcode: hashedPasscode,
       is_registered: true,
-      lead_token: leadToken
+      lead_token: leadToken,
+      otp: null,
+      otp_expiry: null
     });
 
     await logAuditEvent({
@@ -1061,7 +1097,7 @@ router.post('/setup-passcode', async (req, res) => {
 });
 
 // 4. Login with Passcode
-router.post('/login-with-passcode', async (req, res) => {
+router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
   try {
     const phone = cleanText(req.body?.phone, 20);
     const passcode = cleanText(req.body?.passcode, 6);
