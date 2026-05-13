@@ -6,7 +6,8 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-const isGmail = SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com');
+const isGmail = (SMTP_HOST.includes('gmail.com') || SMTP_HOST.includes('googlemail.com')) && 
+                (!process.env.SMTP_PORT || SMTP_PORT === 587 || SMTP_PORT === 465);
 
 const transporterConfig = isGmail 
   ? {
@@ -27,15 +28,14 @@ const transporterConfig = isGmail
         pass: SMTP_PASS,
       },
       tls: {
-        // Essential for Port 587 connections
-        ciphers: 'SSLv3',
+        // Essential for modern SMTP connections; avoid SSLv3
         rejectUnauthorized: false
       }
     };
 
 const transporter = nodemailer.createTransport({
   ...transporterConfig,
-  pool: true, // Use pooled connections for better performance
+  pool: process.env.SMTP_POOL === 'true' || (isGmail && !process.env.SMTP_POOL), // Default pool true for Gmail
   connectionTimeout: 45000,
   greetingTimeout: 45000,
   socketTimeout: 45000,
@@ -87,7 +87,13 @@ async function sendOtpEmail({ email, otp, name }) {
     console.log('[EmailService] OTP sent successfully to %s', email);
     return { sent: true, messageId: info.messageId };
   } catch (error) {
-    console.error('[EmailService] SMTP Error:', error.message);
+    console.error('[EmailService] SMTP Error:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      stack: error.stack
+    });
     return { sent: false, error: error.message };
   }
 }

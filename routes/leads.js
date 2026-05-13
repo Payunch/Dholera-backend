@@ -982,6 +982,13 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
       // If real email fails, we check if bypass is explicitly enabled as a backup
       const isBypassEnabled = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
       if (isBypassEnabled) {
+        // CRITICAL: Update the lead with the bypass OTP so it can actually be verified
+        const bypassOtp = '123456';
+        await lead.update({
+          otp: hashOtp(bypassOtp),
+          otp_raw: bypassOtp
+        });
+
         return res.json({ 
           success: true, 
           message: 'Email delivery delayed. Use test code 123456 to continue.' 
