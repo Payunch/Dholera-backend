@@ -8,13 +8,16 @@ const { cloudinary, hasCloudinaryConfig } = require('../services/cloudinary');
  */
 const cloudinaryStorage = {
   _handleFile(req, file, cb) {
-    const isPdf = file.mimetype === 'application/pdf';
+    const isPdf = file.mimetype === 'application/pdf' || 
+                 path.extname(file.originalname).toLowerCase() === '.pdf';
+    
     const folder = isPdf 
       ? (process.env.CLOUDINARY_PDF_FOLDER || 'dholera/pdfs')
       : (process.env.CLOUDINARY_IMAGE_FOLDER || 'dholera/images');
     
-    // For PDFs, Cloudinary works best with 'raw' or 'auto'
-    const resourceType = isPdf ? 'raw' : 'image';
+    // Using 'auto' allows Cloudinary to detect the type (image, raw, video)
+    // and is generally more robust for different file types.
+    const resourceType = 'auto';
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -26,6 +29,7 @@ const cloudinaryStorage = {
       },
       (error, result) => {
         if (error) {
+          console.error('[Cloudinary Upload Error]', error);
           cb(error);
           return;
         }
@@ -38,7 +42,7 @@ const cloudinaryStorage = {
           public_id: result.public_id,
           format: result.format,
           secure_url: result.secure_url,
-          resource_type: resourceType
+          resource_type: result.resource_type || resourceType
         });
       }
     );
@@ -49,7 +53,8 @@ const cloudinaryStorage = {
 
   _removeFile(req, file, cb) {
     if (file?.public_id) {
-      const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'image';
+      // Use stored resource_type if available, otherwise fallback to auto
+      const resourceType = file.resource_type || 'auto';
       cloudinary.uploader.destroy(file.public_id, { resource_type: resourceType }).finally(() => cb(null));
       return;
     }
@@ -62,7 +67,8 @@ const cloudinaryStorage = {
  */
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const isPdf = file.mimetype === 'application/pdf';
+    const isPdf = file.mimetype === 'application/pdf' || 
+                 path.extname(file.originalname).toLowerCase() === '.pdf';
     const subDir = isPdf ? 'pdfs' : 'images';
     const uploadDir = path.join(__dirname, '../uploads', subDir);
     
@@ -79,11 +85,16 @@ const diskStorage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'application/pdf'];
+  const ext = path.extname(file.originalname).toLowerCase();
   
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
+  } else if ((file.mimetype === 'application/octet-stream' || !file.mimetype) && 
+             (['.pdf', '.jpg', '.jpeg', '.png', '.webp'].includes(ext))) {
+    // Allow common extensions if mimetype is missing or generic (common in mobile uploads)
+    cb(null, true);
   } else {
-    cb(new Error(`Invalid file type: ${file.mimetype}. Only images and PDFs are allowed!`), false);
+    cb(new Error(`Invalid file type: ${file.mimetype || 'unknown'}. Only images and PDFs are allowed!`), false);
   }
 };
 

@@ -85,6 +85,14 @@ const Lead = sequelize.define('Lead', {
   last_whatsapp_sent: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  passcode: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  is_registered: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 });
 

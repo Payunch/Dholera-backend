@@ -4,8 +4,10 @@ const { Lead, VisitorSession, PdfView, PdfDocument } = require('../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const { verifyToken } = require('./auth');
+const { sendOtpEmail } = require('../services/emailService');
 const { 
   sendOtpOnWhatsapp, 
   normalizePhone, 
@@ -886,6 +888,232 @@ router.post('/:id/whatsapp-log', verifyToken, async (req, res) => {
     });
 
     res.json({ success: true, log });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- NEW AUTH FLOW ROUTES ---
+
+// 1. Onboard / Request OTP
+router.post('/register-request', otpSendLimiter, async (req, res) => {
+  try {
+    const name = cleanText(req.body?.name, 120);
+    const email = cleanEmail(req.body?.email);
+    const phone = cleanText(req.body?.phone, 20);
+    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!name || !email || !localPhone) {
+      return res.status(400).json({ error: 'Name, Email and Phone are required.' });
+    }
+
+    if (!isValidPhone(localPhone)) {
+      return res.status(400).json({ error: 'Invalid 10-digit mobile number.' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + OTP_TTL_MS);
+    const otpHash = hashOtp(otp);
+
+    let lead = await Lead.findOne({ where: { phone: localPhone } });
+
+    if (lead) {
+      // If already registered and has passcode, suggest login instead
+      if (lead.is_registered && lead.passcode) {
+        return res.status(409).json({ error: 'User already registered. Please login.', alreadyRegistered: true });
+      }
+
+      await lead.update({ 
+        name: name || lead.name,
+        email: email || lead.email,
+        otp: otpHash,
+        otp_expiry: expiry,
+        browserFingerprint: browserFingerprint || lead.browserFingerprint
+      });
+    } else {
+      lead = await Lead.create({
+        name,
+        phone: localPhone,
+        email,
+        source: 'Email Registration',
+        otp: otpHash,
+        otp_expiry: expiry,
+        browserFingerprint,
+        verified: false,
+        is_registered: false
+      });
+    }
+
+    // Send Email OTP
+    const emailResult = await sendOtpEmail({ email, otp, name });
+
+    await logAuditEvent({
+      eventType: 'lead.email_otp.send.success',
+      actorType: 'lead',
+      actorId: localPhone,
+      success: emailResult.sent,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { email }
+    });
+
+    if (!emailResult.sent) {
+      return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
+    }
+
+    res.json({ success: true, message: 'Verification code sent to your email.' });
+  } catch (err) {
+    console.error('Register request error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Verify Registration OTP
+router.post('/verify-registration-otp', otpVerifyLimiter, async (req, res) => {
+  try {
+    const otp = cleanText(req.body?.otp, 10);
+    const phone = cleanText(req.body?.phone, 20);
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!localPhone || !/^\d{6}$/.test(String(otp || ''))) {
+      return res.status(400).json({ error: 'Invalid phone or OTP format.' });
+    }
+
+    const lead = await Lead.findOne({ where: { phone: localPhone } });
+
+    if (!lead || !lead.otp || hashOtp(otp) !== lead.otp) {
+      return res.status(400).json({ error: 'Invalid or expired OTP.' });
+    }
+
+    if (new Date() > lead.otp_expiry) {
+      return res.status(400).json({ error: 'OTP has expired.' });
+    }
+
+    // Mark as verified but not yet registered (still need passcode)
+    await lead.update({
+      verified: true,
+      otp: null,
+      otp_expiry: null
+    });
+
+    res.json({ success: true, message: 'Email verified. Please set your 6-digit passcode.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Setup Passcode
+router.post('/setup-passcode', async (req, res) => {
+  try {
+    const phone = cleanText(req.body?.phone, 20);
+    const passcode = cleanText(req.body?.passcode, 6);
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!localPhone || !/^\d{6}$/.test(passcode)) {
+      return res.status(400).json({ error: '6-digit passcode is required.' });
+    }
+
+    const lead = await Lead.findOne({ where: { phone: localPhone, verified: true } });
+    if (!lead) {
+      return res.status(403).json({ error: 'Verification required before setting passcode.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPasscode = await bcrypt.hash(passcode, salt);
+    const leadToken = crypto.randomBytes(16).toString('hex');
+
+    await lead.update({
+      passcode: hashedPasscode,
+      is_registered: true,
+      lead_token: leadToken
+    });
+
+    await logAuditEvent({
+      eventType: 'lead.passcode.setup',
+      actorType: 'lead',
+      actorId: localPhone,
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
+    res.json({ 
+      success: true, 
+      lead_token: leadToken,
+      lead: { name: lead.name, email: lead.email, phone: lead.phone } 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Login with Passcode
+router.post('/login-with-passcode', async (req, res) => {
+  try {
+    const phone = cleanText(req.body?.phone, 20);
+    const passcode = cleanText(req.body?.passcode, 6);
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!localPhone || !passcode) {
+      return res.status(400).json({ error: 'Phone and passcode are required.' });
+    }
+
+    const lead = await Lead.findOne({ where: { phone: localPhone, is_registered: true } });
+    if (!lead || !lead.passcode) {
+      return res.status(401).json({ error: 'Invalid credentials or user not registered.' });
+    }
+
+    const isMatch = await bcrypt.compare(passcode, lead.passcode);
+    if (!isMatch) {
+      await logAuditEvent({
+        eventType: 'lead.login.failed',
+        actorType: 'lead',
+        actorId: localPhone,
+        success: false,
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+      return res.status(401).json({ error: 'Invalid passcode.' });
+    }
+
+    const leadToken = crypto.randomBytes(16).toString('hex');
+    await lead.update({ 
+      lead_token: leadToken,
+      visit_count: lead.visit_count + 1,
+      returning_visitor: true
+    });
+
+    await logAuditEvent({
+      eventType: 'lead.login.success',
+      actorType: 'lead',
+      actorId: localPhone,
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
+    res.json({ 
+      success: true, 
+      lead_token: leadToken, 
+      lead: { name: lead.name, email: lead.email, phone: lead.phone } 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
