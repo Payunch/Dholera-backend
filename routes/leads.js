@@ -975,12 +975,26 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
     });
 
     if (!emailResult.sent) {
-      return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
+      return res.status(500).json({ 
+        error: `Failed to send verification email: ${emailResult.error || 'Unknown error'}. Please try again.` 
+      });
     }
 
     res.json({ success: true, message: 'Verification code sent to your email.' });
   } catch (err) {
     console.error('Register request error:', err);
+    await logAuditEvent({
+      eventType: 'lead.register_request.failed',
+      actorType: 'lead',
+      success: false,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { 
+        reason: 'exception', 
+        message: err.message,
+        stack: err.stack?.slice(0, 500)
+      }
+    });
     res.status(500).json({ error: err.message });
   }
 });
@@ -1028,6 +1042,15 @@ router.post('/verify-registration-otp', otpVerifyLimiter, async (req, res) => {
       message: 'Email verified. Please set your 6-digit passcode.'
     });
   } catch (err) {
+    console.error('Verify registration OTP error:', err);
+    await logAuditEvent({
+      eventType: 'lead.verify_registration_otp.failed',
+      actorType: 'lead',
+      success: false,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { reason: 'exception', message: err.message }
+    });
     res.status(500).json({ error: err.message });
   }
 });
@@ -1092,6 +1115,15 @@ router.post('/setup-passcode', async (req, res) => {
       lead: { name: lead.name, email: lead.email, phone: lead.phone } 
     });
   } catch (err) {
+    console.error('Setup passcode error:', err);
+    await logAuditEvent({
+      eventType: 'lead.setup_passcode.failed',
+      actorType: 'lead',
+      success: false,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { reason: 'exception', message: err.message }
+    });
     res.status(500).json({ error: err.message });
   }
 });
@@ -1151,6 +1183,15 @@ router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
       lead: { name: lead.name, email: lead.email, phone: lead.phone } 
     });
   } catch (err) {
+    console.error('Login with passcode error:', err);
+    await logAuditEvent({
+      eventType: 'lead.login_with_passcode.failed',
+      actorType: 'lead',
+      success: false,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { reason: 'exception', message: err.message }
+    });
     res.status(500).json({ error: err.message });
   }
 });
