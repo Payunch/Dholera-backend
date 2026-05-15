@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Lead, Update, VisitorSession, sequelize } = require('../models');
+const { Lead, Update, VisitorSession, PdfDocument, UserSession, sequelize } = require('../models');
 const { verifyToken } = require('./auth');
 const { Op } = require('sequelize');
+const ExcelJS = require('exceljs');
 
 // GET analytics data summary (Admin)
 router.get('/', verifyToken, async (req, res) => {
@@ -186,9 +187,6 @@ router.get('/detailed', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to generate detailed analytics' });
   }
 });
-
-const { Update, PdfDocument, UserSession } = require('../models');
-const ExcelJS = require('exceljs');
 
 // GET separate export for User Sessions
 router.get('/export/sessions', verifyToken, async (req, res) => {

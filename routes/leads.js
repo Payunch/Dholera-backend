@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Lead, VisitorSession, PdfView, PdfDocument } = require('../models');
+const { Lead, VisitorSession, PdfView, PdfDocument, Update, UserSession, Setting, AuditLog } = require('../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const crypto = require('crypto');
@@ -1354,8 +1354,6 @@ router.put('/:id/read', verifyToken, async (req, res) => {
 // GET full system backup (JSON)
 router.get('/system/backup', verifyToken, async (req, res) => {
   try {
-    const { Update, UserSession, PdfDocument, Setting, AuditLog } = require('../models');
-    
     const data = {
       leads: await Lead.findAll(),
       updates: await Update.findAll(),
@@ -1379,7 +1377,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     
     const data = JSON.parse(req.file.buffer.toString());
-    const { Update, UserSession, PdfDocument, Setting, AuditLog } = require('../models');
     
     const results = {
       leads: { created: 0, updated: 0 },
