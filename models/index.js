@@ -8,6 +8,7 @@ const PdfView = require('./PdfView');
 const AuditLog = require('./AuditLog');
 const WhatsAppLog = require('./WhatsAppLog');
 const Setting = require('./Setting');
+const UserSession = require('./UserSession');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -29,5 +30,6 @@ module.exports = {
   PdfView,
   AuditLog,
   WhatsAppLog,
-  Setting
+  Setting,
+  UserSession
 };

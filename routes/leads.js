@@ -17,6 +17,8 @@ const {
 const { logAuditEvent } = require('../services/auditLogger');
 const { maybeNotifyHighInterestLead, isHighInterestLead } = require('../services/leadNotifications');
 const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('../utils/sanitize');
+const multer = require('multer');
+const memoryUpload = multer({ storage: multer.memoryStorage() });
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const PASSCODE_SETUP_TTL_MS = Number.parseInt(process.env.PASSCODE_SETUP_TTL_MS || `${10 * 60 * 1000}`, 10);
@@ -655,6 +657,7 @@ router.get('/export', verifyToken, async (req, res) => {
     const worksheet = workbook.addWorksheet('Leads');
     const sessionsSheet = workbook.addWorksheet('Visitor Sessions');
     const viewsSheet = workbook.addWorksheet('Document Views');
+    const updatesSheet = workbook.addWorksheet('Property Updates');
 
     worksheet.columns = [
       { header: 'Name', key: 'name', width: 20 },
@@ -688,6 +691,15 @@ router.get('/export', verifyToken, async (req, res) => {
       { header: 'Category', key: 'category', width: 18 },
       { header: 'Viewed At', key: 'viewedAt', width: 20 },
       { header: 'Time Spent (s)', key: 'timeSpent', width: 15 }
+    ];
+
+    updatesSheet.columns = [
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Category', key: 'category', width: 15 },
+      { header: 'Content', key: 'content', width: 50 },
+      { header: 'Image URL', key: 'imageUrl', width: 30 },
+      { header: 'Published', key: 'published', width: 10 },
+      { header: 'Created At', key: 'createdAt', width: 20 }
     ];
 
     for (const lead of leads) {
@@ -730,6 +742,20 @@ router.get('/export', verifyToken, async (req, res) => {
         });
       });
     }
+
+    // Add updates to sheet
+    const { Update } = require('../models');
+    const updates = await Update.findAll({ order: [['createdAt', 'DESC']] });
+    updates.forEach((update) => {
+      updatesSheet.addRow({
+        title: update.title,
+        category: update.category,
+        content: update.content,
+        imageUrl: update.imageUrl,
+        published: update.published ? 'Yes' : 'No',
+        createdAt: new Date(update.createdAt).toLocaleString()
+      });
+    });
     
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=' + 'leads_export.xlsx');
@@ -1236,6 +1262,201 @@ router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
       userAgent: req.headers['user-agent'],
       details: { reason: 'exception', message: err.message }
     });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST import leads from Excel (Admin)
+router.post('/import', verifyToken, memoryUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const worksheet = workbook.getWorksheet(1); // Get first worksheet
+    
+    const leadsToCreate = [];
+    const summary = { total: 0, created: 0, updated: 0, failed: 0 };
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header
+
+      const name = cleanText(row.getCell(1).value, 120);
+      const phone = cleanText(row.getCell(2).value, 20);
+      const email = cleanEmail(row.getCell(3).value);
+      const status = cleanText(row.getCell(4).value, 40);
+
+      const normalizedPhone = normalizePhone(phone);
+      const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+        ? normalizedPhone.slice(2)
+        : normalizedPhone;
+
+      if (name && isValidPhone(localPhone)) {
+        leadsToCreate.push({
+          name,
+          phone: localPhone,
+          email,
+          status: ALLOWED_LEAD_STATUSES.has(status) ? status : 'New',
+          source: 'Import'
+        });
+        summary.total++;
+      } else {
+        summary.failed++;
+      }
+    });
+
+    for (const leadData of leadsToCreate) {
+      const [lead, created] = await Lead.findOrCreate({
+        where: { phone: leadData.phone },
+        defaults: leadData
+      });
+
+      if (!created) {
+        await lead.update(leadData);
+        summary.updated++;
+      } else {
+        summary.created++;
+      }
+    }
+
+    await logAuditEvent({
+      eventType: 'leads.imported',
+      actorType: 'admin',
+      actorId: req.user?.username || 'admin',
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: summary
+    });
+
+    res.json({ success: true, summary });
+  } catch (err) {
+    console.error('Import error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT mark lead as read
+router.put('/:id/read', verifyToken, async (req, res) => {
+  try {
+    const lead = await Lead.findByPk(req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    
+    await lead.update({ isRead: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET full system backup (JSON)
+router.get('/system/backup', verifyToken, async (req, res) => {
+  try {
+    const { Update, UserSession, PdfDocument, Setting, AuditLog } = require('../models');
+    
+    const data = {
+      leads: await Lead.findAll(),
+      updates: await Update.findAll(),
+      sessions: await UserSession.findAll(),
+      pdfs: await PdfDocument.findAll(),
+      settings: await Setting.findAll(),
+      auditLogs: await AuditLog.findAll()
+    };
+    
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=' + 'dholera_full_backup.json');
+    res.send(JSON.stringify(data, null, 2));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST restore from backup
+router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    
+    const data = JSON.parse(req.file.buffer.toString());
+    const { Update, UserSession, PdfDocument, Setting, AuditLog } = require('../models');
+    
+    const results = {
+      leads: { created: 0, updated: 0 },
+      updates: { created: 0, updated: 0 },
+      sessions: { created: 0 },
+      pdfs: { created: 0, updated: 0 }
+    };
+
+    // Restore Leads (Deduplicate by phone)
+    if (data.leads) {
+      for (const item of data.leads) {
+        const [obj, created] = await Lead.findOrCreate({
+          where: { phone: item.phone },
+          defaults: item
+        });
+        if (!created) {
+          await obj.update(item);
+          results.leads.updated++;
+        } else {
+          results.leads.created++;
+        }
+      }
+    }
+
+    // Restore Updates (Deduplicate by title)
+    if (data.updates) {
+      for (const item of data.updates) {
+        const [obj, created] = await Update.findOrCreate({
+          where: { title: item.title },
+          defaults: item
+        });
+        if (!created) {
+          await obj.update(item);
+          results.updates.updated++;
+        } else {
+          results.updates.created++;
+        }
+      }
+    }
+
+    // Restore PDFs (Deduplicate by title)
+    if (data.pdfs) {
+      for (const item of data.pdfs) {
+        const [obj, created] = await PdfDocument.findOrCreate({
+          where: { title: item.title },
+          defaults: item
+        });
+        if (!created) {
+          await obj.update(item);
+          results.pdfs.updated++;
+        } else {
+          results.pdfs.created++;
+        }
+      }
+    }
+
+    // Restore Sessions (Add all)
+    if (data.sessions) {
+      for (const item of data.sessions) {
+        await UserSession.create(item);
+        results.sessions.created++;
+      }
+    }
+
+    await logAuditEvent({
+      eventType: 'system.restore',
+      actorType: 'admin',
+      actorId: req.user?.username || 'admin',
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: results
+    });
+
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error('Restore error:', err);
     res.status(500).json({ error: err.message });
   }
 });

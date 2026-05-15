@@ -101,6 +101,10 @@ const Lead = sequelize.define('Lead', {
   is_registered: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  isRead: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 });
 

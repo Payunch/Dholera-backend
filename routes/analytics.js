@@ -187,4 +187,99 @@ router.get('/detailed', verifyToken, async (req, res) => {
   }
 });
 
+const { Update, PdfDocument, UserSession } = require('../models');
+const ExcelJS = require('exceljs');
+
+// GET separate export for User Sessions
+router.get('/export/sessions', verifyToken, async (req, res) => {
+  try {
+    const sessions = await UserSession.findAll({ order: [['loginAt', 'DESC']] });
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('User Sessions');
+    
+    sheet.columns = [
+      { header: 'Username', key: 'username', width: 20 },
+      { header: 'Login At', key: 'loginAt', width: 25 },
+      { header: 'Logout At', key: 'logoutAt', width: 25 },
+      { header: 'Duration (s)', key: 'duration', width: 15 },
+      { header: 'IP', key: 'ip', width: 15 }
+    ];
+
+    sessions.forEach(s => sheet.addRow({
+      username: s.username,
+      loginAt: s.loginAt.toLocaleString(),
+      logoutAt: s.logoutAt ? s.logoutAt.toLocaleString() : 'Active',
+      duration: s.duration,
+      ip: s.ip
+    }));
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=user_sessions.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET separate export for Blogs/Updates
+router.get('/export/updates', verifyToken, async (req, res) => {
+  try {
+    const updates = await Update.findAll({ order: [['createdAt', 'DESC']] });
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Blogs');
+    
+    sheet.columns = [
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Category', key: 'category', width: 15 },
+      { header: 'Content', key: 'content', width: 50 },
+      { header: 'Created At', key: 'createdAt', width: 25 }
+    ];
+
+    updates.forEach(u => sheet.addRow({
+      title: u.title,
+      category: u.category,
+      content: u.content,
+      createdAt: u.createdAt.toLocaleString()
+    }));
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=blogs_export.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET separate export for PDFs
+router.get('/export/pdfs', verifyToken, async (req, res) => {
+  try {
+    const pdfs = await PdfDocument.findAll({ order: [['createdAt', 'DESC']] });
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Documents');
+    
+    sheet.columns = [
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Category', key: 'category', width: 15 },
+      { header: 'Protected', key: 'is_protected', width: 12 },
+      { header: 'URL', key: 'url', width: 40 }
+    ];
+
+    pdfs.forEach(p => sheet.addRow({
+      title: p.title,
+      category: p.category,
+      is_protected: p.is_protected ? 'Yes' : 'No',
+      url: p.url
+    }));
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=pdfs_export.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

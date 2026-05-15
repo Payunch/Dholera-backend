@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { logAuditEvent } = require('../services/auditLogger');
 const { cleanText } = require('../utils/sanitize');
+const { UserSession } = require('../models');
 const {
   isMfaEnabled,
   verifyMfaCode,
@@ -189,6 +190,17 @@ router.post('/login', loginLimiter, async (req, res) => {
       const tokens = issueAdminTokens({ username });
       setAuthCookies(res, tokens);
 
+      // Track session start
+      try {
+        await UserSession.create({
+          username,
+          ip: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+      } catch (sessErr) {
+        console.error('Failed to create UserSession:', sessErr);
+      }
+
       await logAuditEvent({
         eventType: 'admin.login.success',
         actorType: 'admin',
@@ -251,6 +263,27 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const username = req.session?.username || null;
+    
+    // Track session end
+    if (username) {
+      try {
+        const lastSession = await UserSession.findOne({
+          where: { username, logoutAt: null },
+          order: [['loginAt', 'DESC']]
+        });
+        if (lastSession) {
+          const now = new Date();
+          const duration = Math.floor((now - lastSession.loginAt) / 1000);
+          await lastSession.update({
+            logoutAt: now,
+            duration
+          });
+        }
+      } catch (sessErr) {
+        console.error('Failed to update UserSession on logout:', sessErr);
+      }
+    }
+
     const refreshToken = req.cookies?.admin_refresh_token;
     revokeRefreshToken(refreshToken);
     req.session.destroy(async (err) => {
@@ -269,6 +302,18 @@ router.post('/logout', async (req, res) => {
   } catch (err) {
     console.error('Logout error:', err);
     res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+router.get('/sessions', verifyToken, async (req, res) => {
+  try {
+    const sessions = await UserSession.findAll({
+      order: [['loginAt', 'DESC']],
+      limit: 100
+    });
+    res.json(sessions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
