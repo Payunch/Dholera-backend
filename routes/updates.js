@@ -91,11 +91,13 @@ router.delete('/:id', verifyToken, async (req, res) => {
 // POST one-time seed for production without shell access
 router.post('/seed/discover-dholera', async (req, res) => {
   try {
-    // Temporary hardcoded fallback for quick seeding when env var is missing
-    const expectedKey = process.env.BLOG_SEED_KEY || 'DHOLERA_TEMP_SEED_KEY_99';
-    
+    const expectedKey = process.env.BLOG_SEED_KEY;
+    if (!expectedKey) {
+      return res.status(503).json({ error: 'BLOG_SEED_KEY is not configured' });
+    }
+
     const providedKey = req.headers['x-seed-key'] || req.query.key;
-    if (!providedKey || (providedKey !== expectedKey && providedKey !== 'DHOLERA_TEMP_SEED_KEY_99')) {
+    if (!providedKey || providedKey !== expectedKey) {
       return res.status(401).json({ error: 'Invalid seed key' });
     }
 
