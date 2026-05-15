@@ -4,7 +4,7 @@ const { Update } = require('../models');
 const { verifyToken } = require('./auth');
 const { Op } = require('sequelize');
 const { cleanText } = require('../utils/sanitize');
-const { getDiscoverDholeraPayload } = require('../utils/discoverDholeraPost');
+const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const upload = require('../middleware/upload');
 const path = require('path');
 
@@ -101,22 +101,26 @@ router.post('/seed/discover-dholera', async (req, res) => {
       return res.status(401).json({ error: 'Invalid seed key' });
     }
 
-    const payload = getDiscoverDholeraPayload();
-    const legacyTitles = [
-      "Discover Dholera: India's First Greenfield Smart City",
-      'Discover Dholera: India’s First Greenfield Smart City'
-    ];
+    const payloads = getPremiumBlogPosts();
+    let createdCount = 0;
+    let updatedCount = 0;
 
-    const existingRows = await Update.findAll({ where: { title: legacyTitles } });
-    if (existingRows.length > 0) {
-      for (const row of existingRows) {
-        await row.update(payload);
+    for (const payload of payloads) {
+      const existing = await Update.findOne({ where: { title: payload.title } });
+      if (existing) {
+        await existing.update(payload);
+        updatedCount++;
+      } else {
+        await Update.create(payload);
+        createdCount++;
       }
-      return res.json({ message: 'Blog updated', count: existingRows.length });
     }
 
-    const created = await Update.create(payload);
-    return res.status(201).json({ message: 'Blog created', id: created.id });
+    return res.json({ 
+      message: 'Premium blog posts seeded', 
+      created: createdCount, 
+      updated: updatedCount 
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
