@@ -13,6 +13,7 @@ const { sequelize, PdfDocument } = require('./models');
 const { testConnection, getDatabaseInfo } = require('./config/database');
 const { buildOriginMatcher } = require('./utils/originMatcher');
 const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
+const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
 
 const app = express();
 const bootAt = new Date().toISOString();
@@ -203,6 +204,8 @@ const startServer = async () => {
     console.log('[DB] Tables synced successfully.');
     // Auto-seed PDFs from Cloudinary URLs on first boot (no-op if table already populated)
     await seedPdfsIfEmpty(PdfDocument);
+    // Auto-seed the "Discover Dholera" blog post if the table is empty
+    await seedBlogIfEmpty();
   } catch (err) {
     console.error('[DB] ❌ Failed to sync tables:', err.message);
     console.error('[DB] Try setting DB_SYNC_ALTER=true in .env to auto-migrate columns.');
