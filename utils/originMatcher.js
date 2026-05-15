@@ -1,4 +1,5 @@
 const DEFAULT_ALLOWED_ORIGINS = [
+  'https://dholeraplatform.com',
   'https://dholera-frontend-production.up.railway.app',
   'http://localhost:5173',
   'http://localhost:5174',
