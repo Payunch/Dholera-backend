@@ -1,0 +1,70 @@
+const express = require('express');
+const router = express.Router();
+const { ClearanceModel, Lead } = require('../models');
+
+// POST /api/clearance/save - Save a new clearance model
+router.post('/save', async (req, res) => {
+  try {
+    const { projectName, modelType, configurationData, LeadId, status } = req.body;
+
+    if (!modelType || !configurationData) {
+      return res.status(400).json({ error: 'modelType and configurationData are required' });
+    }
+
+    const clearance = await ClearanceModel.create({
+      projectName,
+      modelType,
+      configurationData,
+      LeadId: LeadId || null,
+      status: status || 'Draft'
+    });
+
+    res.status(201).json({ message: 'Clearance model saved successfully', data: clearance });
+  } catch (error) {
+    console.error('Error saving clearance model:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/clearance/my-models - Retrieve models for a user
+router.get('/my-models', async (req, res) => {
+  try {
+    const { leadId } = req.query; // Or get from session/auth token in a real app
+    
+    let whereClause = {};
+    if (leadId) {
+      whereClause.LeadId = leadId;
+    } else if (req.session && req.session.leadId) {
+      whereClause.LeadId = req.session.leadId;
+    }
+
+    const models = await ClearanceModel.findAll({
+      where: whereClause,
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.status(200).json({ data: models });
+  } catch (error) {
+    console.error('Error fetching clearance models:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/clearance/:id - Retrieve a specific model
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const model = await ClearanceModel.findByPk(id);
+
+    if (!model) {
+      return res.status(404).json({ error: 'Clearance model not found' });
+    }
+
+    res.status(200).json({ data: model });
+  } catch (error) {
+    console.error('Error fetching clearance model:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = router;

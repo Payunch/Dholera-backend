@@ -9,6 +9,7 @@ const AuditLog = require('./AuditLog');
 const WhatsAppLog = require('./WhatsAppLog');
 const Setting = require('./Setting');
 const UserSession = require('./UserSession');
+const ClearanceModel = require('./ClearanceModel');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -19,6 +20,9 @@ WhatsAppLog.belongsTo(Lead, { foreignKey: 'lead_id' });
 
 PdfDocument.hasMany(PdfView, { foreignKey: 'pdf_id' });
 PdfView.belongsTo(PdfDocument, { foreignKey: 'pdf_id' });
+
+Lead.hasMany(ClearanceModel, { foreignKey: 'LeadId' });
+ClearanceModel.belongsTo(Lead, { foreignKey: 'LeadId' });
 
 module.exports = {
   sequelize,
@@ -31,5 +35,6 @@ module.exports = {
   AuditLog,
   WhatsAppLog,
   Setting,
-  UserSession
+  UserSession,
+  ClearanceModel
 };

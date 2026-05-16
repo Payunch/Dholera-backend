@@ -186,6 +186,7 @@ app.use('/api/track', require('./routes/track'));
 app.use('/api/pdf', require('./routes/pdf'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/clearance', require('./routes/clearance'));
 
 const PORT = process.env.PORT || 3000;
 
