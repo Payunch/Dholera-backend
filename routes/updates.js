@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
 // POST create update (Admin)
 router.post('/', verifyToken, upload.single('image'), async (req, res) => {
   try {
-    const { title, content, category, published, imageUrl } = req.body;
+    const { title, content, category, published, imageUrl, imagePosition } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -67,7 +67,8 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
       content: cleanText(content, 50000),
       category: cleanText(category, 100) || 'General',
       published: published === 'true' || published === true || published === '1',
-      imageUrl: finalImageUrl
+      imageUrl: finalImageUrl,
+      imagePosition: imagePosition || 'top'
     });
 
     res.status(201).json(update);
@@ -83,6 +84,42 @@ router.delete('/:id', verifyToken, async (req, res) => {
     if (!update) return res.status(404).json({ error: 'Update not found' });
     await update.destroy();
     res.json({ message: 'Update deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update (Admin)
+router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
+  try {
+    const update = await Update.findByPk(req.params.id);
+    if (!update) return res.status(404).json({ error: 'Update not found' });
+
+    const { title, content, category, published, imageUrl, imagePosition } = req.body;
+    
+    let finalImageUrl = update.imageUrl;
+    if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
+
+    if (req.file) {
+      const filePath = req.file.secure_url || req.file.path;
+      if (isRemotePath(filePath)) {
+        finalImageUrl = filePath;
+      } else {
+        const uploadsBase = path.resolve(__dirname, '..');
+        finalImageUrl = '/' + path.relative(uploadsBase, filePath).replace(/\\/g, '/');
+      }
+    }
+
+    await update.update({
+      title: title !== undefined ? cleanText(title, 255) : update.title,
+      content: content !== undefined ? cleanText(content, 50000) : update.content,
+      category: category !== undefined ? (cleanText(category, 100) || 'General') : update.category,
+      published: published !== undefined ? (published === 'true' || published === true || published === '1') : update.published,
+      imageUrl: finalImageUrl,
+      imagePosition: imagePosition !== undefined ? imagePosition : update.imagePosition
+    });
+
+    res.json(update);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

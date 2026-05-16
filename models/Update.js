@@ -19,6 +19,11 @@ const Update = sequelize.define('Update', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  imagePosition: {
+    type: DataTypes.ENUM('top', 'bottom', 'none'),
+    allowNull: false,
+    defaultValue: 'top'
+  },
   published: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
