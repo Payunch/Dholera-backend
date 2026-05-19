@@ -184,6 +184,7 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/track', require('./routes/track'));
 app.use('/api/pdf', require('./routes/pdf'));
+app.use('/api/payment', require('./routes/payment'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/clearance', require('./routes/clearance'));

@@ -67,4 +67,29 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/clearance/:id - Update a specific model
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, configurationData, projectName } = req.body;
+    
+    const model = await ClearanceModel.findByPk(id);
+
+    if (!model) {
+      return res.status(404).json({ error: 'Clearance model not found' });
+    }
+
+    if (status) model.status = status;
+    if (configurationData) model.configurationData = configurationData;
+    if (projectName) model.projectName = projectName;
+    
+    await model.save();
+
+    res.status(200).json({ message: 'Clearance model updated successfully', data: model });
+  } catch (error) {
+    console.error('Error updating clearance model:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

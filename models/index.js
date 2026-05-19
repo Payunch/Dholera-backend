@@ -5,6 +5,7 @@ const Analytics = require('./Analytics');
 const VisitorSession = require('./VisitorSession');
 const PdfDocument = require('./PdfDocument');
 const PdfView = require('./PdfView');
+const PdfPurchase = require('./PdfPurchase');
 const AuditLog = require('./AuditLog');
 const WhatsAppLog = require('./WhatsAppLog');
 const Setting = require('./Setting');
@@ -21,6 +22,12 @@ WhatsAppLog.belongsTo(Lead, { foreignKey: 'lead_id' });
 PdfDocument.hasMany(PdfView, { foreignKey: 'pdf_id' });
 PdfView.belongsTo(PdfDocument, { foreignKey: 'pdf_id' });
 
+Lead.hasMany(PdfPurchase, { foreignKey: 'lead_id' });
+PdfPurchase.belongsTo(Lead, { foreignKey: 'lead_id' });
+
+PdfDocument.hasMany(PdfPurchase, { foreignKey: 'pdf_id' });
+PdfPurchase.belongsTo(PdfDocument, { foreignKey: 'pdf_id' });
+
 Lead.hasMany(ClearanceModel, { foreignKey: 'LeadId' });
 ClearanceModel.belongsTo(Lead, { foreignKey: 'LeadId' });
 
@@ -32,6 +39,7 @@ module.exports = {
   VisitorSession,
   PdfDocument,
   PdfView,
+  PdfPurchase,
   AuditLog,
   WhatsAppLog,
   Setting,

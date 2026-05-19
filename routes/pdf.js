@@ -5,7 +5,7 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
-const { PdfDocument, PdfView, Lead } = require('../models');
+const { PdfDocument, PdfView, Lead, PdfPurchase } = require('../models');
 const { verifyAccessToken, getTokenFromRequest } = require('../services/adminSecurity');
 const { cloudinary } = require('../services/cloudinary');
 const { verifyToken } = require('./auth');
@@ -175,6 +175,22 @@ router.get('/view/:id', async (req, res) => {
     const pdf = await PdfDocument.findByPk(req.params.id);
     if (!pdf) {
       return res.status(404).json({ error: 'PDF not found.' });
+    }
+
+    // 3. Enforce Payment for Protected Documents
+    if (!isAdmin && pdf.is_protected) {
+      const purchase = await PdfPurchase.findOne({
+        where: { lead_id: lead.id, pdf_id: pdf.id, status: 'completed' }
+      });
+
+      if (!purchase) {
+        return res.status(402).json({ 
+          error: 'Payment required to view this document.',
+          requiresPayment: true,
+          amount: 10,
+          currency: 'INR'
+        });
+      }
     }
 
     // Record view only for leads, not for admins
