@@ -127,19 +127,28 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
 
 /**
  * Authenticate the connection and log a clear error if it fails.
- * Called from index.js before .sync().
+ * Includes a retry mechanism for improved resilience during startup.
  */
-async function testConnection() {
-  try {
-    await sequelize.authenticate();
-    console.log('[DB] Connection established successfully.');
-    return true;
-  } catch (err) {
-    console.error('[DB] ❌ Unable to connect to the database:');
-    console.error('   ', err.message);
-    console.error('[DB] Check DATABASE_URL or DB_HOST, DB_USER, DB_PASS, DB_NAME in backend/.env');
-    return false;
+async function testConnection(retries = 5, delay = 5000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await sequelize.authenticate();
+      console.log('[DB] Connection established successfully.');
+      return true;
+    } catch (err) {
+      console.warn(`[DB] ⚠️ Connection attempt ${i + 1}/${retries} failed: ${err.message}`);
+      if (i < retries - 1) {
+        console.log(`[DB] Retrying in ${delay / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error('[DB] ❌ Max retries reached. Unable to connect to the database:');
+        console.error('   ', err.message);
+        console.error('[DB] Check DATABASE_URL or DB_HOST, DB_USER, DB_PASS, DB_NAME in .env');
+        return false;
+      }
+    }
   }
+  return false;
 }
 
 module.exports = sequelize;
