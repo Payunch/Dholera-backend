@@ -205,10 +205,6 @@ const startServer = async () => {
   try {
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log('[DB] Tables synced successfully.');
-    // Auto-seed PDFs from Cloudinary URLs on first boot (no-op if table already populated)
-    await seedPdfsIfEmpty(PdfDocument);
-    // Auto-seed the "Discover Dholera" blog post if the table is empty
-    await seedBlogIfEmpty();
   } catch (err) {
     console.error('[DB] ❌ Failed to sync tables:', err.message);
     console.error('[DB] Try setting DB_SYNC_ALTER=true in .env to auto-migrate columns.');
@@ -217,6 +213,10 @@ const startServer = async () => {
 
   app.listen(PORT, () => {
     console.log(`[Server] ✅ Running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+    
+    // Run background tasks after server is up to avoid blocking health checks
+    seedPdfsIfEmpty(PdfDocument).catch(err => console.error('[Seed] PDF seed failed:', err));
+    seedBlogIfEmpty().catch(err => console.error('[Seed] Blog seed failed:', err));
   });
 };
 
