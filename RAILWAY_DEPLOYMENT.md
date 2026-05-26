@@ -154,11 +154,12 @@ In Railway dashboard:
 
 Once backend is deployed, update the frontend to point to the new backend URL:
 
-**In Dholera-frontend/.env.production**:
+**In Dholera-frontend/.env.production** (Next.js branch):
 ```
-VITE_API_URL=https://dholera-backend-prod-xyz.railway.app
-VITE_SITE_URL=https://dholera-admin-frontend.railway.app
+NEXT_PUBLIC_API_URL=https://dholera-backend-prod-xyz.railway.app
+NEXT_PUBLIC_SITE_URL=https://dholera-admin-frontend.railway.app
 ```
+*(Use `VITE_API_URL` and `VITE_SITE_URL` if you are using the Vite-based `main` branch)*
 
 Then redeploy the frontend.
 
