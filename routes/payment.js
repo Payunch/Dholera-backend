@@ -4,11 +4,15 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { PdfPurchase, PdfDocument, Lead } = require('../models');
 
-// Initialize Razorpay with environment variables or placeholders
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder';
+const normalizeSecret = (value) => String(value || '').trim();
 
-const razorpay = new Razorpay({
+// Initialize Razorpay with explicit configuration checks so production misconfigurations
+// fail with a clear message instead of a generic authentication error.
+const RAZORPAY_KEY_ID = normalizeSecret(process.env.RAZORPAY_KEY_ID);
+const RAZORPAY_KEY_SECRET = normalizeSecret(process.env.RAZORPAY_KEY_SECRET);
+const RAZORPAY_CONFIG_READY = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
+
+const createRazorpayClient = () => new Razorpay({
   key_id: RAZORPAY_KEY_ID,
   key_secret: RAZORPAY_KEY_SECRET
 });
@@ -22,6 +26,13 @@ const CURRENCY = 'INR';
  */
 router.post('/create-order', async (req, res) => {
   try {
+    if (!RAZORPAY_CONFIG_READY) {
+      return res.status(503).json({
+        error: 'Razorpay is not configured on the server.',
+        details: 'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the backend environment.'
+      });
+    }
+
     let { pdfId, leadToken } = req.body;
 
     if (!pdfId || !leadToken) {
@@ -68,7 +79,7 @@ router.post('/create-order', async (req, res) => {
 
     console.log(`[Payment] Creating Razorpay order for Lead ${lead.id}, PDF ${pdfId}`);
     
-    const order = await razorpay.orders.create(options);
+    const order = await createRazorpayClient().orders.create(options);
 
     if (!order || !order.id) {
       throw new Error('Razorpay failed to return an order ID');
