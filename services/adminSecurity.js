@@ -65,7 +65,7 @@ const getCookieOptions = (maxAgeMs) => {
   const isProd = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    secure: isProd || true, // Force secure in cross-domain scenarios
+    secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge: maxAgeMs,
