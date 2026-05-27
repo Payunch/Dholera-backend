@@ -39,6 +39,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET single update by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const { all } = req.query;
+    const update = await Update.findByPk(req.params.id);
+    
+    if (!update) {
+      return res.status(404).json({ error: 'Update not found' });
+    }
+
+    // Only show if published unless 'all' is true
+    if (all !== 'true' && !update.published) {
+      return res.status(404).json({ error: 'Update not found' });
+    }
+
+    res.json(update);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST create update (Admin)
 router.post('/', verifyToken, upload.single('image'), async (req, res) => {
   try {
