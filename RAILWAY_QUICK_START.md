@@ -79,6 +79,8 @@ REDIS_URL=<if scaling to multiple instances>
 - [ ] Leave `DATABASE_URL` unset
 - [ ] Database uses ephemeral storage (recreated on redeploy)
 - [ ] Good for testing; NOT production-ready
+- [ ] Startup seeding can restore only the bundled PDF/blog bootstrap data, not user-generated records
+- [ ] Use this option only if you accept data loss on every redeploy
 
 ### Option C: External PostgreSQL
 

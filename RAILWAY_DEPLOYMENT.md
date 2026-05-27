@@ -81,6 +81,8 @@ Run it twice to get unique JWT_SECRET and SESSION_SECRET.
 - Leave `DATABASE_URL` unset
 - Database will use SQLite in the Railway container (ephemeral storage; data lost on redeploy)
 - **Not recommended for production** due to single-writer limitation
+- Startup seed scripts can repopulate only the bundled initial PDFs/blogs when the database is empty
+- Any leads, admin changes, or other live data still require a persistent database or mounted volume
 
 ### Option C: External PostgreSQL
 

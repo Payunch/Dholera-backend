@@ -24,6 +24,7 @@ Your production server is currently running in **Ephemeral Mode**:
 ### How to fix this permanently:
 1.  **In Render/Railway:** Add a "Disk" or "Volume" and mount it to the path `/app/data/`.
 2.  **Alternative:** Switch to a PostgreSQL database (highly recommended for production).
+3.  **Bootstrap only:** The automatic seed scripts can repopulate the default PDF/blog content, but they cannot recover deleted live records unless you keep a backup export.
 
 ---
 **Verification Link:** [https://api.dholeraplatform.com/api/updates](https://api.dholeraplatform.com/api/updates)
