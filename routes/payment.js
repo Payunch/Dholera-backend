@@ -6,10 +6,19 @@ const { PdfPurchase, PdfDocument, Lead } = require('../models');
 
 const normalizeSecret = (value) => String(value || '').trim();
 
+const pickFirstEnv = (...names) => {
+  for (const name of names) {
+    const value = normalizeSecret(process.env[name]);
+    if (value) return value;
+  }
+
+  return '';
+};
+
 // Initialize Razorpay with explicit configuration checks so production misconfigurations
 // fail with a clear message instead of a generic authentication error.
-const RAZORPAY_KEY_ID = normalizeSecret(process.env.RAZORPAY_KEY_ID);
-const RAZORPAY_KEY_SECRET = normalizeSecret(process.env.RAZORPAY_KEY_SECRET);
+const RAZORPAY_KEY_ID = pickFirstEnv('RAZORPAY_KEY_ID', 'RAZORPAY_API_KEY');
+const RAZORPAY_KEY_SECRET = pickFirstEnv('RAZORPAY_KEY_SECRET', 'RAZORPAY_API_SECRET');
 const RAZORPAY_CONFIG_READY = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
 
 const createRazorpayClient = () => new Razorpay({
