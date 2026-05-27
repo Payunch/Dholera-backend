@@ -632,13 +632,67 @@ router.get('/verify-token', async (req, res) => {
     res.json({ 
       valid: true, 
       lead: { 
+        id: lead.id,
         name: lead.name, 
         email: lead.email, 
-        phone: lead.phone 
+        phone: lead.phone,
+        status: lead.status,
+        source: lead.source,
+        is_registered: lead.is_registered,
+        createdAt: lead.createdAt
       } 
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH update lead profile (Public/Lead with token)
+router.patch('/profile', async (req, res) => {
+  try {
+    const leadToken = extractToken(req.headers['authorization']);
+    if (!leadToken) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const lead = await Lead.findOne({ where: { lead_token: leadToken, verified: true } });
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead session invalid or expired' });
+    }
+
+    const nextName = cleanText(req.body?.name, 120);
+    const rawEmail = typeof req.body?.email === 'string' ? req.body.email : undefined;
+    const nextEmail = rawEmail === undefined ? undefined : cleanEmail(rawEmail);
+
+    if (rawEmail !== undefined && rawEmail.trim() && !nextEmail) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const updates = {};
+    if (nextName) updates.name = nextName;
+    if (rawEmail !== undefined) updates.email = nextEmail || null;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No profile changes provided' });
+    }
+
+    await lead.update(updates);
+
+    return res.json({
+      success: true,
+      lead: {
+        id: lead.id,
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        status: lead.status,
+        source: lead.source,
+        is_registered: lead.is_registered,
+        createdAt: lead.createdAt
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 

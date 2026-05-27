@@ -29,6 +29,12 @@ const createRazorpayClient = () => new Razorpay({
 const PDF_PRICE_PAISE = 1000; // 10 INR
 const CURRENCY = 'INR';
 
+const extractToken = (authHeader = '') => {
+  if (!authHeader) return '';
+  if (authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice(7).trim();
+  return authHeader.trim();
+};
+
 /**
  * POST /api/payment/create-order
  * Creates a new Razorpay order for a specific PDF and Lead.
@@ -250,9 +256,7 @@ router.get('/status/:pdfId', async (req, res) => {
     let leadToken = req.headers.authorization || req.query.token;
     if (!leadToken) return res.json({ purchased: false });
 
-    if (leadToken.toLowerCase().startsWith('bearer ')) {
-      leadToken = leadToken.slice(7).trim();
-    }
+    leadToken = extractToken(String(leadToken));
 
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) return res.json({ purchased: false });
@@ -265,6 +269,66 @@ router.get('/status/:pdfId', async (req, res) => {
   } catch (err) {
     console.error('[Payment] Status Check Error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/payment/my-purchases
+ * Returns completed purchases for the authenticated lead token.
+ */
+router.get('/my-purchases', async (req, res) => {
+  try {
+    const leadToken = extractToken(req.headers.authorization || req.query.token || '');
+    if (!leadToken) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const lead = await Lead.findOne({ where: { lead_token: leadToken, verified: true } });
+    if (!lead) {
+      return res.status(401).json({ error: 'Invalid lead token' });
+    }
+
+    const purchases = await PdfPurchase.findAll({
+      where: { lead_id: lead.id, status: 'completed' },
+      include: [
+        {
+          model: PdfDocument,
+          attributes: ['id', 'title', 'category', 'file_path', 'is_protected']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return res.json({
+      lead: {
+        id: lead.id,
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email
+      },
+      purchases: purchases.map((purchase) => ({
+        id: purchase.id,
+        pdf_id: purchase.pdf_id,
+        amount: purchase.amount,
+        currency: purchase.currency,
+        status: purchase.status,
+        razorpay_order_id: purchase.razorpay_order_id,
+        razorpay_payment_id: purchase.razorpay_payment_id,
+        purchasedAt: purchase.createdAt,
+        document: purchase.PdfDocument
+          ? {
+              id: purchase.PdfDocument.id,
+              title: purchase.PdfDocument.title,
+              category: purchase.PdfDocument.category,
+              file_path: purchase.PdfDocument.file_path,
+              is_protected: purchase.PdfDocument.is_protected
+            }
+          : null
+      }))
+    });
+  } catch (err) {
+    console.error('[Payment] My Purchases Error:', err);
+    return res.status(500).json({ error: 'Failed to fetch purchases' });
   }
 });
 

@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { ClearanceModel, Lead } = require('../models');
 
+const extractToken = (authHeader = '') => {
+  if (!authHeader) return '';
+  if (authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice(7).trim();
+  return authHeader.trim();
+};
+
 // POST /api/clearance/save - Save a new clearance model
 router.post('/save', async (req, res) => {
   try {
@@ -29,13 +35,22 @@ router.post('/save', async (req, res) => {
 // GET /api/clearance/my-models - Retrieve models for a user
 router.get('/my-models', async (req, res) => {
   try {
-    const { leadId } = req.query; // Or get from session/auth token in a real app
+    const { leadId } = req.query;
+    const leadToken = extractToken(req.headers['authorization']);
     
     let whereClause = {};
     if (leadId) {
       whereClause.LeadId = leadId;
+    } else if (leadToken) {
+      const lead = await Lead.findOne({ where: { lead_token: leadToken, verified: true } });
+      if (!lead) {
+        return res.status(401).json({ error: 'Invalid lead token' });
+      }
+      whereClause.LeadId = lead.id;
     } else if (req.session && req.session.leadId) {
       whereClause.LeadId = req.session.leadId;
+    } else {
+      return res.status(200).json({ data: [] });
     }
 
     const models = await ClearanceModel.findAll({
