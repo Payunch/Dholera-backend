@@ -64,9 +64,10 @@ const isMfaEnabled = () => Boolean(ADMIN_MFA_SECRET);
 const getCookieOptions = (maxAgeMs) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   path: '/',
-  maxAge: maxAgeMs
+  maxAge: maxAgeMs,
+  ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
 });
 
 const getAuthCookies = ({ accessToken, refreshToken }) => ({
