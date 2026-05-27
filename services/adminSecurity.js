@@ -61,14 +61,17 @@ const verifyTotp = (secret, token) => {
 
 const isMfaEnabled = () => Boolean(ADMIN_MFA_SECRET);
 
-const getCookieOptions = (maxAgeMs) => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  path: '/',
-  maxAge: maxAgeMs,
-  ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
-});
+const getCookieOptions = (maxAgeMs) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd || true, // Force secure in cross-domain scenarios
+    sameSite: isProd ? 'none' : 'lax',
+    path: '/',
+    maxAge: maxAgeMs,
+    ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
+  };
+};
 
 const getAuthCookies = ({ accessToken, refreshToken }) => ({
   accessToken,
