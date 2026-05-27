@@ -93,10 +93,19 @@ router.post('/create-order', async (req, res) => {
 
   } catch (err) {
     console.error('[Payment] Razorpay Order Error:', err);
+    
+    // Check for Razorpay specific errors
+    if (err.statusCode === 401) {
+      return res.status(500).json({ 
+        error: 'Razorpay authentication failed. Please check your API keys in .env.',
+        details: 'The provided key_id or key_secret is invalid.'
+      });
+    }
+
     res.status(500).json({ 
       error: 'Failed to create payment order',
       details: process.env.NODE_ENV === 'production' ? err.message : err,
-      razorpay_error: err.error || null // Some versions of Razorpay SDK put error details here
+      razorpay_error: err.error || null
     });
   }
 });
