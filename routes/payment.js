@@ -104,8 +104,8 @@ router.post('/create-order', async (req, res) => {
 
     res.status(500).json({ 
       error: 'Failed to create payment order',
-      details: process.env.NODE_ENV === 'production' ? err.message : err,
-      razorpay_error: err.error || null
+      details: err.message,
+      razorpay_error: err.error || err
     });
   }
 });
