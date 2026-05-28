@@ -23,15 +23,16 @@ const PdfPurchase = sequelize.define('PdfPurchase', {
     type: DataTypes.STRING,
     defaultValue: 'INR'
   },
-  razorpay_order_id: {
+  transaction_id: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
+  gateway_payment_id: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  razorpay_payment_id: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  razorpay_signature: {
+  gateway_signature: {
     type: DataTypes.STRING,
     allowNull: true
   },

@@ -1,30 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
+const axios = require('axios');
+const sha256 = require('sha256');
+const uniqid = require('uniqid');
 const { PdfPurchase, PdfDocument, Lead } = require('../models');
 
-const normalizeSecret = (value) => String(value || '').trim();
+// PhonePe Configuration
+const MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID || 'PGTESTPAYUAT';
+const SALT_KEY = process.env.PHONEPE_SALT_KEY || '099eb0cd-02cf-4e2a-8aca-3e6c6aff0399';
+const SALT_INDEX = process.env.PHONEPE_SALT_INDEX || 1;
+const PHONEPE_ENV = process.env.PHONEPE_ENV || 'sandbox'; // 'sandbox' or 'production'
 
-const pickFirstEnv = (...names) => {
-  for (const name of names) {
-    const value = normalizeSecret(process.env[name]);
-    if (value) return value;
-  }
-
-  return '';
+// Base URLs for PhonePe
+const BASE_URLS = {
+  sandbox: 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+  production: 'https://api.phonepe.com/apis/hermes'
 };
-
-// Initialize Razorpay with explicit configuration checks so production misconfigurations
-// fail with a clear message instead of a generic authentication error.
-const RAZORPAY_KEY_ID = pickFirstEnv('RAZORPAY_KEY_ID', 'RAZORPAY_API_KEY');
-const RAZORPAY_KEY_SECRET = pickFirstEnv('RAZORPAY_KEY_SECRET', 'RAZORPAY_API_SECRET');
-const RAZORPAY_CONFIG_READY = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
-
-const createRazorpayClient = () => new Razorpay({
-  key_id: RAZORPAY_KEY_ID,
-  key_secret: RAZORPAY_KEY_SECRET
-});
+const HOST_URL = BASE_URLS[PHONEPE_ENV];
 
 const PDF_PRICE_PAISE = 1000; // 10 INR
 const CURRENCY = 'INR';
@@ -37,32 +29,22 @@ const extractToken = (authHeader = '') => {
 
 /**
  * POST /api/payment/create-order
- * Creates a new Razorpay order for a specific PDF and Lead.
+ * Initiates a PhonePe payment for a specific PDF and Lead.
  */
 router.post('/create-order', async (req, res) => {
   try {
-    if (!RAZORPAY_CONFIG_READY) {
-      return res.status(503).json({
-        error: 'Razorpay is not configured on the server.',
-        details: 'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the backend environment.'
-      });
-    }
-
     let { pdfId, leadToken } = req.body;
 
     if (!pdfId || !leadToken) {
       return res.status(400).json({ error: 'PDF ID and Lead Token are required' });
     }
 
-    // Clean token (strip Bearer if present)
-    if (leadToken.toLowerCase().startsWith('bearer ')) {
-      leadToken = leadToken.slice(7).trim();
-    }
+    // Clean token
+    leadToken = extractToken(leadToken);
 
     // Verify Lead
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) {
-      console.warn(`[Payment] Lead not found for token: ${leadToken.substring(0, 10)}...`);
       return res.status(403).json({ error: 'Invalid lead token' });
     }
 
@@ -72,7 +54,7 @@ router.post('/create-order', async (req, res) => {
       return res.status(404).json({ error: 'PDF not found' });
     }
 
-    // Check if already purchased and completed
+    // Check if already purchased
     const existing = await PdfPurchase.findOne({
       where: { lead_id: lead.id, pdf_id: pdfId, status: 'completed' }
     });
@@ -80,163 +62,165 @@ router.post('/create-order', async (req, res) => {
       return res.json({ alreadyPurchased: true });
     }
 
-    // Razorpay Order Options
-    const options = {
+    const merchantTransactionId = `TXN_${uniqid().toUpperCase()}`;
+    const redirectUrl = process.env.PHONEPE_REDIRECT_URL || `${req.protocol}://${req.get('host')}/api/payment/status/${merchantTransactionId}`;
+    
+    const payload = {
+      merchantId: MERCHANT_ID,
+      merchantTransactionId: merchantTransactionId,
+      merchantUserId: `USER_${lead.id}`,
       amount: PDF_PRICE_PAISE,
-      currency: CURRENCY,
-      receipt: `pdf_${pdfId}_lead_${lead.id}`,
-      notes: {
-        pdf_title: pdf.title,
-        lead_name: lead.name,
-        lead_phone: lead.phone
+      redirectUrl: redirectUrl,
+      redirectMode: 'REDIRECT',
+      callbackUrl: process.env.PHONEPE_WEBHOOK_URL || `${req.protocol}://${req.get('host')}/api/payment/webhook`,
+      mobileNumber: lead.phone.replace(/\D/g, '').slice(-10),
+      paymentInstrument: {
+        type: 'PAY_PAGE'
       }
     };
 
-    console.log(`[Payment] Creating Razorpay order for Lead ${lead.id}, PDF ${pdfId}`);
-    
-    const order = await createRazorpayClient().orders.create(options);
+    // 1. Base64 Encode Payload
+    const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
 
-    if (!order || !order.id) {
-      throw new Error('Razorpay failed to return an order ID');
-    }
+    // 2. Generate Checksum (X-VERIFY)
+    const stringToHash = base64Payload + '/pg/v1/pay' + SALT_KEY;
+    const checksum = sha256(stringToHash) + '###' + SALT_INDEX;
 
-    // Create a pending purchase record
+    // 3. Create Pending Purchase Record
     await PdfPurchase.create({
       lead_id: lead.id,
       pdf_id: pdfId,
       amount: PDF_PRICE_PAISE,
-      razorpay_order_id: order.id,
+      transaction_id: merchantTransactionId,
       status: 'pending'
     });
 
-    // Send order details back to frontend
-    res.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      key_id: RAZORPAY_KEY_ID // Ensure this matches what was used to create the order
-    });
+    console.log(`[Payment] Initiating PhonePe payment for Lead ${lead.id}, PDF ${pdfId}, TXN ${merchantTransactionId}`);
 
-  } catch (err) {
-    console.error('[Payment] Razorpay Order Error:', err);
-    
-    // Check for Razorpay specific errors
-    if (err.statusCode === 401) {
-      return res.status(500).json({ 
-        error: 'Razorpay authentication failed. Please check your API keys in .env.',
-        details: 'The provided key_id or key_secret is invalid.'
+    // 4. Call PhonePe API
+    const response = await axios.post(
+      `${HOST_URL}/pg/v1/pay`,
+      { request: base64Payload },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VERIFY': checksum,
+          'accept': 'application/json'
+        }
+      }
+    );
+
+    if (response.data.success && response.data.data.instrumentResponse.redirectInfo.url) {
+      return res.json({
+        success: true,
+        redirectUrl: response.data.data.instrumentResponse.redirectInfo.url,
+        transactionId: merchantTransactionId
       });
+    } else {
+      throw new Error(response.data.message || 'PhonePe initiation failed');
     }
 
+  } catch (err) {
+    console.error('[Payment] PhonePe Initiation Error:', err.response?.data || err.message);
     res.status(500).json({ 
-      error: 'Failed to create payment order',
-      details: err.message,
-      razorpay_error: err.error || err
+      error: 'Failed to initiate payment',
+      details: err.response?.data?.message || err.message
     });
   }
 });
 
 /**
- * POST /api/payment/verify-payment
- * Verifies the Razorpay payment signature and completes the purchase.
+ * GET /api/payment/status/:merchantTransactionId
+ * Handles the redirect from PhonePe after payment attempt.
  */
-router.post('/verify-payment', async (req, res) => {
+router.get('/status/:merchantTransactionId', async (req, res) => {
+  const { merchantTransactionId } = req.params;
+
   try {
-    let {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      pdfId,
-      leadToken
-    } = req.body;
+    // Generate Checksum for Status Check
+    const stringToHash = `/pg/v1/status/${MERCHANT_ID}/${merchantTransactionId}` + SALT_KEY;
+    const checksum = sha256(stringToHash) + '###' + SALT_INDEX;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: 'Payment details are missing' });
-    }
+    console.log(`[Payment] Checking status for TXN ${merchantTransactionId}`);
 
-    // Clean token
-    if (leadToken && leadToken.toLowerCase().startsWith('bearer ')) {
-      leadToken = leadToken.slice(7).trim();
-    }
+    const options = {
+      method: 'GET',
+      url: `${HOST_URL}/pg/v1/status/${MERCHANT_ID}/${merchantTransactionId}`,
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-VERIFY': checksum,
+        'X-MERCHANT-ID': MERCHANT_ID
+      }
+    };
 
-    // Verify Signature
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSignature = crypto
-      .createHmac('sha256', RAZORPAY_KEY_SECRET)
-      .update(body.toString())
-      .digest('hex');
-
-    console.log(`[Payment] Verifying signature for Order ${razorpay_order_id}`);
-    
-    if (expectedSignature !== razorpay_signature) {
-      console.error('[Payment] Signature mismatch!');
-      return res.status(400).json({ error: 'Invalid payment signature' });
-    }
-
-    // Find the pending purchase
-    const purchase = await PdfPurchase.findOne({
-      where: { razorpay_order_id: razorpay_order_id }
-    });
+    const response = await axios.request(options);
+    const purchase = await PdfPurchase.findOne({ where: { transaction_id: merchantTransactionId } });
 
     if (!purchase) {
-      console.error(`[Payment] Purchase record not found for Order ${razorpay_order_id}`);
-      return res.status(404).json({ error: 'Purchase record not found' });
+      return res.status(404).send('Transaction record not found');
     }
 
-    // Update purchase status
-    await purchase.update({
-      razorpay_payment_id,
-      razorpay_signature,
-      status: 'completed'
-    });
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'https://dholeraplatform.com';
+    const redirectPath = `/pdfs?payment_status=`;
 
-    console.log(`[Payment] Purchase completed for Lead ${purchase.lead_id}, PDF ${purchase.pdf_id}`);
-
-    res.json({ success: true });
+    if (response.data.code === 'PAYMENT_SUCCESS') {
+      await purchase.update({
+        gateway_payment_id: response.data.data.transactionId,
+        status: 'completed'
+      });
+      console.log(`[Payment] TXN ${merchantTransactionId} SUCCESS`);
+      return res.redirect(`${frontendBaseUrl}${redirectPath}success&pdfId=${purchase.pdf_id}`);
+    } else if (response.data.code === 'PAYMENT_ERROR' || response.data.code === 'PAYMENT_DECLINED') {
+      await purchase.update({ status: 'failed' });
+      console.log(`[Payment] TXN ${merchantTransactionId} FAILED: ${response.data.code}`);
+      return res.redirect(`${frontendBaseUrl}${redirectPath}failed`);
+    } else {
+      // Pending or unknown status
+      return res.redirect(`${frontendBaseUrl}${redirectPath}pending`);
+    }
 
   } catch (err) {
-    console.error('[Payment] Payment Verification Error:', err);
-    res.status(500).json({ error: 'Payment verification failed' });
+    console.error('[Payment] Status Check Error:', err.response?.data || err.message);
+    res.status(500).send('Error checking payment status');
   }
 });
 
 /**
  * POST /api/payment/webhook
- * Handles Razorpay webhooks for asynchronous payment status updates.
+ * Handles PhonePe server-to-server callbacks.
  */
 router.post('/webhook', async (req, res) => {
   try {
-    const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || RAZORPAY_KEY_SECRET;
-    const signature = req.headers['x-razorpay-signature'];
+    const { response: base64Response } = req.body;
+    
+    // Verify Webhook Signature (X-VERIFY from headers)
+    const xVerifyHeader = req.headers['x-verify'];
+    const stringToHash = base64Response + SALT_KEY;
+    const expectedChecksum = sha256(stringToHash) + '###' + SALT_INDEX;
 
-    if (!signature) {
-      return res.status(400).json({ error: 'Webhook signature missing' });
-    }
-
-    const expectedSignature = crypto
-      .createHmac('sha256', WEBHOOK_SECRET)
-      .update(JSON.stringify(req.body))
-      .digest('hex');
-
-    if (expectedSignature !== signature) {
+    if (xVerifyHeader !== expectedChecksum) {
       console.warn('[Payment Webhook] Signature mismatch');
       return res.status(400).json({ error: 'Invalid webhook signature' });
     }
 
-    const { event, payload } = req.body;
-    console.log(`[Payment Webhook] Received event: ${event}`);
+    // Decode Payload
+    const payload = JSON.parse(Buffer.from(base64Response, 'base64').toString());
+    console.log(`[Payment Webhook] Received: ${payload.code} for ${payload.data.merchantTransactionId}`);
 
-    if (event === 'payment.captured') {
-      const orderId = payload.payment.entity.order_id;
-      const paymentId = payload.payment.entity.id;
-
-      const purchase = await PdfPurchase.findOne({ where: { razorpay_order_id: orderId } });
+    if (payload.code === 'PAYMENT_SUCCESS') {
+      const purchase = await PdfPurchase.findOne({ where: { transaction_id: payload.data.merchantTransactionId } });
       if (purchase && purchase.status !== 'completed') {
         await purchase.update({
-          razorpay_payment_id: paymentId,
+          gateway_payment_id: payload.data.transactionId,
           status: 'completed'
         });
-        console.log(`[Payment Webhook] Updated purchase for order ${orderId} to completed`);
+        console.log(`[Payment Webhook] Updated TXN ${payload.data.merchantTransactionId} to completed`);
+      }
+    } else if (payload.code === 'PAYMENT_ERROR' || payload.code === 'PAYMENT_DECLINED') {
+      const purchase = await PdfPurchase.findOne({ where: { transaction_id: payload.data.merchantTransactionId } });
+      if (purchase && purchase.status === 'pending') {
+        await purchase.update({ status: 'failed' });
       }
     }
 
@@ -248,10 +232,9 @@ router.post('/webhook', async (req, res) => {
 });
 
 /**
- * GET /api/payment/status/:pdfId
- * Checks if a lead has already purchased a specific PDF.
+ * GET /api/payment/status-check/:pdfId
  */
-router.get('/status/:pdfId', async (req, res) => {
+router.get('/status-check/:pdfId', async (req, res) => {
   try {
     let leadToken = req.headers.authorization || req.query.token;
     if (!leadToken) return res.json({ purchased: false });
@@ -274,7 +257,6 @@ router.get('/status/:pdfId', async (req, res) => {
 
 /**
  * GET /api/payment/my-purchases
- * Returns completed purchases for the authenticated lead token.
  */
 router.get('/my-purchases', async (req, res) => {
   try {
@@ -300,28 +282,23 @@ router.get('/my-purchases', async (req, res) => {
     });
 
     return res.json({
-      lead: {
-        id: lead.id,
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email
-      },
-      purchases: purchases.map((purchase) => ({
-        id: purchase.id,
-        pdf_id: purchase.pdf_id,
-        amount: purchase.amount,
-        currency: purchase.currency,
-        status: purchase.status,
-        razorpay_order_id: purchase.razorpay_order_id,
-        razorpay_payment_id: purchase.razorpay_payment_id,
-        purchasedAt: purchase.createdAt,
-        document: purchase.PdfDocument
+      lead: { id: lead.id, name: lead.name, phone: lead.phone, email: lead.email },
+      purchases: purchases.map((p) => ({
+        id: p.id,
+        pdf_id: p.pdf_id,
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status,
+        transaction_id: p.transaction_id,
+        gateway_payment_id: p.gateway_payment_id,
+        purchasedAt: p.createdAt,
+        document: p.PdfDocument
           ? {
-              id: purchase.PdfDocument.id,
-              title: purchase.PdfDocument.title,
-              category: purchase.PdfDocument.category,
-              file_path: purchase.PdfDocument.file_path,
-              is_protected: purchase.PdfDocument.is_protected
+              id: p.PdfDocument.id,
+              title: p.PdfDocument.title,
+              category: p.PdfDocument.category,
+              file_path: p.PdfDocument.file_path,
+              is_protected: p.PdfDocument.is_protected
             }
           : null
       }))
