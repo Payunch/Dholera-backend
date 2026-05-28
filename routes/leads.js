@@ -639,6 +639,7 @@ router.get('/verify-token', async (req, res) => {
         status: lead.status,
         source: lead.source,
         is_registered: lead.is_registered,
+        is_trial: lead.is_trial,
         createdAt: lead.createdAt
       } 
     });
@@ -1257,6 +1258,7 @@ router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
   try {
     const phone = cleanText(req.body?.phone, 20);
     const passcode = cleanText(req.body?.passcode, 6);
+    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
 
     const normalizedPhone = normalizePhone(phone);
     const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
@@ -1266,6 +1268,52 @@ router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
     if (!localPhone || !passcode) {
       return res.status(400).json({ error: 'Phone and passcode are required.' });
     }
+
+    // --- TRIAL CREDENTIAL HANDLING ---
+    const TRIAL_PHONE = '1234567890';
+    const TRIAL_PASSCODE = '123456';
+
+    if (localPhone === TRIAL_PHONE && passcode === TRIAL_PASSCODE) {
+      // Create a unique trial lead per visitor fingerprint to track independent trial limits
+      const fingerprintSuffix = browserFingerprint ? `-${browserFingerprint.substring(0, 30)}` : '';
+      const trialIdentifier = `${TRIAL_PHONE}${fingerprintSuffix}`;
+
+      let [trialLead] = await Lead.findOrCreate({
+        where: { phone: trialIdentifier },
+        defaults: {
+          name: 'Trial User',
+          phone: trialIdentifier,
+          email: 'trial@dholera.local',
+          is_trial: true,
+          verified: true,
+          is_registered: true,
+          source: 'Trial Account'
+        }
+      });
+
+      const leadToken = crypto.randomBytes(16).toString('hex');
+      await trialLead.update({ 
+        lead_token: leadToken,
+        visit_count: trialLead.visit_count + 1,
+        returning_visitor: true
+      });
+
+      await logAuditEvent({
+        eventType: 'lead.trial_login.success',
+        actorType: 'lead',
+        actorId: trialIdentifier,
+        success: true,
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
+      return res.json({ 
+        success: true, 
+        lead_token: leadToken, 
+        lead: { name: 'Trial User', email: trialLead.email, phone: TRIAL_PHONE } 
+      });
+    }
+    // --- END TRIAL CREDENTIAL HANDLING ---
 
     const lead = await Lead.findOne({ where: { phone: localPhone, is_registered: true } });
     if (!lead || !lead.passcode) {

@@ -179,17 +179,34 @@ router.get('/view/:id', async (req, res) => {
 
     // 3. Enforce Payment for Protected Documents
     if (!isAdmin && pdf.is_protected) {
-      const purchase = await PdfPurchase.findOne({
-        where: { lead_id: lead.id, pdf_id: pdf.id, status: 'completed' }
-      });
-
-      if (!purchase) {
-        return res.status(402).json({ 
-          error: 'Payment required to view this document.',
-          requiresPayment: true,
-          amount: 10,
-          currency: 'INR'
+      // 3.1 Trial Access Limit
+      if (lead.is_trial) {
+        const viewCount = await PdfView.count({ where: { lead_id: lead.id } });
+        const hasViewedThisPdf = await PdfView.findOne({ where: { lead_id: lead.id, pdf_id: pdf.id } });
+        
+        // If they have viewed something else already, block it
+        if (viewCount >= 1 && !hasViewedThisPdf) {
+          return res.status(403).json({ 
+            error: 'Trial limit reached. Please register for full access to view more documents.',
+            requiresRegistration: true,
+            trialLimitReached: true
+          });
+        }
+        // If it's their first view or they are re-viewing the same PDF, allow it without payment check
+      } else {
+        // Standard Payment Check
+        const purchase = await PdfPurchase.findOne({
+          where: { lead_id: lead.id, pdf_id: pdf.id, status: 'completed' }
         });
+
+        if (!purchase) {
+          return res.status(402).json({ 
+            error: 'Payment required to view this document.',
+            requiresPayment: true,
+            amount: 10,
+            currency: 'INR'
+          });
+        }
       }
     }
 
