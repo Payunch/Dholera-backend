@@ -1513,3 +1513,71 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
 });
 
 module.exports = router;
+
+// NOTE: Test-only endpoint for QA/third-party testers (staging only)
+// Usage: enable TEST_LOGIN_ALLOWED=true in env (or run when NODE_ENV !== 'production')
+// Creates or updates a lead and returns a lead_token for passcode-less testing.
+router.post('/test-login', async (req, res) => {
+  try {
+    const allow = process.env.TEST_LOGIN_ALLOWED === 'true' || process.env.NODE_ENV !== 'production';
+    if (!allow) return res.status(403).json({ error: 'Test login disabled.' });
+
+    const name = cleanText(req.body?.name || process.env.TEST_USER_NAME || 'QA Tester', 120);
+    const email = cleanEmail(req.body?.email || process.env.TEST_USER_EMAIL || 'qa@test.local');
+    const phoneRaw = cleanText(req.body?.phone || process.env.TEST_USER_PHONE || '9876543210', 20);
+    const passcodePlain = req.body?.passcode || process.env.TEST_USER_PASSCODE || '123456';
+
+    const normalizedPhone = normalizePhone(phoneRaw);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!localPhone || !/^[0-9]{10,}$/.test(localPhone)) {
+      return res.status(400).json({ error: 'Invalid phone provided.' });
+    }
+
+    let lead = await Lead.findOne({ where: { phone: localPhone } });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPass = await bcrypt.hash(passcodePlain, salt);
+    const leadToken = crypto.randomBytes(16).toString('hex');
+
+    if (lead) {
+      await lead.update({
+        name,
+        email,
+        verified: true,
+        is_registered: true,
+        passcode: hashedPass,
+        passcode_raw: passcodePlain,
+        lead_token: leadToken
+      });
+    } else {
+      lead = await Lead.create({
+        name,
+        phone: localPhone,
+        email,
+        verified: true,
+        is_registered: true,
+        passcode: hashedPass,
+        passcode_raw: passcodePlain,
+        lead_token: leadToken
+      });
+    }
+
+    await logAuditEvent({
+      eventType: 'lead.test_login.created',
+      actorType: 'system',
+      actorId: 'test-login',
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { phone: localPhone }
+    });
+
+    res.json({ success: true, lead_token: leadToken, lead: { name: lead.name, email: lead.email, phone: lead.phone } });
+  } catch (err) {
+    console.error('Test-login error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
