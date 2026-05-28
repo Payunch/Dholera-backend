@@ -410,7 +410,6 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
         name: name || lead.name,
         email: email || lead.email,
         otp: otpHash,
-        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint: browserFingerprint || lead.browserFingerprint
       });
@@ -421,7 +420,6 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
         email,
         source: 'OTP Verification',
         otp: otpHash,
-        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint,
         verified: false
@@ -1027,7 +1025,6 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
         name: name || lead.name,
         email: email || lead.email,
         otp: otpHash,
-        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint: browserFingerprint || lead.browserFingerprint
       });
@@ -1038,7 +1035,6 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
         email,
         source: 'Email Registration',
         otp: otpHash,
-        otp_raw: otp,
         otp_expiry: expiry,
         browserFingerprint,
         verified: false,
@@ -1066,8 +1062,7 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
         // CRITICAL: Update the lead with the bypass OTP so it can actually be verified
         const bypassOtp = '123456';
         await lead.update({
-          otp: hashOtp(bypassOtp),
-          otp_raw: bypassOtp
+          otp: hashOtp(bypassOtp)
         });
 
         return res.json({ 
@@ -1218,7 +1213,6 @@ router.post('/setup-passcode', async (req, res) => {
 
     await lead.update({
       passcode: hashedPasscode,
-      passcode_raw: passcode,
       is_registered: true,
       lead_token: leadToken,
       otp: null,
@@ -1597,7 +1591,6 @@ router.post('/test-login', async (req, res) => {
         verified: true,
         is_registered: true,
         passcode: hashedPass,
-        passcode_raw: passcodePlain,
         lead_token: leadToken
       });
     } else {
@@ -1608,7 +1601,6 @@ router.post('/test-login', async (req, res) => {
         verified: true,
         is_registered: true,
         passcode: hashedPass,
-        passcode_raw: passcodePlain,
         lead_token: leadToken
       });
     }

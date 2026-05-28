@@ -135,9 +135,6 @@ router.post('/login', loginLimiter, async (req, res) => {
   const password = cleanText(req.body?.password, 120);
   const mfaCode = cleanText(req.body?.mfaCode, 16);
 
-  console.log(`[Login Diagnostic] Received: user="${username}", pass="${password}"`);
-  console.log(`[Login Diagnostic] Expected: user="${ADMIN_USER}", pass="${ADMIN_PASS}"`);
-
   const lockKey = getLockoutKey(username, req.ip);
   const lockInfo = failedLoginState.get(lockKey);
 

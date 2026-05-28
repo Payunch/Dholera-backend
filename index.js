@@ -106,9 +106,9 @@ app.use(session({
 
 // Request logger for debugging (Moved after session middleware)
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  console.log('Session ID:', req.sessionID);
-  console.log('Is Admin Session:', !!req.session?.isAdmin);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  }
   next();
 });
 
