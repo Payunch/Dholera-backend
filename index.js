@@ -191,6 +191,7 @@ app.use('/api/bi', require('./routes/bi'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/clearance', require('./routes/clearance'));
+app.use('/api/admin', require('./routes/admin'));
 
 const PORT = process.env.PORT || 3000;
 
