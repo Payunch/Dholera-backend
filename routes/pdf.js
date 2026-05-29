@@ -88,7 +88,7 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
 router.get('/list', async (req, res) => {
   try {
     const pdfs = await PdfDocument.findAll({
-      attributes: ['id', 'title', 'category']
+      attributes: ['id', 'title', 'category', 'createdAt']
     });
     res.json(pdfs);
   } catch (err) {
