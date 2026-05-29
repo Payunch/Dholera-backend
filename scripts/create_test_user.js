@@ -23,8 +23,7 @@ async function main() {
       email,
       verified: true,
       is_registered: true,
-      passcode: hashed,
-      passcode_raw: passcode
+      passcode: hashed
     }
   });
 
@@ -34,8 +33,7 @@ async function main() {
       email,
       verified: true,
       is_registered: true,
-      passcode: hashed,
-      passcode_raw: passcode
+      passcode: hashed
     });
   }
 

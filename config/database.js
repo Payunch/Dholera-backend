@@ -103,7 +103,23 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
     '/data/database.sqlite'
   ].filter(Boolean);
 
-  const persistentStoragePath = persistentCandidates.find((candidate) => fs.existsSync(path.dirname(candidate)));
+  let persistentStoragePath = persistentCandidates.find((candidate) => fs.existsSync(path.dirname(candidate)));
+  
+  // If we are in production and no persistent directory exists yet, 
+  // try to create /app/data if it's the intended mount point.
+  if (!persistentStoragePath && process.env.NODE_ENV === 'production') {
+    const defaultPersistentDir = '/app/data';
+    try {
+      if (!fs.existsSync(defaultPersistentDir)) {
+        fs.mkdirSync(defaultPersistentDir, { recursive: true });
+        console.log(`[DB] Created persistent directory at ${defaultPersistentDir}`);
+      }
+      persistentStoragePath = path.join(defaultPersistentDir, 'database.sqlite');
+    } catch (err) {
+      console.warn(`[DB] Could not create persistent directory: ${err.message}`);
+    }
+  }
+
   if (persistentStoragePath) {
     storagePath = persistentStoragePath;
     console.log(`[DB] Using persistent volume storage at ${storagePath}`);
