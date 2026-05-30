@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 
     const updates = await Update.findAll({
       where,
-      order: [['createdAt', 'DESC']]
+      order: [['publishedAt', 'DESC']]
     });
     res.json(updates);
   } catch (err) {
@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
 // POST create update (Admin)
 router.post('/', verifyToken, upload.single('image'), async (req, res) => {
   try {
-    const { title, content, category, published, imageUrl, imagePosition } = req.body;
+    const { title, content, category, published, imageUrl, imagePosition, publishedAt } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -89,7 +89,8 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
       category: cleanText(category, 100) || 'General',
       published: published === 'true' || published === true || published === '1',
       imageUrl: finalImageUrl,
-      imagePosition: imagePosition || 'top'
+      imagePosition: imagePosition || 'top',
+      publishedAt: publishedAt || new Date()
     });
 
     res.status(201).json(update);
@@ -116,7 +117,7 @@ router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
     const update = await Update.findByPk(req.params.id);
     if (!update) return res.status(404).json({ error: 'Update not found' });
 
-    const { title, content, category, published, imageUrl, imagePosition } = req.body;
+    const { title, content, category, published, imageUrl, imagePosition, publishedAt } = req.body;
     
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
@@ -137,7 +138,8 @@ router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
       category: category !== undefined ? (cleanText(category, 100) || 'General') : update.category,
       published: published !== undefined ? (published === 'true' || published === true || published === '1') : update.published,
       imageUrl: finalImageUrl,
-      imagePosition: imagePosition !== undefined ? imagePosition : update.imagePosition
+      imagePosition: imagePosition !== undefined ? imagePosition : update.imagePosition,
+      publishedAt: publishedAt !== undefined ? publishedAt : update.publishedAt
     });
 
     res.json(update);

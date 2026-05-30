@@ -4,6 +4,7 @@ const getPremiumBlogPosts = () => {
       title: "Dholera: The Rise of India's Most Ambitious Smart City",
       category: 'Infrastructure',
       imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop',
+      publishedAt: '2024-05-15T09:00:00.000Z',
       content: `🏙️ **Dholera: The Rise of India’s Most Ambitious Smart City**
 *A New Economic Civilization is Emerging in Gujarat*
 
@@ -28,6 +29,7 @@ Very few opportunities emerge where government vision, infrastructure investment
       title: "The Silicon Valley of Industrial India: Dholera’s Semiconductor Ecosystem",
       category: 'Technology',
       imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070&auto=format&fit=crop',
+      publishedAt: '2024-05-18T10:30:00.000Z',
       content: `💻 **The Silicon Valley of Industrial India: Dholera’s Semiconductor Ecosystem**
 *Anchoring the Future of Global Tech Manufacturing*
 
@@ -49,6 +51,7 @@ For tech investors, Dholera isn't just a location; it is a strategic platform fo
       title: "A Green Economic Engine: Leading India’s Renewable Energy Shift",
       category: 'Sustainability',
       imageUrl: 'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?q=80&w=2070&auto=format&fit=crop',
+      publishedAt: '2024-05-20T14:15:00.000Z',
       content: `🌱 **A Green Economic Engine: Leading India’s Renewable Energy Shift**
 *Sustainability as a Competitive Advantage in DSIR*
 
@@ -68,6 +71,7 @@ From automated water management to waste-to-energy systems, every aspect of Dhol
       title: "The Logistics Gateway: How Infrastructure is Driving Dholera’s Growth",
       category: 'Logistics',
       imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop',
+      publishedAt: '2024-05-22T11:45:00.000Z',
       content: `🛣️ **The Logistics Gateway: How Infrastructure is Driving Dholera’s Growth**
 *Connectivity is the Currency of Industrial Success*
 
@@ -91,6 +95,7 @@ With pre-planned utility networks and road alignments, the city functions as a g
       title: "Urban Excellence: The Future of Living in Dholera’s TP Schemes",
       category: 'Residential',
       imageUrl: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070&auto=format&fit=crop',
+      publishedAt: '2024-05-25T16:20:00.000Z',
       content: `🏙️ **Urban Excellence: The Future of Living in Dholera’s TP Schemes**
 *Defining the 'Live-Work-Play' Standard in DSIR*
 
@@ -116,6 +121,7 @@ Dholera is the blueprint for the next generation of global cities, where economi
       title: "Why Smart Investors Are Turning Toward Emerging Real Estate Markets",
       category: 'Investment',
       imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2070&auto=format&fit=crop',
+      publishedAt: '2024-05-28T10:00:00.000Z',
       content: `📈 **Why Smart Investors Are Turning Toward Emerging Real Estate Markets**
 *Strategic Wealth Building in the New Economic Landscape*
 
