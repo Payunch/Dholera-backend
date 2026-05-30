@@ -86,7 +86,13 @@ router.post('/restore', verifyToken, upload.single('backup'), async (req, res) =
         // Remove existing rows
         await models[key].destroy({ where: {}, truncate: true, transaction: t });
         if (items.length > 0) {
-          await models[key].bulkCreate(items, { transaction: t });
+          // Preserve timestamps from the backup file
+          await models[key].bulkCreate(items, { 
+            transaction: t,
+            validate: false,
+            hooks: false,
+            individualHooks: false
+          });
         }
         resultCounts[key] = items.length;
       }
