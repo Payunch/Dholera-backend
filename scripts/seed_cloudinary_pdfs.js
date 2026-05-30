@@ -61,7 +61,8 @@ function loadGeneratedSeedData() {
       .map((item) => ({
         title: String(item.title || '').trim(),
         category: String(item.category || '').trim(),
-        file_path: String(item.file_path || '').trim()
+        file_path: String(item.file_path || '').trim(),
+        documentDate: item.documentDate || null
       }))
       .filter((item) => item.title && item.file_path);
 
@@ -90,23 +91,31 @@ async function seedPdfsIfEmpty(PdfDocument) {
 
     if (existingPdfs.length === 0) {
       await PdfDocument.bulkCreate(pdfsToSeed);
-      console.log(`[Seed] Seeded ${pdfsToSeed.length} PDF records from Cloudinary URLs.`);
+      console.log(`[Seed] Seeded ${pdfsToSeed.length} PDF records from Cloudinary URLs with actual dates.`);
     } else {
-      console.log(`[Seed] PdfDocument table has ${existingPdfs.length} records. Checking for local paths...`);
+      console.log(`[Seed] PdfDocument table has ${existingPdfs.length} records. Checking for local paths or missing dates...`);
       let updatedCount = 0;
       
       for (const target of pdfsToSeed) {
         const record = existingPdfs.find(r => r.title === target.title);
-        if (record && !record.file_path.startsWith('http')) {
-          await record.update({ file_path: target.file_path });
-          updatedCount++;
+        if (record) {
+          const needsFilePathUpdate = !record.file_path.startsWith('http');
+          const needsDateUpdate = target.documentDate && (!record.documentDate || record.documentDate.toISOString() !== new Date(target.documentDate).toISOString());
+          
+          if (needsFilePathUpdate || needsDateUpdate) {
+            await record.update({ 
+              file_path: target.file_path,
+              documentDate: target.documentDate || record.documentDate
+            });
+            updatedCount++;
+          }
         }
       }
       
       if (updatedCount > 0) {
-        console.log(`[Seed] Updated ${updatedCount} records from local paths to Cloudinary URLs.`);
+        console.log(`[Seed] Updated ${updatedCount} records with actual dates and Cloudinary URLs.`);
       } else {
-        console.log('[Seed] All existing records already use remote URLs.');
+        console.log('[Seed] All existing records are already up to date.');
       }
     }
   } catch (err) {

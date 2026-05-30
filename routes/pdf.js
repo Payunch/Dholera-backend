@@ -88,9 +88,112 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
 router.get('/list', async (req, res) => {
   try {
     const pdfs = await PdfDocument.findAll({
-      attributes: ['id', 'title', 'category', 'createdAt']
+      attributes: ['id', 'title', 'category', 'createdAt', 'documentDate']
     });
     res.json(pdfs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET export all PDF metadata (Admin)
+router.get('/export', verifyToken, async (req, res) => {
+  try {
+    const pdfs = await PdfDocument.findAll();
+    res.json(pdfs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST sync from disk (Admin) - scans a specific directory or uploads
+router.post('/sync-disk', verifyToken, async (req, res) => {
+  try {
+    // Scan the 'uploads' directory
+    const uploadsDir = path.resolve(__dirname, '..', 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      return res.status(404).json({ error: 'Uploads directory not found.' });
+    }
+
+    const files = fs.readdirSync(uploadsDir);
+    const pdfFiles = files.filter(f => f.toLowerCase().endsWith('.pdf'));
+
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    for (const fileName of pdfFiles) {
+      const fullPath = path.join(uploadsDir, fileName);
+      const stats = fs.statSync(fullPath);
+      const fileMtime = stats.mtime;
+
+      const filePath = `/uploads/${fileName}`;
+      const title = fileName.replace(/\.pdf$/i, '').replace(/_/g, ' ');
+      
+      const [record, created] = await PdfDocument.findOrCreate({
+        where: { file_path: filePath },
+        defaults: {
+          title: title,
+          category: 'Discovered',
+          is_protected: true,
+          documentDate: fileMtime // Use actual file date for new records
+        }
+      });
+
+      if (created) {
+        addedCount++;
+      } else {
+        // If it already exists but doesn't have a documentDate, update it
+        if (!record.documentDate) {
+          await record.update({ documentDate: fileMtime });
+          updatedCount++;
+        }
+      }
+    }
+
+    res.json({ success: true, added: addedCount, updated: updatedCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST import PDF metadata (Admin)
+router.post('/import', verifyToken, async (req, res) => {
+  try {
+    const data = req.body;
+    if (!Array.isArray(data)) {
+      return res.status(400).json({ error: 'Import data must be an array.' });
+    }
+
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const item of data) {
+      if (!item.title || !item.file_path) continue;
+
+      const [record, created] = await PdfDocument.findOrCreate({
+        where: { title: item.title },
+        defaults: {
+          category: item.category || 'General',
+          file_path: item.file_path,
+          is_protected: item.is_protected !== undefined ? item.is_protected : true,
+          documentDate: item.documentDate || null
+        }
+      });
+
+      if (!created) {
+        await record.update({
+          category: item.category || record.category,
+          file_path: item.file_path || record.file_path,
+          is_protected: item.is_protected !== undefined ? item.is_protected : record.is_protected,
+          documentDate: item.documentDate || record.documentDate
+        });
+        updatedCount++;
+      } else {
+        createdCount++;
+      }
+    }
+
+    res.json({ success: true, created: createdCount, updated: updatedCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

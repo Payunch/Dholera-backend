@@ -17,6 +17,10 @@ const PdfDocument = sequelize.define('PdfDocument', {
   is_protected: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  documentDate: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 });
 
