@@ -116,8 +116,9 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   } catch (err) {
     console.error('[Session] Failed to initialize Postgres store:', err.message);
   }
-} else if (process.env.REDIS_URL) {
-// ...
+} else {
+  console.warn('PostgreSQL not detected: using in-memory session store (not suitable for production)');
+}
 
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-session-secret';
 const isProd = process.env.NODE_ENV === 'production';
