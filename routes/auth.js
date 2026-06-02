@@ -236,32 +236,41 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 });
 
-router.post('/refresh', async (req, res) => {
-  const refreshToken = req.cookies?.admin_refresh_token;
-  if (!refreshToken) {
-    return res.status(401).json({ error: 'Missing refresh token' });
-  }
+// 4. Refresh Token (JWT Rotation)
+router.post('/refresh-token', async (req, res) => {
+  const oldToken = getTokenFromRequest(req, 'admin_refresh_token');
+  if (!oldToken) return res.status(401).json({ error: 'No refresh token' });
 
   try {
-    const rotated = rotateRefreshToken(refreshToken);
+    const rotated = rotateRefreshToken(oldToken);
     if (!rotated) {
       clearAuthCookies(res);
-      return res.status(401).json({ error: 'Refresh token expired or invalid' });
+      return res.status(401).json({ error: 'Invalid or expired session' });
     }
+
     setAuthCookies(res, rotated);
     const payload = verifyAccessToken(rotated.accessToken);
-    return res.json({ ok: true, username: payload.sub });
+    
+    if (req.session && !req.session.isAdmin) {
+      req.session.isAdmin = true;
+      req.session.username = payload.sub;
+    }
+
+    res.json({ 
+      success: true, 
+      ok: true, 
+      username: payload.sub, 
+      accessToken: rotated.accessToken 
+    });
   } catch (err) {
     clearAuthCookies(res);
-    return res.status(401).json({ error: 'Refresh token expired or invalid' });
+    res.status(401).json({ error: 'Token rotation failed' });
   }
 });
 
 router.post('/logout', async (req, res) => {
   try {
     const username = req.session?.username || null;
-    
-    // Track session end
     if (username) {
       try {
         const lastSession = await UserSession.findOne({
@@ -271,10 +280,7 @@ router.post('/logout', async (req, res) => {
         if (lastSession) {
           const now = new Date();
           const duration = Math.floor((now - lastSession.loginAt) / 1000);
-          await lastSession.update({
-            logoutAt: now,
-            duration
-          });
+          await lastSession.update({ logoutAt: now, duration });
         }
       } catch (sessErr) {
         console.error('Failed to update UserSession on logout:', sessErr);
@@ -282,32 +288,30 @@ router.post('/logout', async (req, res) => {
     }
 
     const refreshToken = req.cookies?.admin_refresh_token;
-    revokeRefreshToken(refreshToken);
+    if (refreshToken) revokeRefreshToken(refreshToken);
+    
     req.session.destroy(async (err) => {
-      if (err) return res.status(500).json({ error: 'Failed to destroy session' });
       clearAuthCookies(res);
-      await logAuditEvent({
-        eventType: 'admin.logout',
-        actorType: 'admin',
-        actorId: username,
-        success: true,
-        ip: req.ip,
-        userAgent: req.headers['user-agent']
-      });
+      if (username) {
+        await logAuditEvent({
+          eventType: 'admin.logout',
+          actorType: 'admin',
+          actorId: username,
+          success: true,
+          ip: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+      }
       res.json({ ok: true });
     });
   } catch (err) {
-    console.error('Logout error:', err);
     res.status(500).json({ error: 'Logout failed' });
   }
 });
 
 router.get('/sessions', verifyToken, async (req, res) => {
   try {
-    const sessions = await UserSession.findAll({
-      order: [['loginAt', 'DESC']],
-      limit: 100
-    });
+    const sessions = await UserSession.findAll({ order: [['loginAt', 'DESC']], limit: 100 });
     res.json(sessions);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -319,7 +323,7 @@ router.get('/me', verifyToken, (req, res) => {
 });
 
 router.get('/mfa/status', (req, res) => {
-  return res.json({ enabled: isMfaEnabled(), issuer: process.env.ADMIN_MFA_ISSUER || 'Dholera Growth Evidence Platform' });
+  return res.json({ enabled: isMfaEnabled(), issuer: 'Dholera Growth Evidence Platform' });
 });
 
 router.get('/mfa/provisioning-uri', verifyToken, (req, res) => {

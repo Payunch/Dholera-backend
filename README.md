@@ -407,7 +407,38 @@ Dholera-backend/
 
 ---
 
-**Built with Node.js + Express | Managed by Dholera Backend Team | Last Updated: May 2026**
+---
+**Built with Node.js + Express | Managed by Dholera Backend Team | Last Updated: June 2026**
+
+## 🚀 Next Phase: Advanced Enterprise Roadmap
+
+The following technical enhancements are scheduled to elevate the Dholera Platform to an enterprise-grade service.
+
+### Phase 1: Real-time Communication (1-2 Hours)
+*   **WebSockets (Socket.io):** Transition from HTTP polling to real-time events.
+*   **Benefit:** Admin approvals will unlock user documents in **0.1 seconds** instead of 5-10 seconds.
+*   **Notifications:** Live "Toast" notifications in the Admin App for every new visitor or payment attempt.
+
+### Phase 2: High-Performance Data Streaming (1 Hour)
+*   **Node.js Streams & Pipes:** Full refactor of the PDF delivery engine.
+*   **Benefit:** Faster loading for large technical maps and 90% reduction in server memory usage. Resilient to slow internet connections.
+
+### Phase 3: Enterprise Database Migration (3-4 Hours)
+*   **SQLite to PostgreSQL:** Migration to a robust, hosted relational database on Railway.
+*   **Data Integrity:** Automated migration script to move existing Leads, Purchases, and Logs with zero data loss.
+*   **Scalability:** Supports thousands of concurrent users and secure automated backups.
+
+### Phase 4: "Unbreakable" Security Hardening (1-2 Hours)
+*   **JWT Rotation:** Implementation of Access + Refresh token pairs.
+*   **Device Binding:** Optional binding of Admin sessions to specific devices for maximum security.
+*   **DDoS Protection:** Advanced rate-limiting and request signing for all sensitive API routes.
+
+### Phase 5: Caching & Scalability (2 Hours)
+*   **Redis Integration:** Adding an in-memory cache for frequently accessed PDF metadata and session states.
+*   **Benefit:** Sub-millisecond response times for the Archive and Search features.
+
+---
+**Roadmap Status:** Prepared for Execution | **Lead Architect:** Paresh Solanki
 
 # Dholera Backend API
 
