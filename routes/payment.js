@@ -26,6 +26,45 @@ async function getTotalRevenue() {
 }
 
 /**
+ * GET /api/payment/my-purchases
+ * Lists all completed and pending purchases for the current user.
+ */
+router.get('/my-purchases', async (req, res) => {
+  try {
+    let leadToken = req.headers.authorization || '';
+    leadToken = extractToken(leadToken);
+
+    const lead = await Lead.findOne({ where: { lead_token: leadToken } });
+    if (!lead) return res.status(403).json({ error: 'Invalid lead token' });
+
+    const purchases = await PdfPurchase.findAll({
+      where: { lead_id: lead.id },
+      include: [
+        { model: PdfDocument, attributes: ['title', 'category'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      purchases: purchases.map(p => ({
+        id: p.id,
+        pdfId: p.pdf_id,
+        status: p.status,
+        amount: p.amount / 100,
+        transactionId: p.transaction_id,
+        createdAt: p.createdAt,
+        documentTitle: p.PdfDocument?.title || (p.pdf_id === 0 ? 'PRO ACCESS' : 'Unknown'),
+        category: p.PdfDocument?.category
+      }))
+    });
+  } catch (err) {
+    console.error('[Payment] My Purchases Error:', err);
+    res.status(500).json({ error: 'Failed to fetch purchases' });
+  }
+});
+
+/**
  * POST /api/payment/request-manual
  * Logs a user's intent to pay via UPI QR and returns UPI details.
  * Also checks the 18 Lakh revenue limit.
