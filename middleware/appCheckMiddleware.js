@@ -17,9 +17,9 @@ async function appCheckVerification(req, res, next) {
     return next();
   }
 
-  // MOBILE COMPATIBILITY: If a valid JWT token is in the query string, we trust the identity
-  // for the document stream (since external browsers can't send AppCheck headers).
-  if (req.query.token) {
+  // MOBILE & SESSION COMPATIBILITY: If a valid JWT token is in the query string or header,
+  // we prioritize the user's authenticated identity over the device integrity handshake.
+  if (req.query.token || req.headers.authorization) {
     return next();
   }
 
