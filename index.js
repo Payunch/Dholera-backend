@@ -119,6 +119,11 @@ if (process.env.REDIS_URL) {
 }
 
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-session-secret';
+const isProd = process.env.NODE_ENV === 'production';
+let cookieDomain = process.env.COOKIE_DOMAIN;
+if (!cookieDomain && isProd) {
+  cookieDomain = '.dholeraplatform.com';
+}
 
 app.use(session({
   store: sessionStore,
@@ -127,11 +132,11 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: true, // Always secure for modern browser cross-site compatibility
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge: 24 * 60 * 60 * 1000, // 1 day
-    ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
+    ...(cookieDomain && { domain: cookieDomain })
   }
 }));
 

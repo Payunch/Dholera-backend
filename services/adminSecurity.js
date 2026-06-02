@@ -63,13 +63,21 @@ const isMfaEnabled = () => Boolean(ADMIN_MFA_SECRET);
 
 const getCookieOptions = (maxAgeMs) => {
   const isProd = process.env.NODE_ENV === 'production';
+  
+  // Cross-origin cookies (api.domain.com -> domain.com) require a leading dot in the domain.
+  // We prioritize process.env.COOKIE_DOMAIN if set.
+  let domain = process.env.COOKIE_DOMAIN;
+  if (!domain && isProd) {
+    domain = '.dholeraplatform.com';
+  }
+
   return {
     httpOnly: true,
-    secure: isProd,
+    secure: true, // Always secure for modern browsers handling cross-site cookies
     sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge: maxAgeMs,
-    ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN })
+    ...(domain && { domain })
   };
 };
 
