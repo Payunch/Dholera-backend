@@ -1,8 +1,8 @@
 /**
  * sync_from_cloudinary.js
  * 
- * Fetches all PDF resources from Cloudinary and adds them to the PdfDocument table
- * if they don't already exist.
+ * Fetches all PDF resources from Cloudinary and adds them to the PdfDocument table.
+ * Matches existing records by filename to avoid duplicates.
  */
 
 const path = require('path');
@@ -37,68 +37,6 @@ async function sync() {
     await sequelize.authenticate();
     console.log('[DB] Connected.');
 
-    // Fix sequence if on Postgres BEFORE starting
-    if (sequelize.getDialect() === 'postgres') {
-      await sequelize.query(`
-        SELECT setval(pg_get_serial_sequence('"PdfDocuments"', 'id'), 
-        COALESCE((SELECT MAX(id) FROM "PdfDocuments"), 1));
-      `);
-      console.log('[DB] Sequence updated.');
-    }
-
-    console.log('[Cloudinary] Fetching all PDF resources...');
-    
-    const rawResult = await cloudinary.api.resources({
-      resource_type: 'raw',
-      max_results: 500
-    });
-    const imgResult = await cloudinary.api.resources({
-      resource_type: 'image',
-      max_results: 500
-    });
-
-    const allResources = [...rawResult.resources, ...imgResult.resources];
-    const resources = allResources.filter(r => r.format === 'pdf' || r.secure_url.endsWith('.pdf'));
-    console.log(`[Cloudinary] Found ${resources.length} PDF resources.`);
-
-    let added = 0;
-    let existing = 0;
-
-    for (const res of resources) {
-      const url = res.secure_url;
-      const publicId = res.public_id;
-      const title = path.basename(publicId).replace(/_/g, ' ').replace(/\.pdf$/i, '');
-      const category = detectCategory(title);
-      
-      // EXTREMELY IMPORTANT: We need to store the true URL that identifies if it's restricted
-      // If Cloudinary returned it via API, res.type will be 'authenticated' if it's restricted.
-      const isRestricted = res.type === 'authenticated';
-      
-      const doc = await PdfDocument.findOne({ where: { title: title } });
-      
-      if (!doc) {
-        await PdfDocument.create({
-          title: title,
-          category: category,
-          file_path: url,
-          is_protected: true,
-          documentDate: res.created_at
-        });
-        console.log(`  [ADDED] ${title} (${category})${isRestricted ? ' [SECURE]' : ''}`);
-        added++;
-      } else {
-        if (doc.file_path !== url) {
-           await doc.update({ file_path: url, documentDate: res.created_at });
-           console.log(`  [UPDATED] ${title}${isRestricted ? ' [SECURE]' : ''}`);
-           added++;
-        } else {
-           existing++;
-        }
-      }
-    }
-
-    console.log(`\nSync Complete: ${added} processed, ${existing} already up to date.`);
-    
     // Fix sequence if on Postgres
     if (sequelize.getDialect() === 'postgres') {
       await sequelize.query(`
@@ -107,19 +45,60 @@ async function sync() {
       `);
     }
 
-    const allDocs = await PdfDocument.findAll({ raw: true });
-    const seedData = allDocs.map(d => ({
-      title: d.title,
-      category: d.category,
-      file_path: d.file_path,
-      documentDate: d.documentDate
-    }));
+    console.log('[Cloudinary] Fetching all PDF resources...');
     
-    const seedPath = path.join(__dirname, 'cloudinary_pdfs.json');
-    const fs = require('fs');
-    fs.writeFileSync(seedPath, JSON.stringify(seedData, null, 2), 'utf8');
-    console.log(`[Seed] Updated ${seedPath} with ${allDocs.length} records.`);
+    const rawResult = await cloudinary.api.resources({ resource_type: 'raw', max_results: 500 });
+    const imgResult = await cloudinary.api.resources({ resource_type: 'image', max_results: 500 });
 
+    const allResources = [...rawResult.resources, ...imgResult.resources];
+    const resources = allResources.filter(r => r.format === 'pdf' || r.secure_url.endsWith('.pdf'));
+    console.log(`[Cloudinary] Found ${resources.length} PDF resources.`);
+
+    let added = 0;
+    let updated = 0;
+    let total = 0;
+
+    for (const res of resources) {
+      const url = res.secure_url;
+      const publicId = res.public_id;
+      const fileName = path.basename(publicId);
+      const title = fileName.replace(/_/g, ' ').replace(/\.pdf$/i, '');
+      const category = detectCategory(title);
+      
+      // Match by filename in the URL
+      const { Op } = require('sequelize');
+      const doc = await PdfDocument.findOne({ 
+        where: { 
+          file_path: { [Op.like]: `%${fileName}%` } 
+        } 
+      });
+      
+      if (!doc) {
+        await PdfDocument.create({
+          title: title,
+          category: category,
+          file_path: url,
+          storage_type: res.type,
+          resource_type: res.resource_type,
+          is_protected: true,
+          documentDate: res.created_at
+        });
+        console.log(`  [ADDED] ${title} (${category}) [${res.type}]`);
+        added++;
+      } else {
+        await doc.update({
+          file_path: url,
+          storage_type: res.type,
+          resource_type: res.resource_type,
+          documentDate: res.created_at
+        });
+        updated++;
+      }
+      total++;
+    }
+
+    console.log(`\nSync Complete: ${added} added, ${updated} updated, ${total} total.`);
+    
   } catch (err) {
     console.error('Sync failed:', err);
   } finally {

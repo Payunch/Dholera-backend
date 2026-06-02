@@ -5,12 +5,13 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
-const { PdfDocument, PdfView, Lead, PdfPurchase } = require('../models');
+const { PdfDocument, PdfView, Lead, PdfPurchase, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { verifyAccessToken, getTokenFromRequest } = require('../services/adminSecurity');
 const { cloudinary } = require('../services/cloudinary');
 const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
+const { appCheckVerification } = require('../middleware/appCheckMiddleware');
 
 const ALLOWED_REMOTE_PDF_HOSTS = new Set(['res.cloudinary.com']);
 
@@ -48,7 +49,6 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
         upstream.resume();
         const nextUrl = new URL(redirectLocation, remoteUrl).toString();
         
-        // Allow redirects from api.cloudinary.com to res.cloudinary.com during authenticated download
         const parsedNext = new URL(nextUrl);
         if (parsedNext.hostname !== 'res.cloudinary.com' && !isAllowedRemotePdfUrl(nextUrl)) {
           reject(new Error('Remote PDF redirect target is not allowed.'));
@@ -90,166 +90,19 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
 router.get('/list', async (req, res) => {
   try {
     const pdfs = await PdfDocument.findAll({
-      attributes: ['id', 'title', 'category', 'createdAt', 'documentDate']
+      attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
+      order: [['id', 'ASC']]
     });
     res.json(pdfs);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
-// GET export all PDF metadata (Admin)
-router.get('/export', verifyToken, async (req, res) => {
-  try {
-    const pdfs = await PdfDocument.findAll();
-    res.json(pdfs);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST sync from disk (Admin) - scans a specific directory or uploads
-router.post('/sync-disk', verifyToken, async (req, res) => {
-  try {
-    // Scan the 'uploads' directory
-    const uploadsDir = path.resolve(__dirname, '..', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      return res.status(404).json({ error: 'Uploads directory not found.' });
-    }
-
-    const files = fs.readdirSync(uploadsDir);
-    const pdfFiles = files.filter(f => f.toLowerCase().endsWith('.pdf'));
-
-    let addedCount = 0;
-    let updatedCount = 0;
-
-    for (const fileName of pdfFiles) {
-      const fullPath = path.join(uploadsDir, fileName);
-      const stats = fs.statSync(fullPath);
-      const fileMtime = stats.mtime;
-
-      const filePath = `/uploads/${fileName}`;
-      const title = fileName.replace(/\.pdf$/i, '').replace(/_/g, ' ');
-      
-      const [record, created] = await PdfDocument.findOrCreate({
-        where: { file_path: filePath },
-        defaults: {
-          title: title,
-          category: 'Discovered',
-          is_protected: true,
-          documentDate: fileMtime // Use actual file date for new records
-        }
-      });
-
-      if (created) {
-        addedCount++;
-      } else {
-        // If it already exists but doesn't have a documentDate, update it
-        if (!record.documentDate) {
-          await record.update({ documentDate: fileMtime });
-          updatedCount++;
-        }
-      }
-    }
-
-    res.json({ success: true, added: addedCount, updated: updatedCount });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST import PDF metadata (Admin)
-router.post('/import', verifyToken, async (req, res) => {
-  try {
-    const data = req.body;
-    if (!Array.isArray(data)) {
-      return res.status(400).json({ error: 'Import data must be an array.' });
-    }
-
-    let createdCount = 0;
-    let updatedCount = 0;
-
-    for (const item of data) {
-      if (!item.title || !item.file_path) continue;
-
-      const [record, created] = await PdfDocument.findOrCreate({
-        where: { title: item.title },
-        defaults: {
-          category: item.category || 'General',
-          file_path: item.file_path,
-          is_protected: item.is_protected !== undefined ? item.is_protected : true,
-          documentDate: item.documentDate || null
-        }
-      });
-
-      if (!created) {
-        await record.update({
-          category: item.category || record.category,
-          file_path: item.file_path || record.file_path,
-          is_protected: item.is_protected !== undefined ? item.is_protected : record.is_protected,
-          documentDate: item.documentDate || record.documentDate
-        });
-        updatedCount++;
-      } else {
-        createdCount++;
-      }
-    }
-
-    res.json({ success: true, created: createdCount, updated: updatedCount });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST upload a new PDF (Admin)
-router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
-  try {
-    const { title, category } = req.body;
-    const isProtected = req.body.is_protected === undefined
-      ? true
-      : ['true', true, '1', 1].includes(req.body.is_protected);
-    
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'PDF file is required' });
-    }
-
-    // Save relative path for local storage so static server can find it
-    let filePath = req.file.secure_url || req.file.path;
-    if (!isRemotePdfPath(filePath)) {
-      // Convert absolute path to relative for static serving
-      // req.file.path is usually .../uploads/pdfs/filename.pdf
-      // We want /uploads/pdfs/filename.pdf
-      const uploadsBase = path.resolve(__dirname, '..');
-      filePath = '/' + path.relative(uploadsBase, filePath).replace(/\\/g, '/');
-    }
-
-    const pdf = await PdfDocument.create({
-      title: title.trim(),
-      category: category ? category.trim() : 'General',
-      file_path: filePath,
-      is_protected: isProtected
-    });
-
-    res.status(201).json(pdf);
-  } catch (err) {
-    console.error('Error uploading PDF:', err);
-    res.status(400).json({ error: err.message || 'Failed to upload PDF' });
-  }
-});
-const { appCheckVerification } = require('../middleware/appCheckMiddleware');
-
-// ... (existing helper functions)
 
 // GET secure PDF stream
 router.get('/view/:id', appCheckVerification, async (req, res) => {
   try {
-// ...
-
-    // 1. Check if the user is an Admin first (Super-Power)
+    // 1. Authenticate (Admin or Verified Lead)
     let isAdmin = false;
     if (req.session?.isAdmin) {
       isAdmin = true;
@@ -259,135 +112,89 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
         try {
           const payload = verifyAccessToken(accessToken);
           if (payload?.sub) isAdmin = true;
-        } catch (e) {
-          // Token invalid, ignore and check lead token
-        }
+        } catch (e) {}
       }
     }
 
     let lead = null;
     if (!isAdmin) {
-      // 2. If not admin, verify Lead Token
       let leadToken = req.headers.authorization || req.query.token || '';
-      if (!leadToken) {
-        return res.status(403).json({ error: 'Verification required to view this document.' });
-      }
       if (leadToken.toLowerCase().startsWith('bearer ')) {
         leadToken = leadToken.slice(7).trim();
       }
 
-      lead = await Lead.findOne({ where: { lead_token: leadToken } });
-      if (!lead || !lead.verified) {
-        return res.status(403).json({ error: 'Invalid or unverified lead token.' });
+      if (leadToken) {
+        lead = await Lead.findOne({ where: { lead_token: leadToken } });
+      }
+      
+      // If no token and it's not a trial, block it early
+      const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
+      if (!lead && String(req.params.id) !== String(freeTrialId)) {
+        return res.status(403).json({ error: 'Verification required to view this document.' });
       }
     }
 
     const pdf = await PdfDocument.findByPk(req.params.id);
-    if (!pdf) {
-      return res.status(404).json({ error: 'PDF not found.' });
-    }
+    if (!pdf) return res.status(404).json({ error: 'PDF not found.' });
 
-    // 3. Enforce Payment for Protected Documents
+    // 2. Authorization (Payment check)
     if (!isAdmin && pdf.is_protected) {
-      // 3.0 Pro Access Check (Unlock All)
-      if (lead.is_pro) {
-        console.log(`[PDF] Lead ${lead.id} is PRO. Access Granted.`);
-      } 
-      else {
-        // 3.1 Check for any relevant purchase records (Specific PDF OR Pro Access)
-        const targetPdfId = parseInt(pdf.id, 10);
-        
-        console.log(`[PDF] Checking access for Lead ${lead.id} on PDF ${targetPdfId}`);
+      const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
+      const isTrial = String(pdf.id) === String(freeTrialId);
 
-        const purchase = await PdfPurchase.findOne({
-          where: { 
-            lead_id: lead.id, 
-            pdf_id: { [Op.in]: [targetPdfId, 0] }, // 0 is PRO_ACCESS
-            status: { [Op.in]: ['completed', 'awaiting_approval'] }
-          },
-          order: [
-            [sequelize.literal("CASE WHEN status = 'completed' THEN 1 ELSE 2 END"), 'ASC'],
-            ['updatedAt', 'DESC']
-          ]
-        });
+      if (!isTrial) {
+        if (!lead || !lead.verified) return res.status(403).json({ error: 'Invalid or unverified lead token.' });
+        if (!lead.is_pro) {
+          const purchase = await PdfPurchase.findOne({
+            where: { 
+              lead_id: lead.id, 
+              pdf_id: { [Op.in]: [pdf.id, 0] }, // 0 is PRO_ACCESS
+              status: { [Op.in]: ['completed', 'awaiting_approval'] }
+            },
+            order: [
+              [sequelize.literal("CASE WHEN status = 'completed' THEN 1 ELSE 2 END"), 'ASC'],
+              ['updatedAt', 'DESC']
+            ]
+          });
 
-        if (purchase) {
-          console.log(`[PDF] Lead ${lead.id} match: ${purchase.status}`);
-          if (purchase.status === 'completed') {
-            // Access granted
-          } else if (purchase.status === 'awaiting_approval') {
-            return res.status(402).json({ 
-              error: 'Payment Awaiting Approval',
-              status: 'awaiting_approval',
-              message: 'Your payment details are being verified by the Admin.',
-              leadId: lead.id
-            });
-          }
-        }
-        else {
-          console.log(`[PDF] No active purchase found for Lead ${lead.id} on PDF ${targetPdfId}`);
-          
-          // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
-          const freeTrialId = parseInt(process.env.FREE_TRIAL_PDF_ID || '19', 10);
-          const isTrialDocument = targetPdfId === freeTrialId;
-
-          if (isTrialDocument) {
-            console.log(`[PDF] PDF ${freeTrialId} is free trial. Access Granted.`);
-          } else {
+          if (!purchase) {
             return res.status(402).json({ 
               error: 'Premium Document',
               requiresPayment: true,
-              amount: 10, 
-              currency: 'INR',
-              message: 'This is a premium document. You can unlock it individually or get Pro access for all documents.',
-              leadId: lead.id
+              message: 'Unlock this document or get Pro access.'
+            });
+          }
+          if (purchase.status === 'awaiting_approval') {
+            return res.status(402).json({ 
+              error: 'Payment Awaiting Approval',
+              status: 'awaiting_approval'
             });
           }
         }
       }
     }
 
-    // Record view only for leads, not for admins
-    if (lead) {
-      try {
-        await PdfView.create({ lead_id: lead.id, pdf_id: pdf.id });
-        const viewCount = await PdfView.count({ where: { lead_id: lead.id } });
-        if (viewCount > 1 && !lead.returning_visitor) {
-          await lead.update({ returning_visitor: true });
-        }
-      } catch (viewErr) {
-        console.error('Error recording PDF view:', viewErr.message);
-      }
-    }
-
+    // 3. Document Streaming
     const filePath = String(pdf.file_path || '').trim();
-    if (!filePath) {
-      return res.status(500).json({ error: 'Document path is not configured.' });
-    }
+    if (!filePath) return res.status(500).json({ error: 'Document path missing.' });
 
     if (isRemotePdfPath(filePath)) {
-      if (!isAllowedRemotePdfUrl(filePath)) {
-        console.error('[PDF] Blocked remote host:', filePath);
-        return res.status(400).json({ error: 'Invalid remote document path.' });
-      }
+      if (!isAllowedRemotePdfUrl(filePath)) return res.status(400).json({ error: 'Blocked remote host.' });
 
       let streamUrl = filePath;
 
-      // ROADMAP PHASE 6: CLOUDINARY SECURE HANDSHAKE
-      // Force secure signing for all Cloudinary assets to ensure maximum reliability
+      // ROADMAP PHASE 6: SECURE CLOUDINARY SIGNING
       try {
         const parsed = new URL(filePath);
         if (parsed.hostname === 'res.cloudinary.com') {
           const parts = parsed.pathname.split('/');
-          // Cloudinary path: /cloud_name/resource_type/type/v_version/public_id
-          const typeIndex = parts.findIndex(p => ['upload', 'private', 'authenticated'].includes(p));
+          const uploadIndex = parts.indexOf('upload');
+          const privateIndex = parts.indexOf('private');
+          const authenticatedIndex = parts.indexOf('authenticated');
+          const typeIndex = uploadIndex !== -1 ? uploadIndex : (privateIndex !== -1 ? privateIndex : authenticatedIndex);
           
           if (typeIndex !== -1) {
-            const resourceType = parts[typeIndex - 1] || 'image';
-            const type = parts[typeIndex];
             let publicIdParts = parts.slice(typeIndex + 1);
-            
-            // Skip version segment
             if (publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
               publicIdParts = publicIdParts.slice(1);
             }
@@ -397,51 +204,86 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
             const format = extMatch ? extMatch[1] : 'pdf';
             const publicId = extMatch ? fullPublicId.slice(0, -extMatch[0].length) : fullPublicId;
 
-            // Generate signed download URL
+            // USE STORED METADATA FOR PERFECT SIGNING
             streamUrl = cloudinary.utils.private_download_url(publicId, format, {
-              resource_type: resourceType,
-              type: type
+              resource_type: pdf.resource_type || 'image',
+              type: pdf.storage_type || parts[typeIndex]
             });
-            console.log(`[PDF] Securely signed: ${publicId} (Type: ${type})`);
+            console.log(`[PDF] Securely signed ${pdf.title} (Type: ${pdf.storage_type || 'auto'})`);
           }
         }
-      } catch (signErr) {
-        console.warn('[PDF] Handshake failed, falling back to direct stream:', signErr.message);
+      } catch (err) {
+        console.warn('[PDF] Cloudinary handshake failed:', err.message);
       }
 
-      // HIGH-PERFORMANCE STREAMING (Phase 2)
-      try {
-        await pipeRemoteUrl(streamUrl, res);
-      } catch (err) {
-        console.error(`[PDF] Stream failed for ${pdf.title}:`, err.message);
-        if (!res.headersSent) res.status(502).json({ error: 'Cloud storage link failed. Please try again in a moment.' });
-      }
+      await pipeRemoteUrl(streamUrl, res);
       return;
     }
 
+    // Local file streaming
     const uploadsDir = path.resolve(__dirname, '..', 'uploads');
     const resolved = path.resolve(__dirname, '..', filePath.startsWith('/') ? filePath.substring(1) : filePath);
 
-    if (!isPathInsideDir(uploadsDir, resolved)) return res.status(400).json({ error: 'Invalid path' });
-    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File missing' });
+    if (!isPathInsideDir(uploadsDir, resolved) || !fs.existsSync(resolved)) {
+      return res.status(404).json({ error: 'File missing.' });
+    }
 
-    // NODE.JS STREAMS (Phase 2)
     const stats = fs.statSync(resolved);
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Length': stats.size,
-      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
+      'Cache-Control': 'no-store, private'
     });
-    
-    const stream = fs.createReadStream(resolved);
-    stream.pipe(res);
-    stream.on('error', (err) => {
-      console.error('[Stream] Local read error:', err);
-      if (!res.headersSent) res.status(500).end();
-    });
+    fs.createReadStream(resolved).pipe(res);
+
   } catch (err) {
     console.error('PDF View Error:', err);
-    res.status(500).json({ error: 'Internal server error while loading document.' });
+    if (!res.headersSent) res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// Admin upload
+router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
+  try {
+    const { title, category } = req.body;
+    if (!title || !req.file) return res.status(400).json({ error: 'Title and PDF required.' });
+
+    const filePath = req.file.secure_url || '/' + path.relative(path.resolve(__dirname, '..'), req.file.path).replace(/\\/g, '/');
+
+    const pdf = await PdfDocument.create({
+      title: title.trim(),
+      category: category ? category.trim() : 'General',
+      file_path: filePath,
+      is_protected: true
+    });
+
+    res.status(201).json(pdf);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin sync-disk
+router.post('/sync-disk', verifyToken, async (req, res) => {
+  try {
+    const uploadsDir = path.resolve(__dirname, '..', 'uploads');
+    if (!fs.existsSync(uploadsDir)) return res.status(404).json({ error: 'Uploads missing.' });
+
+    const files = fs.readdirSync(uploadsDir).filter(f => f.toLowerCase().endsWith('.pdf'));
+    let added = 0;
+
+    for (const fileName of files) {
+      const filePath = `/uploads/${fileName}`;
+      const [, created] = await PdfDocument.findOrCreate({
+        where: { file_path: filePath },
+        defaults: { title: fileName.replace(/\.pdf$/i, '').replace(/_/g, ' '), category: 'Discovered', is_protected: true }
+      });
+      if (created) added++;
+    }
+
+    res.json({ success: true, added });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

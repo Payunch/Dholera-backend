@@ -40,6 +40,13 @@ async function appCheckVerification(req, res, next) {
   }
 
   try {
+    // Safety: If Firebase Admin was not initialized (missing service account), skip App Check.
+    // This avoids 500 errors in production while the admin is still setting up secrets.
+    if (!admin.apps.length) {
+      console.warn('[AppCheck] Firebase not initialized. Skipping verification.');
+      return next();
+    }
+
     const appCheckClaims = await admin.appCheck().verifyToken(appCheckToken);
     // Token is valid. 
     // You could also check appCheckClaims.appId if you want to restrict to specific apps

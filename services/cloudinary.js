@@ -14,9 +14,27 @@ function configureCloudinary() {
     return cloudinary;
   }
 
-  if (hasCloudinaryDsn) {
-    isConfigured = true;
-    return cloudinary;
+  // Parse CLOUDINARY_URL if present to ensure individual keys are set
+  // DSN format: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+  if (process.env.CLOUDINARY_URL) {
+    try {
+      const url = new URL(process.env.CLOUDINARY_URL);
+      const cloud_name = url.hostname;
+      const api_key = url.username;
+      const api_secret = url.password;
+
+      cloudinary.config({
+        cloud_name,
+        api_key,
+        api_secret,
+        secure: true
+      });
+      console.log('[Cloudinary] Configured via URL DSN');
+      isConfigured = true;
+      return cloudinary;
+    } catch (e) {
+      console.warn('[Cloudinary] Failed to parse DSN:', e.message);
+    }
   }
 
   if (hasCloudinaryVars) {
