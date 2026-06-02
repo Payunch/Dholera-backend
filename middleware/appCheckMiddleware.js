@@ -18,13 +18,17 @@ async function appCheckVerification(req, res, next) {
   }
 
   // 2. MOBILE & SESSION COMPATIBILITY: Priority to authenticated identity
-  if (req.query.token || req.headers.authorization) {
+  // If we have an admin session, a lead token, or a login cookie, we bypass App Check.
+  if (req.query.token || req.headers.authorization || req.session?.isAdmin || req.cookies?.admin_access_token) {
     return next();
   }
 
   // 3. TRIAL DOCUMENT COMPATIBILITY: Allow trial PDF to bypass App Check
   const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
-  if (req.params.id === String(freeTrialId)) {
+  const pathParts = req.path.split('/');
+  const pathId = req.params.id || pathParts[pathParts.length - 1];
+
+  if (String(pathId) === String(freeTrialId)) {
     return next();
   }
 
