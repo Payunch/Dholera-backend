@@ -138,11 +138,20 @@ router.post('/verify-utr', async (req, res) => {
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) return res.status(403).json({ error: 'Invalid session' });
 
+    // Handle batch transactions: find records starting with this transactionId
+    const { Op } = require('sequelize');
     const purchases = await PdfPurchase.findAll({ 
-      where: { transaction_id: transactionId, lead_id: lead.id } 
+      where: { 
+        lead_id: lead.id,
+        [Op.or]: [
+          { transaction_id: transactionId },
+          { transaction_id: { [Op.like]: `${transactionId}_%` } }
+        ]
+      } 
     });
 
     if (purchases.length === 0) {
+      console.warn(`[Payment] No pending records for ${transactionId}`);
       return res.status(404).json({ error: 'Transaction record not found.' });
     }
 
@@ -173,15 +182,36 @@ const { verifyToken: adminVerify } = require('./auth');
 // GET /api/payment/admin/pending
 router.get('/admin/pending', adminVerify, async (req, res) => {
   try {
-    const pending = await PdfPurchase.findAll({
+    // Fetch all awaiting_approval records
+    const allPending = await PdfPurchase.findAll({
       where: { status: 'awaiting_approval' },
       include: [
-        { model: Lead, attributes: ['name', 'phone', 'email'] },
-        { model: PdfDocument, attributes: ['title'] }
+        { model: Lead, attributes: ['id', 'name', 'phone', 'email'] },
+        { model: PdfDocument, attributes: ['id', 'title'] }
       ],
       order: [['updatedAt', 'DESC']]
     });
-    res.json(pending);
+
+    // Group by base transactionId (before the _) to avoid duplicates in Admin view
+    const grouped = {};
+    for (const p of allPending) {
+      const baseId = p.transaction_id.split('_').slice(0, 2).join('_'); // TXN_ABC or PRO_ABC
+      if (!grouped[baseId]) {
+        grouped[baseId] = {
+          id: p.id,
+          transaction_id: baseId,
+          utr: p.gateway_payment_id,
+          amount: 0,
+          lead: p.Lead,
+          items: [],
+          updatedAt: p.updatedAt
+        };
+      }
+      grouped[baseId].amount += p.amount;
+      grouped[baseId].items.push(p.PdfDocument?.title || (p.pdf_id === 0 ? 'PRO ACCESS' : 'PDF Access'));
+    }
+
+    res.json(Object.values(grouped));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -190,7 +220,11 @@ router.get('/admin/pending', adminVerify, async (req, res) => {
 // GET /api/payment/admin/count-pending
 router.get('/admin/count-pending', adminVerify, async (req, res) => {
   try {
-    const count = await PdfPurchase.count({ where: { status: 'awaiting_approval' } });
+    const count = await PdfPurchase.count({ 
+      where: { status: 'awaiting_approval' },
+      distinct: true,
+      col: 'transaction_id' 
+    });
     res.json({ count });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -201,9 +235,22 @@ router.get('/admin/count-pending', adminVerify, async (req, res) => {
 router.post('/admin/approve/:transactionId', adminVerify, async (req, res) => {
   try {
     const { transactionId } = req.params;
-    const purchases = await PdfPurchase.findAll({ where: { transaction_id: transactionId } });
+    const { Op } = require('sequelize');
+
+    // Find all matching records (handle suffixes like _1, _2)
+    const purchases = await PdfPurchase.findAll({ 
+      where: { 
+        [Op.or]: [
+          { transaction_id: transactionId },
+          { transaction_id: { [Op.like]: `${transactionId}_%` } }
+        ]
+      } 
+    });
     
-    if (purchases.length === 0) return res.status(404).json({ error: 'Not found' });
+    if (purchases.length === 0) {
+      console.warn(`[Admin] Approval failed: No records for ${transactionId}`);
+      return res.status(404).json({ error: 'Transaction record not found' });
+    }
 
     for (const p of purchases) {
       await p.update({ status: 'completed' });
@@ -211,12 +258,17 @@ router.post('/admin/approve/:transactionId', adminVerify, async (req, res) => {
       // If it was a PRO purchase, update lead
       if (p.pdf_id === 0) {
         const lead = await Lead.findByPk(p.lead_id);
-        if (lead) await lead.update({ is_pro: true });
+        if (lead) {
+          await lead.update({ is_pro: true });
+          console.log(`[Admin] User ${lead.id} upgraded to PRO`);
+        }
       }
     }
 
+    console.log(`[Admin] Approved transaction: ${transactionId} (${purchases.length} items)`);
     res.json({ success: true, message: 'Payment approved. Access granted.' });
   } catch (err) {
+    console.error('[Admin] Approval Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
