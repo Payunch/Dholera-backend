@@ -97,14 +97,18 @@ router.post('/create-order', async (req, res) => {
     leadToken = extractToken(leadToken);
 
     // Verify Lead
+    console.log(`[Payment] Finding Lead with token hint: ${leadToken.substring(0, 5)}...`);
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) {
+      console.warn('[Payment] Lead not found for token');
       return res.status(403).json({ error: 'Invalid lead token' });
     }
 
     // Verify PDF
+    console.log(`[Payment] Finding PDF with ID: ${pdfId}`);
     const pdf = await PdfDocument.findByPk(pdfId);
     if (!pdf) {
+      console.warn(`[Payment] PDF ${pdfId} not found`);
       return res.status(404).json({ error: 'PDF not found' });
     }
 
@@ -113,6 +117,7 @@ router.post('/create-order', async (req, res) => {
       where: { lead_id: lead.id, pdf_id: pdfId, status: 'completed' }
     });
     if (existing) {
+      console.log(`[Payment] PDF ${pdfId} already purchased by Lead ${lead.id}`);
       return res.json({ alreadyPurchased: true });
     }
 
@@ -141,6 +146,7 @@ router.post('/create-order', async (req, res) => {
     const checksum = sha256(stringToHash) + '###' + SALT_INDEX;
 
     // 3. Create Pending Purchase Record
+    console.log('[Payment] Creating pending purchase record...');
     await PdfPurchase.create({
       lead_id: lead.id,
       pdf_id: pdfId,
@@ -149,9 +155,7 @@ router.post('/create-order', async (req, res) => {
       status: 'pending'
     });
 
-    console.log(`[Payment] Initiating PhonePe payment for Lead ${lead.id}, PDF ${pdfId}, TXN ${merchantTransactionId}`);
-    console.log(`[Payment] Using redirectUrl: ${redirectUrl}`);
-
+    console.log(`[Payment] Calling PhonePe API at: ${HOST_URL}/pg/v1/pay`);
     // 4. Call PhonePe API
     const response = await axios.post(
       `${HOST_URL}/pg/v1/pay`,
@@ -163,7 +167,11 @@ router.post('/create-order', async (req, res) => {
           'accept': 'application/json'
         }
       }
-    );
+    ).catch(e => {
+      console.error('[Payment] PhonePe Axios Error Status:', e.response?.status);
+      console.error('[Payment] PhonePe Axios Error Data:', e.response?.data);
+      throw e;
+    });
 
     console.log('[Payment] PhonePe response:', response.data);
 

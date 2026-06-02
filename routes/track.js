@@ -34,7 +34,15 @@ router.post('/', async (req, res) => {
       session.browserFingerprint = browserFingerprint;
     }
 
-    let pages = JSON.parse(session.visitedPages || '[]');
+    let pages = [];
+    try {
+      pages = JSON.parse(session.visitedPages || '[]');
+      if (!Array.isArray(pages)) pages = [];
+    } catch (e) {
+      console.warn('[Track] Invalid JSON in visitedPages, resetting to empty array');
+      pages = [];
+    }
+
     if (page && !pages.includes(page)) {
       pages.push(page);
     }
