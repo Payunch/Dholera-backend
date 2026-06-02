@@ -103,18 +103,21 @@ router.post('/request-manual', async (req, res) => {
       isPro = true;
     } 
     // Multi-select (Cart)
-    else if (pdfIds && Array.isArray(pdfIds) && pdfIds.length > 0) {
+    else if (Array.isArray(pdfIds) && pdfIds.length > 0) {
       amountPaise = pdfIds.length * 1000;
       targetPdfIds = pdfIds;
     }
     // Single Select
-    else {
+    else if (pdfId) {
       const pdf = await PdfDocument.findByPk(pdfId);
       if (!pdf) return res.status(404).json({ error: 'PDF not found' });
       const existing = await PdfPurchase.findOne({ where: { lead_id: lead.id, pdf_id: pdfId, status: 'completed' } });
       if (existing || lead.is_pro) return res.json({ alreadyPurchased: true });
       amountPaise = 1000;
       targetPdfIds = [pdfId];
+    }
+    else {
+      return res.status(400).json({ error: 'No documents selected for purchase' });
     }
 
     const baseTransactionId = `${isPro ? 'PRO' : 'PDF'}_${uniqid().toUpperCase()}`;
@@ -141,13 +144,6 @@ router.post('/request-manual', async (req, res) => {
     const merchantName = (process.env.ADMIN_NAME || 'Dholera Platform').trim();
 
     console.log(`[Payment] Manual Request Created. ID: ${baseTransactionId}, UPI: ${upiId}, Name: ${merchantName}`);
-
-    const { sendAdminNotification } = require('../services/notificationService');
-    await sendAdminNotification(
-      'New Payment Request',
-      `${lead.name} submitted UTR: ${utr} for ₹${amountPaise/100}`,
-      { type: 'payment', transactionId: baseTransactionId }
-    );
 
     res.json({
       success: true,
@@ -210,6 +206,18 @@ router.post('/verify-utr', async (req, res) => {
         status: 'awaiting_approval', 
         gateway_payment_id: utr 
       });
+    }
+
+    // ROADMAP PHASE 1: NOTIFY ADMIN OF SUBMITTED UTR
+    try {
+      const { sendAdminNotification } = require('../services/notificationService');
+      await sendAdminNotification(
+        'Payment Proof Submitted',
+        `${lead.name} submitted UTR: ${utr}. Verify and approve now.`,
+        { type: 'payment', transactionId: transactionId, utr: utr }
+      );
+    } catch (notifyErr) {
+      console.error('[Payment] Push notification failed:', notifyErr.message);
     }
 
     res.json({ 
