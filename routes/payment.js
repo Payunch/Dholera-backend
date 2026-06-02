@@ -54,6 +54,19 @@ const extractToken = (authHeader = '') => {
  */
 router.post('/create-order', async (req, res) => {
   try {
+    // Verbose debug: log request body and safe headers (do not log Authorization)
+    try {
+      const safeHeaders = {
+        host: req.get('host'),
+        origin: req.headers.origin,
+        'user-agent': req.headers['user-agent'],
+        'content-type': req.headers['content-type']
+      };
+      console.log('[Payment][DEBUG] create-order request', { body: req.body, headers: safeHeaders });
+    } catch (e) {
+      console.warn('[Payment][DEBUG] failed to stringify request for logging', e && e.message);
+    }
+
     let { pdfId, leadToken } = req.body;
 
     if (!pdfId || !leadToken) {
@@ -145,7 +158,13 @@ router.post('/create-order', async (req, res) => {
     }
 
   } catch (err) {
-    console.error('[Payment] PhonePe Initiation Error:', err.response?.data || err.message);
+    // Log as much useful debug information as possible without exposing secrets
+    console.error('[Payment] PhonePe Initiation Error - message:', err.message);
+    if (err.stack) console.error('[Payment] Stack:', err.stack);
+    if (err.response) {
+      console.error('[Payment] PhonePe response error data:', err.response.data);
+      console.error('[Payment] PhonePe response status:', err.response.status);
+    }
     res.status(500).json({ 
       error: 'Failed to initiate payment',
       details: err.response?.data?.message || err.message
