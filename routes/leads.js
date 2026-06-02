@@ -1554,8 +1554,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
   }
 });
 
-module.exports = router;
-
 // NOTE: Test-only endpoint for QA/third-party testers (staging only)
 // Usage: enable TEST_LOGIN_ALLOWED=true in env (or run when NODE_ENV !== 'production')
 // Creates or updates a lead and returns a lead_token for passcode-less testing.
@@ -1605,6 +1603,7 @@ router.post('/test-login', async (req, res) => {
       });
     }
 
+    const { logAuditEvent } = require('../services/auditLogger');
     await logAuditEvent({
       eventType: 'lead.test_login.created',
       actorType: 'system',
@@ -1621,3 +1620,5 @@ router.post('/test-login', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+module.exports = router;
