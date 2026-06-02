@@ -109,4 +109,52 @@ router.post('/restore', verifyToken, upload.single('backup'), async (req, res) =
   }
 });
 
+/**
+ * GET /api/admin/db/tables
+ * Lists all tables in the database.
+ */
+router.get('/db/tables', verifyToken, async (req, res) => {
+  try {
+    const tables = await sequelize.getQueryInterface().showAllTables();
+    // Exclude internal/system tables if any
+    const filtered = tables.filter(t => !['sqlite_sequence', 'SequelizeMeta'].includes(t));
+    res.json(filtered);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/db/raw/:tableName
+ * Fetches all rows from a specific table.
+ */
+router.get('/db/raw/:tableName', verifyToken, async (req, res) => {
+  try {
+    const { tableName } = req.params;
+    
+    // Safety check: ensure tableName is alphanumeric to prevent injection
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+      return res.status(400).json({ error: 'Invalid table name' });
+    }
+
+    // Direct query for total visibility
+    // Check if the table has createdAt to order by, otherwise just select
+    let query = `SELECT * FROM ${tableName} LIMIT 1000`;
+    try {
+       const [results] = await sequelize.query(`SELECT name FROM pragma_table_info('${tableName}') WHERE name = 'createdAt'`);
+       if (results.length > 0) {
+         query = `SELECT * FROM ${tableName} ORDER BY createdAt DESC LIMIT 1000`;
+       }
+    } catch(e) {}
+
+    const data = await sequelize.query(query, {
+      type: sequelize.QueryTypes.SELECT
+    });
+    
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
