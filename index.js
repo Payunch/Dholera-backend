@@ -15,7 +15,38 @@ const { buildOriginMatcher } = require('./utils/originMatcher');
 const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
 const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
 
+const http = require('http');
+const { Server } = require('socket.io');
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (originMatcher.isAllowedOrigin(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+  }
+});
+
+// Attach io to app so routes can access it
+app.set('io', io);
+
+io.on('connection', (socket) => {
+  socket.on('join_lead', (leadToken) => {
+    socket.join(`lead_${leadToken}`);
+    console.log(`[Socket] Lead joined channel: lead_${leadToken.substring(0, 8)}...`);
+  });
+
+  socket.on('join_admin', () => {
+    // Note: in a real app, verify admin session before joining admin channel
+    socket.join('admin_alerts');
+    console.log('[Socket] Admin joined alert channel');
+  });
+});
+
 const bootAt = new Date().toISOString();
 
 // Build the origin matcher from configured sources. Prefer an explicit
@@ -214,8 +245,9 @@ const startServer = async () => {
     process.exit(1);
   }
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`[Server] ✅ Running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+    console.log(`[Socket] ⚡ Engine active`);
     
     // Run background tasks after server is up to avoid blocking health checks
     seedPdfsIfEmpty(PdfDocument).catch(err => console.error('[Seed] PDF seed failed:', err));

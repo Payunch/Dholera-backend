@@ -310,17 +310,27 @@ router.post('/admin/approve/:transactionId', adminVerify, async (req, res) => {
       return res.status(404).json({ error: 'Transaction record not found' });
     }
 
+    const leadId = purchases[0].lead_id;
+    const lead = await Lead.findByPk(leadId);
+
     for (const p of purchases) {
       await p.update({ status: 'completed' });
       
       // If it was a PRO purchase, update lead
-      if (p.pdf_id === 0) {
-        const lead = await Lead.findByPk(p.lead_id);
-        if (lead) {
-          await lead.update({ is_pro: true });
-          console.log(`[Admin] User ${lead.id} upgraded to PRO`);
-        }
+      if (p.pdf_id === 0 && lead) {
+        await lead.update({ is_pro: true });
+        console.log(`[Admin] User ${lead.id} upgraded to PRO`);
       }
+    }
+
+    // REAL-TIME UNLOCK (Roadmap Phase 1)
+    const io = req.app.get('io');
+    if (io && lead?.lead_token) {
+      io.to(`lead_${lead.lead_token}`).emit('payment_approved', {
+        transactionId: transactionId,
+        message: 'Access granted by Admin'
+      });
+      console.log(`[Socket] Unlock signal emitted to lead_${lead.lead_token.substring(0, 8)}...`);
     }
 
     console.log(`[Admin] Approved transaction: ${transactionId} (${purchases.length} items)`);

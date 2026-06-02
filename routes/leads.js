@@ -1484,7 +1484,9 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     
-    const data = JSON.parse(req.file.buffer.toString());
+    const root = JSON.parse(req.file.buffer.toString());
+    // Handle both { leads: [] } and { data: { Lead: [] } } formats
+    const data = root.data || root;
     
     const results = {
       leads: { created: 0, updated: 0 },
@@ -1493,9 +1495,10 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       pdfs: { created: 0, updated: 0 }
     };
 
-    // Restore Leads (Deduplicate by phone)
-    if (data.leads) {
-      for (const item of data.leads) {
+    // Restore Leads
+    const leadList = data.Lead || data.leads;
+    if (leadList) {
+      for (const item of leadList) {
         const [obj, created] = await Lead.findOrCreate({
           where: { phone: item.phone },
           defaults: item
@@ -1509,9 +1512,10 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       }
     }
 
-    // Restore Updates (Deduplicate by title)
-    if (data.updates) {
-      for (const item of data.updates) {
+    // Restore Updates
+    const updateList = data.Update || data.updates;
+    if (updateList) {
+      for (const item of updateList) {
         const [obj, created] = await Update.findOrCreate({
           where: { title: item.title },
           defaults: item
@@ -1525,9 +1529,10 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       }
     }
 
-    // Restore PDFs (Deduplicate by title)
-    if (data.pdfs) {
-      for (const item of data.pdfs) {
+    // Restore PDFs
+    const pdfList = data.PdfDocument || data.pdfs;
+    if (pdfList) {
+      for (const item of pdfList) {
         const [obj, created] = await PdfDocument.findOrCreate({
           where: { title: item.title },
           defaults: item
@@ -1541,9 +1546,10 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       }
     }
 
-    // Restore Sessions (Add all)
-    if (data.sessions) {
-      for (const item of data.sessions) {
+    // Restore Sessions
+    const sessionList = data.UserSession || data.sessions;
+    if (sessionList) {
+      for (const item of sessionList) {
         await UserSession.create(item);
         results.sessions.created++;
       }
