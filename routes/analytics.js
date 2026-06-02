@@ -89,7 +89,7 @@ router.get('/platform-insights', verifyToken, async (req, res) => {
     const topViews = await PdfView.findAll({
       attributes: [
         'pdf_id',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'viewCount']
+        [sequelize.fn('COUNT', sequelize.col('PdfView.id')), 'viewCount']
       ],
       group: ['pdf_id'],
       include: [{ model: PdfDocument, attributes: ['title'] }],
@@ -102,7 +102,7 @@ router.get('/platform-insights', verifyToken, async (req, res) => {
       where: { status: 'completed', pdf_id: { [Op.ne]: 0 } },
       attributes: [
         'pdf_id',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'buyCount']
+        [sequelize.fn('COUNT', sequelize.col('PdfPurchase.id')), 'buyCount']
       ],
       group: ['pdf_id'],
       include: [{ model: PdfDocument, attributes: ['title'] }],
