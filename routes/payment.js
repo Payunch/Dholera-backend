@@ -118,4 +118,54 @@ router.post('/request-manual', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/payment/verify-utr
+ * Manually unlocks access based on a 12-digit UTR/Ref No.
+ */
+router.post('/verify-utr', async (req, res) => {
+  try {
+    let { utr, transactionId, leadToken } = req.body;
+    if (!utr || !transactionId || !leadToken) {
+      return res.status(400).json({ error: 'UTR and Transaction ID required' });
+    }
+
+    // Basic validation: UTR should be 12 digits for most Indian banks
+    if (!/^\d{12}$/.test(utr)) {
+      return res.status(400).json({ error: 'Please enter a valid 12-digit UTR/Reference number.' });
+    }
+
+    leadToken = extractToken(leadToken);
+    const lead = await Lead.findOne({ where: { lead_token: leadToken } });
+    if (!lead) return res.status(403).json({ error: 'Invalid session' });
+
+    // Find all pending records for this manual transaction attempt
+    const purchases = await PdfPurchase.findAll({ 
+      where: { transaction_id: transactionId, lead_id: lead.id } 
+    });
+
+    if (purchases.length === 0) {
+      return res.status(404).json({ error: 'Transaction record not found.' });
+    }
+
+    // Mark as completed instantly (Admin will verify later)
+    for (const purchase of purchases) {
+      await purchase.update({ 
+        status: 'completed', 
+        gateway_payment_id: utr 
+      });
+
+      // If it was a PRO purchase, update lead
+      if (purchase.pdf_id === 0) {
+        await lead.update({ is_pro: true });
+      }
+    }
+
+    res.json({ success: true, message: 'Access granted. Thank you for your payment.' });
+
+  } catch (err) {
+    console.error('[Payment] UTR Verify Error:', err);
+    res.status(500).json({ error: 'Failed to verify UTR' });
+  }
+});
+
 module.exports = router;
