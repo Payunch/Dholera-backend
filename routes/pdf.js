@@ -239,10 +239,15 @@ router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
     res.status(400).json({ error: err.message || 'Failed to upload PDF' });
   }
 });
+const { appCheckVerification } = require('../middleware/appCheckMiddleware');
+
+// ... (existing helper functions)
 
 // GET secure PDF stream
-router.get('/view/:id', async (req, res) => {
+router.get('/view/:id', appCheckVerification, async (req, res) => {
   try {
+// ...
+
     // 1. Check if the user is an Admin first (Super-Power)
     let isAdmin = false;
     if (req.session?.isAdmin) {
