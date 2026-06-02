@@ -78,31 +78,43 @@ router.post('/request-manual', async (req, res) => {
       targetPdfIds = [pdfId];
     }
 
-    const transactionId = `${isPro ? 'PRO' : 'PDF'}_${uniqid().toUpperCase()}`;
+    const baseTransactionId = `${isPro ? 'PRO' : 'PDF'}_${uniqid().toUpperCase()}`;
 
     // Create pending records for each PDF
-    for (const tid of targetPdfIds) {
+    for (let i = 0; i < targetPdfIds.length; i++) {
+      const tid = targetPdfIds[i];
+      // Make transaction_id unique by adding a suffix for multi-items
+      const uniqueTxnId = targetPdfIds.length > 1 ? `${baseTransactionId}_${i+1}` : baseTransactionId;
+      
       await PdfPurchase.create({
         lead_id: lead.id,
         pdf_id: tid,
-        amount: amountPaise / targetPdfIds.length,
-        transaction_id: transactionId,
+        amount: Math.round(amountPaise / targetPdfIds.length),
+        transaction_id: uniqueTxnId,
         status: 'pending'
       });
     }
 
+    const upiId = (process.env.ADMIN_UPI_ID || '917435808310@ybl').trim();
+    const merchantName = (process.env.ADMIN_NAME || 'Dholera Platform').trim();
+
+    console.log(`[Payment] Manual Request Created. ID: ${baseTransactionId}, UPI: ${upiId}, Name: ${merchantName}`);
+
     res.json({
       success: true,
-      transactionId: transactionId,
-      upiId: process.env.ADMIN_UPI_ID || '917435808310@ybl',
-      merchantName: process.env.ADMIN_NAME || 'Dholera Platform',
+      transactionId: baseTransactionId,
+      upiId: upiId,
+      merchantName: merchantName,
       amount: amountPaise / 100,
       isPro
     });
 
   } catch (err) {
     console.error('[Payment] Manual Request Error:', err.message);
-    res.status(500).json({ error: 'Failed to initiate payment request' });
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      console.error('[Payment] Unique Constraint Error Details:', err.errors.map(e => e.message));
+    }
+    res.status(500).json({ error: 'Failed to initiate payment request', details: err.message });
   }
 });
 
