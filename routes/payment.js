@@ -165,10 +165,19 @@ router.post('/create-order', async (req, res) => {
       console.error('[Payment] PhonePe response error data:', err.response.data);
       console.error('[Payment] PhonePe response status:', err.response.status);
     }
-    res.status(500).json({ 
+    const includeFull = String(process.env.PHONEPE_DEBUG).toLowerCase() === 'true';
+    const responsePayload = {
       error: 'Failed to initiate payment',
       details: err.response?.data?.message || err.message
-    });
+    };
+
+    if (includeFull && err.response && err.response.data) {
+      // Include raw upstream response for debugging when PHONEPE_DEBUG=true
+      responsePayload.upstream = err.response.data;
+      responsePayload.upstreamStatus = err.response.status;
+    }
+
+    res.status(500).json(responsePayload);
   }
 });
 
