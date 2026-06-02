@@ -224,9 +224,12 @@ const { verifyToken: adminVerify } = require('./auth');
 // GET /api/payment/admin/pending
 router.get('/admin/pending', adminVerify, async (req, res) => {
   try {
-    // Fetch all awaiting_approval records
-    const allPending = await PdfPurchase.findAll({
-      where: { status: 'awaiting_approval' },
+    const { Op } = require('sequelize');
+    // Fetch both pending and completed records for history
+    const allRecords = await PdfPurchase.findAll({
+      where: { 
+        status: { [Op.in]: ['awaiting_approval', 'completed'] } 
+      },
       include: [
         { model: Lead, attributes: ['id', 'name', 'phone', 'email'] },
         { model: PdfDocument, attributes: ['id', 'title'] }
@@ -236,7 +239,7 @@ router.get('/admin/pending', adminVerify, async (req, res) => {
 
     // Group by base transactionId (before the _) to avoid duplicates in Admin view
     const grouped = {};
-    for (const p of allPending) {
+    for (const p of allRecords) {
       const baseId = p.transaction_id.split('_').slice(0, 2).join('_'); // TXN_ABC or PRO_ABC
       if (!grouped[baseId]) {
         grouped[baseId] = {
@@ -244,6 +247,7 @@ router.get('/admin/pending', adminVerify, async (req, res) => {
           transaction_id: baseId,
           utr: p.gateway_payment_id,
           amount: 0,
+          status: p.status, // Group status
           lead: p.Lead,
           items: [],
           updatedAt: p.updatedAt
@@ -251,6 +255,11 @@ router.get('/admin/pending', adminVerify, async (req, res) => {
       }
       grouped[baseId].amount += p.amount;
       grouped[baseId].items.push(p.PdfDocument?.title || (p.pdf_id === 0 ? 'PRO ACCESS' : 'PDF Access'));
+      
+      // If any item in the batch is awaiting_approval, the whole batch is pending
+      if (p.status === 'awaiting_approval') {
+        grouped[baseId].status = 'awaiting_approval';
+      }
     }
 
     res.json(Object.values(grouped));
