@@ -294,20 +294,19 @@ router.get('/view/:id', async (req, res) => {
 
         if (!purchase) {
           // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
-          // We mark PDF ID 19 as the designated free document for testing.
-          // All other documents require payment immediately.
+          // PDF ID 19 is the designated free trial document.
           const isTrialDocument = String(pdf.id) === '19';
 
           if (isTrialDocument) {
             // Allow viewing PDF 19 as a trial
           } else {
-            // Block all other documents
+            // Block all other documents unless Pro or Purchased
             return res.status(402).json({ 
               error: 'Premium Document',
               requiresPayment: true,
-              amount: 499,
+              amount: 10, 
               currency: 'INR',
-              message: 'Only the designated test document (PDF 19) is free. Please unlock the premium archive to continue.'
+              message: 'This is a premium document. You can unlock it individually or get Pro access for all documents.'
             });
           }
         }
