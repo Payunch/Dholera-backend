@@ -638,6 +638,7 @@ router.get('/verify-token', async (req, res) => {
         source: lead.source,
         is_registered: lead.is_registered,
         is_trial: lead.is_trial,
+        is_pro: lead.is_pro,
         createdAt: lead.createdAt
       } 
     });
@@ -687,6 +688,7 @@ router.patch('/profile', async (req, res) => {
         status: lead.status,
         source: lead.source,
         is_registered: lead.is_registered,
+        is_pro: lead.is_pro,
         createdAt: lead.createdAt
       }
     });

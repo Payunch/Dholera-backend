@@ -282,8 +282,12 @@ router.get('/view/:id', async (req, res) => {
 
     // 3. Enforce Payment for Protected Documents
     if (!isAdmin && pdf.is_protected) {
+      // 3.0 Pro Access Check (Unlock All)
+      if (lead.is_pro) {
+        // Grant access instantly if they are a Pro member
+      } 
       // 3.1 Trial Access Limit
-      if (lead.is_trial) {
+      else if (lead.is_trial) {
         const viewCount = await PdfView.count({ where: { lead_id: lead.id } });
         const hasViewedThisPdf = await PdfView.findOne({ where: { lead_id: lead.id, pdf_id: pdf.id } });
         

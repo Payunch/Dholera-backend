@@ -109,6 +109,10 @@ const Lead = sequelize.define('Lead', {
   is_trial: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  is_pro: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 });
 

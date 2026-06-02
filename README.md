@@ -1,5 +1,7 @@
 # Dholera Backend API
 
+> **IMPORTANT: Automated Payment Integration (PhonePe/Razorpay) has been cancelled due to GSTIN compliance requirements. All payments are now handled manually via UPI QR, and document access is granted by the Admin.**
+
 Node.js/Express API for the Dholera platform. It powers authentication, leads, updates/blogs, analytics, exports, PDF access, WhatsApp activity, and platform settings.
 
 ## Status
@@ -409,6 +411,8 @@ Dholera-backend/
 
 # Dholera Backend API
 
+> **IMPORTANT: Automated Payment Integration (PhonePe/Razorpay) has been cancelled due to GSTIN compliance requirements. All payments are now handled manually via UPI QR, and document access is granted by the Admin.**
+
 Node.js/Express API for the Dholera platform. It powers authentication, leads, updates/blogs, analytics, exports, PDF access, WhatsApp activity, and platform settings.
 
 ## Status
@@ -479,3 +483,103 @@ The export route is admin-protected and returns an `.xlsx` workbook with lead de
 Test no : 9876543210
 TEST_USER_EMAIL (default: testuser@example.com)
 TEST_USER_PASSCODE (default: 123456)
+
+ # Dholera Growth Platform: Database Schema
+        2 - 
+        3 - This document defines the Sequelize models and their relationships within the Dholera Platform database.
+        4 - 
+        5 - ---
+        6 - 
+        7 - ## 1. Core Models
+        8 - 
+        9 - ### `Lead`
+       10 - Stores user/investor profiles and authentication data.
+       11 - *   `id`: Integer (PK)
+       12 - *   `name`: String
+       13 - *   `phone`: String (Unique, Indexed)
+       14 - *   `email`: String
+       15 - *   `status`: String (New, Contacted, Converted, etc.)
+       16 - *   `source`: String (Website, App, Import)
+       17 - *   `passcode`: String (Hashed)
+       18 - *   `verified`: Boolean
+       19 - *   `is_registered`: Boolean
+       20 - *   `lead_token`: String (Unique)
+       21 - *   `createdAt`, `updatedAt`: Timestamps
+       22 - 
+       23 - ### `Update` (Blogs/News)
+       24 - Stores property updates and regional news.
+       25 - *   `id`: Integer (PK)
+       26 - *   `title`: String
+       27 - *   `content`: Text
+       28 - *   `category`: String
+       29 - *   `imageUrl`: String (Cloudinary URL)
+       30 - *   `published`: Boolean
+       31 - *   `publishedAt`: DateTime (Historical timestamp)
+       32 - 
+       33 - ### `PdfDocument`
+       34 - Metadata for industrial and regulatory PDFs.
+       35 - *   `id`: Integer (PK)
+       36 - *   `title`: String
+       37 - *   `file_path`: String (Cloudinary URL or local path)
+       38 - *   `category`: String
+       39 - *   `is_protected`: Boolean
+       40 - *   `documentDate`: DateTime
+       41 - 
+       42 - ---
+       43 - 
+       44 - ## 2. Interaction & Log Models
+       45 - 
+       46 - ### `VisitorSession`
+       47 - Tracks individual browsing sessions before and after lead registration.
+       48 - *   `id`: Integer (PK)
+       49 - *   `browserFingerprint`: String
+       50 - *   `sessionId`: String
+       51 - *   `visitedPages`: Text (JSON string)
+       52 - *   `timeSpent`: Integer
+       53 - 
+       54 - ### `PdfView`
+       55 - Logs every time a lead views a document.
+       56 - *   `lead_id`: Integer (FK -> Leads.id)
+       57 - *   `pdf_id`: Integer (FK -> PdfDocuments.id)
+       58 - *   `viewedAt`: DateTime
+       59 - 
+       60 - ### `PdfPurchase`
+       61 - Tracks PhonePe transactions for protected documents.
+       62 - *   `id`: Integer (PK)
+       63 - *   `lead_id`: Integer (FK -> Leads.id)
+       64 - *   `pdf_id`: Integer (FK -> PdfDocuments.id)
+       65 - *   `amount`: Integer (Paise)
+       66 - *   `status`: String (pending, completed, failed)
+       67 - *   `transaction_id`: String (Merchant ID)
+       68 - *   `gateway_payment_id`: String (PhonePe ID)
+       69 - 
+       70 - ---
+       71 - 
+       72 - ## 3. System & Admin Models
+       73 - 
+       74 - ### `AuditLog`
+       75 - Tracks administrative actions (imports, restores, logins).
+       76 - *   `eventType`: String
+       77 - *   `actorId`: String
+       78 - *   `details`: Text (JSON)
+       79 - 
+       80 - ### `UserSession`
+       81 - Tracks Admin dashboard logins for security monitoring.
+       82 - *   `username`: String
+       83 - *   `ip`: String
+       84 - *   `userAgent`: String
+       85 - *   `loginAt`: DateTime
+       86 - 
+       87 - ---
+       88 - 
+       89 - ## 4. Relationships (ERD Summary)
+       90 - 
+       91 - *   **Lead (1:N) PdfView:** One lead can view multiple PDFs.
+       92 - *   **Lead (1:N) PdfPurchase:** One lead can buy multiple PDFs.
+       93 - *   **PdfDocument (1:N) PdfView:** One PDF can be viewed by many leads.
+       94 - *   **Lead (1:N) ClearanceModel:** One lead can have multiple clearance project drafts.
+       95 - 
+       96 - ---
+       97 - 
+       98 - ## 5. Storage Notes
+       99 - *   **Dialect:** Currently using **SQLite** (`database.sqlite`).
