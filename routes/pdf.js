@@ -289,10 +289,19 @@ router.get('/view/:id', async (req, res) => {
       else {
         // 3.1 Check if this specific document was already purchased
         const purchase = await PdfPurchase.findOne({
-          where: { lead_id: lead.id, pdf_id: pdf.id, status: 'completed' }
+          where: { lead_id: lead.id, pdf_id: pdf.id }
         });
 
-        if (!purchase) {
+        if (purchase && purchase.status === 'completed') {
+          // Access granted
+        } else if (purchase && purchase.status === 'awaiting_approval') {
+          return res.status(402).json({ 
+            error: 'Payment Awaiting Approval',
+            status: 'awaiting_approval',
+            message: 'Your payment details are being verified by the Admin.'
+          });
+        }
+        else {
           // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
           // PDF ID 19 is the designated free trial document.
           const isTrialDocument = String(pdf.id) === '19';

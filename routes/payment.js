@@ -120,7 +120,8 @@ router.post('/request-manual', async (req, res) => {
 
 /**
  * POST /api/payment/verify-utr
- * Manually unlocks access based on a 12-digit UTR/Ref No.
+ * User submits their UTR for verification. 
+ * Sets status to 'awaiting_approval'.
  */
 router.post('/verify-utr', async (req, res) => {
   try {
@@ -129,16 +130,14 @@ router.post('/verify-utr', async (req, res) => {
       return res.status(400).json({ error: 'UTR and Transaction ID required' });
     }
 
-    // Basic validation: UTR should be 12 digits for most Indian banks
-    if (!/^\d{12}$/.test(utr)) {
-      return res.status(400).json({ error: 'Please enter a valid 12-digit UTR/Reference number.' });
+    if (!/^\d{10,14}$/.test(utr)) {
+      return res.status(400).json({ error: 'Please enter a valid Transaction/UTR number (10-14 digits).' });
     }
 
     leadToken = extractToken(leadToken);
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) return res.status(403).json({ error: 'Invalid session' });
 
-    // Find all pending records for this manual transaction attempt
     const purchases = await PdfPurchase.findAll({ 
       where: { transaction_id: transactionId, lead_id: lead.id } 
     });
@@ -147,24 +146,78 @@ router.post('/verify-utr', async (req, res) => {
       return res.status(404).json({ error: 'Transaction record not found.' });
     }
 
-    // Mark as completed instantly (Admin will verify later)
+    // Set to awaiting_approval
     for (const purchase of purchases) {
       await purchase.update({ 
-        status: 'completed', 
+        status: 'awaiting_approval', 
         gateway_payment_id: utr 
       });
+    }
 
+    res.json({ 
+      success: true, 
+      message: 'Payment submitted for approval. Admin will verify and unlock your access shortly.' 
+    });
+
+  } catch (err) {
+    console.error('[Payment] UTR Submit Error:', err);
+    res.status(500).json({ error: 'Failed to submit payment details' });
+  }
+});
+
+/**
+ * ADMIN ONLY ROUTES
+ */
+const { verifyToken: adminVerify } = require('./auth');
+
+// GET /api/payment/admin/pending
+router.get('/admin/pending', adminVerify, async (req, res) => {
+  try {
+    const pending = await PdfPurchase.findAll({
+      where: { status: 'awaiting_approval' },
+      include: [
+        { model: Lead, attributes: ['name', 'phone', 'email'] },
+        { model: PdfDocument, attributes: ['title'] }
+      ],
+      order: [['updatedAt', 'DESC']]
+    });
+    res.json(pending);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/payment/admin/count-pending
+router.get('/admin/count-pending', adminVerify, async (req, res) => {
+  try {
+    const count = await PdfPurchase.count({ where: { status: 'awaiting_approval' } });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/payment/admin/approve/:transactionId
+router.post('/admin/approve/:transactionId', adminVerify, async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const purchases = await PdfPurchase.findAll({ where: { transaction_id: transactionId } });
+    
+    if (purchases.length === 0) return res.status(404).json({ error: 'Not found' });
+
+    for (const p of purchases) {
+      await p.update({ status: 'completed' });
+      
       // If it was a PRO purchase, update lead
-      if (purchase.pdf_id === 0) {
-        await lead.update({ is_pro: true });
+      if (p.pdf_id === 0) {
+        const lead = await Lead.findByPk(p.lead_id);
+        if (lead) await lead.update({ is_pro: true });
       }
     }
 
-    res.json({ success: true, message: 'Access granted. Thank you for your payment.' });
-
+    res.json({ success: true, message: 'Payment approved. Access granted.' });
   } catch (err) {
-    console.error('[Payment] UTR Verify Error:', err);
-    res.status(500).json({ error: 'Failed to verify UTR' });
+    res.status(500).json({ error: err.message });
   }
 });
 
