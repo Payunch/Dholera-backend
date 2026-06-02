@@ -67,6 +67,70 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
+// GET platform-level business insights (Admin)
+router.get('/platform-insights', verifyToken, async (req, res) => {
+  try {
+    const { PdfPurchase, PdfDocument, PdfView, Lead } = require('../models');
+
+    // 1. Total Revenue (Completed)
+    const revenueResult = await PdfPurchase.sum('amount', { where: { status: 'completed' } });
+    const totalRevenue = (revenueResult || 0) / 100;
+
+    // 2. Conversion: Total Leads vs Purchases
+    const totalLeads = await Lead.count();
+    const uniqueBuyers = await PdfPurchase.count({
+      distinct: true,
+      col: 'lead_id',
+      where: { status: 'completed' }
+    });
+    const conversionRate = totalLeads > 0 ? (uniqueBuyers / totalLeads) * 100 : 0;
+
+    // 3. Top Documents (by Views)
+    const topViews = await PdfView.findAll({
+      attributes: [
+        'pdf_id',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'viewCount']
+      ],
+      group: ['pdf_id'],
+      include: [{ model: PdfDocument, attributes: ['title'] }],
+      order: [[sequelize.literal('viewCount'), 'DESC']],
+      limit: 5
+    });
+
+    // 4. Top Documents (by Purchase)
+    const topPurchases = await PdfPurchase.findAll({
+      where: { status: 'completed', pdf_id: { [Op.ne]: 0 } },
+      attributes: [
+        'pdf_id',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'buyCount']
+      ],
+      group: ['pdf_id'],
+      include: [{ model: PdfDocument, attributes: ['title'] }],
+      order: [[sequelize.literal('buyCount'), 'DESC']],
+      limit: 5
+    });
+
+    // 5. Pro Members
+    const proCount = await Lead.count({ where: { is_pro: true } });
+
+    res.json({
+      success: true,
+      data: {
+        totalRevenue,
+        conversionRate: conversionRate.toFixed(1),
+        uniqueBuyers,
+        proCount,
+        topViews: topViews.map(v => ({ title: v.PdfDocument?.title || 'Unknown', count: v.get('viewCount') })),
+        topPurchases: topPurchases.map(p => ({ title: p.PdfDocument?.title || 'Unknown', count: p.get('buyCount') }))
+      }
+    });
+
+  } catch (err) {
+    console.error('[Platform Insights Error]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET detailed analytics data (Admin)
 router.get('/detailed', verifyToken, async (req, res) => {
   try {
