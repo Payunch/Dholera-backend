@@ -142,6 +142,13 @@ router.post('/request-manual', async (req, res) => {
 
     console.log(`[Payment] Manual Request Created. ID: ${baseTransactionId}, UPI: ${upiId}, Name: ${merchantName}`);
 
+    const { sendAdminNotification } = require('../services/notificationService');
+    await sendAdminNotification(
+      'New Payment Request',
+      `${lead.name} submitted UTR: ${utr} for ₹${amountPaise/100}`,
+      { type: 'payment', transactionId: baseTransactionId }
+    );
+
     res.json({
       success: true,
       transactionId: baseTransactionId,

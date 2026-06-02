@@ -299,11 +299,14 @@ router.get('/view/:id', async (req, res) => {
             pdf_id: { [Op.in]: [targetPdfId, 0] }, // 0 is PRO_ACCESS
             status: { [Op.in]: ['completed', 'awaiting_approval'] }
           },
-          order: [['updatedAt', 'DESC']]
+          order: [
+            [sequelize.literal("CASE WHEN status = 'completed' THEN 1 ELSE 2 END"), 'ASC'],
+            ['updatedAt', 'DESC']
+          ]
         });
 
         if (purchase) {
-          console.log(`[PDF] Found purchase record: ID ${purchase.id}, Status ${purchase.status}`);
+          console.log(`[PDF] Lead ${lead.id} match: ${purchase.status}`);
           if (purchase.status === 'completed') {
             // Access granted
           } else if (purchase.status === 'awaiting_approval') {

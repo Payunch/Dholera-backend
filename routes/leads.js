@@ -860,6 +860,13 @@ router.post('/', async (req, res) => {
       visited_pages: visitedPages
     });
 
+    const { sendAdminNotification } = require('../services/notificationService');
+    await sendAdminNotification(
+      'New Lead Registered',
+      `${lead.name} has joined the platform via ${lead.source}`,
+      { type: 'lead', leadId: lead.id }
+    );
+
     await maybeNotifyLeadIfHighInterest(lead, { pages: safeJsonParse(visitedPages, []), totalTimeSpent: timeSpent });
     
     res.status(201).json(lead);
