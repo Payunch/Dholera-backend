@@ -20,11 +20,11 @@ const UserSession = sequelize.define('UserSession', {
     allowNull: true
   },
   ip: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(500),
     allowNull: true
   },
   userAgent: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(500),
     allowNull: true
   }
 });

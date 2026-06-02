@@ -21,11 +21,11 @@ const AuditLog = sequelize.define('AuditLog', {
     defaultValue: true
   },
   ip: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(500),
     allowNull: true
   },
   userAgent: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(500),
     allowNull: true
   },
   details: {
