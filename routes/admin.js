@@ -58,14 +58,40 @@ router.post('/restore', verifyToken, upload.single('backup'), async (req, res) =
     const resultCounts = {};
 
     await sequelize.transaction(async (t) => {
-      // For SQLite, temporarily disable foreign key checks
-      const dialect = sequelize.getDialect && sequelize.getDialect();
-      if (dialect === 'sqlite') {
-        await sequelize.query('PRAGMA foreign_keys = OFF', { transaction: t });
+      const dialect = sequelize.getDialect();
+      
+      // 1. CLEAR PHASE: Delete in reverse dependency order to respect foreign keys
+      const deleteOrder = [
+        'UserSession',
+        'ClearanceModel',
+        'PdfPurchase',
+        'PdfView',
+        'WhatsAppLog',
+        'AuditLog',
+        'VisitorSession',
+        'Analytics',
+        'Update',
+        'PdfDocument',
+        'Lead',
+        'Setting'
+      ];
+
+      for (const key of deleteOrder) {
+        if (!models[key]) continue;
+        if (dialect === 'postgres') {
+          // PostgreSQL requires CASCADE if there are any lingering references
+          await sequelize.query(`TRUNCATE TABLE "${models[key].tableName}" RESTART IDENTITY CASCADE`, { transaction: t });
+        } else if (dialect === 'sqlite') {
+          await sequelize.query('PRAGMA foreign_keys = OFF', { transaction: t });
+          await models[key].destroy({ where: {}, truncate: true, transaction: t });
+        } else {
+          await models[key].destroy({ where: {}, force: true, transaction: t });
+        }
       }
 
-      // Simple restore strategy: delete existing rows then bulk insert in safe-ish order
+      // 2. INSERT PHASE: Insert in forward dependency order
       const insertOrder = [
+        'Setting',
         'Lead',
         'PdfDocument',
         'Update',
@@ -76,17 +102,15 @@ router.post('/restore', verifyToken, upload.single('backup'), async (req, res) =
         'PdfView',
         'PdfPurchase',
         'ClearanceModel',
-        'Setting',
         'UserSession'
       ];
 
       for (const key of insertOrder) {
         if (!models[key]) continue;
-        const items = Array.isArray(data[key]) ? data[key] : [];
-        // Remove existing rows
-        await models[key].destroy({ where: {}, truncate: true, transaction: t });
-        if (items.length > 0) {
-          // Preserve timestamps from the backup file
+        // Support both { data: { Lead: [] } } and { leads: [] } formats
+        const items = data[key] || data[key.toLowerCase()] || data[key.toLowerCase() + 's'] || [];
+        
+        if (Array.isArray(items) && items.length > 0) {
           await models[key].bulkCreate(items, { 
             transaction: t,
             validate: false,
@@ -94,7 +118,7 @@ router.post('/restore', verifyToken, upload.single('backup'), async (req, res) =
             individualHooks: false
           });
         }
-        resultCounts[key] = items.length;
+        resultCounts[key] = Array.isArray(items) ? items.length : 0;
       }
 
       if (dialect === 'sqlite') {
@@ -138,14 +162,29 @@ router.get('/db/raw/:tableName', verifyToken, async (req, res) => {
     }
 
     // Direct query for total visibility
-    // Check if the table has createdAt to order by, otherwise just select
-    let query = `SELECT * FROM ${tableName} LIMIT 1000`;
+    const dialect = sequelize.getDialect();
+    let query = `SELECT * FROM "${tableName}" LIMIT 1000`;
+    
     try {
-       const [results] = await sequelize.query(`SELECT name FROM pragma_table_info('${tableName}') WHERE name = 'createdAt'`);
-       if (results.length > 0) {
-         query = `SELECT * FROM ${tableName} ORDER BY createdAt DESC LIMIT 1000`;
-       }
-    } catch(e) {}
+      let hasCreatedAt = false;
+      if (dialect === 'sqlite') {
+        const [results] = await sequelize.query(`SELECT name FROM pragma_table_info('${tableName}') WHERE name = 'createdAt'`);
+        hasCreatedAt = results.length > 0;
+      } else if (dialect === 'postgres') {
+        const [results] = await sequelize.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = '${tableName}' AND column_name = 'createdAt'
+        `);
+        hasCreatedAt = results.length > 0;
+      }
+
+      if (hasCreatedAt) {
+        query = `SELECT * FROM "${tableName}" ORDER BY "createdAt" DESC LIMIT 1000`;
+      }
+    } catch(e) {
+      console.warn(`[Admin] Failed to check for createdAt in ${tableName}:`, e.message);
+    }
 
     const data = await sequelize.query(query, {
       type: sequelize.QueryTypes.SELECT
