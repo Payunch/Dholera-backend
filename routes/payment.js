@@ -117,6 +117,7 @@ router.post('/create-order', async (req, res) => {
     });
 
     console.log(`[Payment] Initiating PhonePe payment for Lead ${lead.id}, PDF ${pdfId}, TXN ${merchantTransactionId}`);
+    console.log(`[Payment] Using redirectUrl: ${redirectUrl}`);
 
     // 4. Call PhonePe API
     const response = await axios.post(
@@ -130,6 +131,8 @@ router.post('/create-order', async (req, res) => {
         }
       }
     );
+
+    console.log('[Payment] PhonePe response:', response.data);
 
     if (response.data.success && response.data.data.instrumentResponse.redirectInfo.url) {
       return res.json({
@@ -147,6 +150,64 @@ router.post('/create-order', async (req, res) => {
       error: 'Failed to initiate payment',
       details: err.response?.data?.message || err.message
     });
+  }
+});
+
+/**
+ * Landing page endpoint for payment redirects.
+ * PhonePe will redirect the user here; this page posts a message back to the opener
+ * (the frontend popup) and then forwards the user to the frontend PDF listing.
+ */
+router.get('/landing/:merchantTransactionId', async (req, res) => {
+  const { merchantTransactionId } = req.params;
+  try {
+    const purchase = await PdfPurchase.findOne({ where: { transaction_id: merchantTransactionId } });
+    if (!purchase) {
+      return res.status(404).send('Transaction not found');
+    }
+
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const pdfId = purchase.pdf_id;
+    const status = purchase.status === 'completed' ? 'success' : purchase.status === 'failed' ? 'failed' : 'pending';
+
+    // Render a minimal HTML page that posts a message to the opener and shows a friendly UI.
+    return res.send(`<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width,initial-scale=1" />
+          <title>Payment Result</title>
+          <style>body{font-family:Inter,system-ui,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0f172a;color:#fff} .card{max-width:520px;padding:28px;border-radius:16px;background:#0b1220;text-align:center}</style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>${status === 'success' ? 'Payment Successful' : status === 'failed' ? 'Payment Failed' : 'Payment Pending'}</h2>
+            <p style="opacity:0.85;margin-top:12px">You can close this window or continue to view your document.</p>
+            <div style="margin-top:18px;display:flex;gap:8px;justify-content:center">
+              <button id="closeBtn" style="padding:10px 18px;border-radius:10px;border:none;cursor:pointer">Close Window</button>
+              <a id="continueLink" href="${frontendBaseUrl}/pdfs?payment_status=${status}&pdfId=${pdfId}" style="text-decoration:none"><button style="padding:10px 18px;border-radius:10px;background:#ff7a18;border:none;color:#fff;cursor:pointer">Continue</button></a>
+            </div>
+          </div>
+          <script>
+            (function(){
+              try {
+                const msg = { type: 'phonepe-payment-success', pdfId: '${pdfId}', status: '${status}' };
+                if (window.opener && !window.opener.closed) {
+                  // Use wildcard targetOrigin here; opener will validate origin in the frontend.
+                  window.opener.postMessage(msg, '*');
+                }
+              } catch (e) {
+                console.warn('Landing postMessage error', e);
+              }
+              document.getElementById('closeBtn').addEventListener('click', function(){ window.close(); });
+            })();
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('[Payment Landing] Error:', err);
+    res.status(500).send('Server error');
   }
 });
 

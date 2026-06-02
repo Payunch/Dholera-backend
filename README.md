@@ -50,6 +50,17 @@ npm install
 npm start
 ```
 
+## PhonePe Payment Testing (Local)
+
+When testing PhonePe locally we provide a landing endpoint that keeps the popup open and posts a message back to the opener. Recommended `.env` setting:
+
+```
+PHONEPE_REDIRECT_URL=http://localhost:3001/api/payment/landing/:merchantTransactionId
+PHONEPE_WEBHOOK_URL=http://localhost:3001/api/payment/webhook
+```
+
+Start both backend and frontend and trigger the payment from the frontend. Check backend logs for `Initiating PhonePe payment` and the `redirectUrl` returned by PhonePe.
+
 ## Verification Commands
 
 ```bash
