@@ -25,7 +25,7 @@ async function run() {
   const utcDay = now.getUTCDate();
   const start = new Date(Date.UTC(utcYear, utcMonth, utcDay, 0, 0, 0, 0));
   const end = new Date(Date.UTC(utcYear, utcMonth, utcDay, 23, 59, 59, 999));
-  const phone = '9876543210';
+  const phone = '74358080310';
   console.log('[E2E] Creating test lead', phone);
   const [lead, created] = await Lead.findOrCreate({
     where: { phone },

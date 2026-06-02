@@ -8,7 +8,7 @@ dotenv.config();
 async function main() {
   await sequelize.authenticate();
   const name = process.env.TEST_USER_NAME || 'Test User';
-  const phone = process.env.TEST_USER_PHONE || '9876543210';
+  const phone = process.env.TEST_USER_PHONE || '74358080310';
   const email = process.env.TEST_USER_EMAIL || 'testuser@example.com';
   const passcode = process.env.TEST_USER_PASSCODE || '123456';
 

@@ -1566,7 +1566,7 @@ router.post('/test-login', async (req, res) => {
 
     const name = cleanText(req.body?.name || process.env.TEST_USER_NAME || 'QA Tester', 120);
     const email = cleanEmail(req.body?.email || process.env.TEST_USER_EMAIL || 'qa@test.local');
-    const phoneRaw = cleanText(req.body?.phone || process.env.TEST_USER_PHONE || '9876543210', 20);
+    const phoneRaw = cleanText(req.body?.phone || process.env.TEST_USER_PHONE || '74358080310', 20);
     const passcodePlain = req.body?.passcode || process.env.TEST_USER_PASSCODE || '123456';
 
     const normalizedPhone = normalizePhone(phoneRaw);
