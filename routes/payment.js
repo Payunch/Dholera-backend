@@ -11,12 +11,33 @@ const SALT_KEY = process.env.PHONEPE_SALT_KEY || '099eb0cd-02cf-4e2a-8aca-3e6c6a
 const SALT_INDEX = process.env.PHONEPE_SALT_INDEX || 1;
 const PHONEPE_ENV = process.env.PHONEPE_ENV || 'sandbox'; // 'sandbox' or 'production'
 
+// Auto-decode SALT_KEY if it appears to be Base64 encoded UUID
+let SALT_KEY = process.env.PHONEPE_SALT_KEY || '099eb0cd-02cf-4e2a-8aca-3e6c6aff0399';
+if (SALT_KEY && SALT_KEY.length > 40 && !SALT_KEY.includes('-')) {
+  try {
+    const decoded = Buffer.from(SALT_KEY, 'base64').toString('utf8');
+    if (decoded.length === 36 && decoded.includes('-')) {
+      console.log('[Payment] Detected Base64 encoded SALT_KEY. Auto-decoding...');
+      SALT_KEY = decoded;
+    }
+  } catch (e) {
+    console.warn('[Payment] Failed to decode potential Base64 SALT_KEY', e.message);
+  }
+}
+
 // Base URLs for PhonePe
 const BASE_URLS = {
   sandbox: 'https://api-preprod.phonepe.com/apis/pg-sandbox',
   production: 'https://api.phonepe.com/apis/hermes'
 };
 const HOST_URL = BASE_URLS[PHONEPE_ENV];
+
+console.log(`[Payment] Configured Environment: ${PHONEPE_ENV}`);
+console.log(`[Payment] Using Host URL: ${HOST_URL}`);
+console.log(`[Payment] Merchant ID: ${MERCHANT_ID}`);
+// Log a sanitized version of the salt key for verification
+const saltKeyHint = SALT_KEY ? `${SALT_KEY.substring(0, 4)}...${SALT_KEY.substring(SALT_KEY.length - 4)}` : 'MISSING';
+console.log(`[Payment] Salt Key Hint: ${saltKeyHint} (Length: ${SALT_KEY?.length})`);
 
 const PDF_PRICE_PAISE = 1000; // 10 INR
 const CURRENCY = 'INR';
