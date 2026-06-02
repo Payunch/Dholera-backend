@@ -60,6 +60,7 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
 
       if (statusCode >= 400) {
         upstream.resume();
+        console.error(`[PDF] Remote Fetch Failed: ${statusCode} for URL: ${remoteUrl.substring(0, 100)}...`);
         reject(new Error(`Remote PDF returned ${statusCode}`));
         return;
       }
@@ -366,24 +367,54 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
     if (isRemotePdfPath(filePath)) {
       if (!isAllowedRemotePdfUrl(filePath)) {
-        console.error('Blocked remote PDF host:', filePath);
+        console.error('[PDF] Blocked remote host:', filePath);
         return res.status(400).json({ error: 'Invalid remote document path.' });
       }
 
       let streamUrl = filePath;
-      // ... (Cloudinary private URL generation logic)
+
+      // ROADMAP PHASE 6: CLOUDINARY SECURE HANDSHAKE
+      // Force secure signing for all Cloudinary assets to ensure maximum reliability
       try {
         const parsed = new URL(filePath);
         if (parsed.hostname === 'res.cloudinary.com') {
-           // ... (existing signing logic)
+          const parts = parsed.pathname.split('/');
+          // Cloudinary path: /cloud_name/resource_type/type/v_version/public_id
+          const typeIndex = parts.findIndex(p => ['upload', 'private', 'authenticated'].includes(p));
+          
+          if (typeIndex !== -1) {
+            const resourceType = parts[typeIndex - 1] || 'image';
+            const type = parts[typeIndex];
+            let publicIdParts = parts.slice(typeIndex + 1);
+            
+            // Skip version segment
+            if (publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
+              publicIdParts = publicIdParts.slice(1);
+            }
+            
+            const fullPublicId = publicIdParts.join('/');
+            const extMatch = fullPublicId.match(/\.([a-z0-9]+)$/i);
+            const format = extMatch ? extMatch[1] : 'pdf';
+            const publicId = extMatch ? fullPublicId.slice(0, -extMatch[0].length) : fullPublicId;
+
+            // Generate signed download URL
+            streamUrl = cloudinary.utils.private_download_url(publicId, format, {
+              resource_type: resourceType,
+              type: type
+            });
+            console.log(`[PDF] Securely signed: ${publicId} (Type: ${type})`);
+          }
         }
-      } catch (e) {}
+      } catch (signErr) {
+        console.warn('[PDF] Handshake failed, falling back to direct stream:', signErr.message);
+      }
 
       // HIGH-PERFORMANCE STREAMING (Phase 2)
       try {
         await pipeRemoteUrl(streamUrl, res);
       } catch (err) {
-        if (!res.headersSent) res.status(502).json({ error: 'Storage link failed' });
+        console.error(`[PDF] Stream failed for ${pdf.title}:`, err.message);
+        if (!res.headersSent) res.status(502).json({ error: 'Cloud storage link failed. Please try again in a moment.' });
       }
       return;
     }
