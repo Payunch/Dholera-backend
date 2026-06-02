@@ -286,33 +286,32 @@ router.get('/view/:id', async (req, res) => {
       if (lead.is_pro) {
         // Grant access instantly if they are a Pro member
       } 
-      // 3.1 Trial Access Limit
-      else if (lead.is_trial) {
-        const viewCount = await PdfView.count({ where: { lead_id: lead.id } });
-        const hasViewedThisPdf = await PdfView.findOne({ where: { lead_id: lead.id, pdf_id: pdf.id } });
-        
-        // If they have viewed something else already, block it
-        if (viewCount >= 1 && !hasViewedThisPdf) {
-          return res.status(403).json({ 
-            error: 'Trial limit reached. Please register for full access to view more documents.',
-            requiresRegistration: true,
-            trialLimitReached: true
-          });
-        }
-        // If it's their first view or they are re-viewing the same PDF, allow it without payment check
-      } else {
-        // Standard Payment Check
+      else {
+        // 3.1 Check if this specific document was already purchased
         const purchase = await PdfPurchase.findOne({
           where: { lead_id: lead.id, pdf_id: pdf.id, status: 'completed' }
         });
 
         if (!purchase) {
-          return res.status(402).json({ 
-            error: 'Payment required to view this document.',
-            requiresPayment: true,
-            amount: 10,
-            currency: 'INR'
-          });
+          // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
+          // We mark documents with the category "Trial" or "Test" as free for everyone.
+          // All other documents require payment immediately.
+          const isTrialDocument = (pdf.category || '').toLowerCase().includes('trial') || 
+                                 (pdf.category || '').toLowerCase().includes('test') ||
+                                 pdf.id === 1; // ID 1 is always free for testing
+
+          if (isTrialDocument) {
+            // Allow viewing this specific test/trial document
+          } else {
+            // Block all other documents
+            return res.status(402).json({ 
+              error: 'Premium Document',
+              requiresPayment: true,
+              amount: 10,
+              currency: 'INR',
+              message: 'Only the test document is free. Please unlock this premium archive to continue.'
+            });
+          }
         }
       }
     }
