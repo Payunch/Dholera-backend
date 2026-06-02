@@ -83,12 +83,15 @@ router.post('/request-manual', async (req, res) => {
     // Create pending records for each PDF
     for (let i = 0; i < targetPdfIds.length; i++) {
       const tid = targetPdfIds[i];
+      // Ensure tid is an integer
+      const pdfIdInt = parseInt(tid, 10);
+      
       // Make transaction_id unique by adding a suffix for multi-items
       const uniqueTxnId = targetPdfIds.length > 1 ? `${baseTransactionId}_${i+1}` : baseTransactionId;
       
       await PdfPurchase.create({
         lead_id: lead.id,
-        pdf_id: tid,
+        pdf_id: isNaN(pdfIdInt) ? 0 : pdfIdInt,
         amount: Math.round(amountPaise / targetPdfIds.length),
         transaction_id: uniqueTxnId,
         status: 'pending'

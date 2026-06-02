@@ -6,6 +6,7 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 const { PdfDocument, PdfView, Lead, PdfPurchase } = require('../models');
+const { Op } = require('sequelize');
 const { verifyAccessToken, getTokenFromRequest } = require('../services/adminSecurity');
 const { cloudinary } = require('../services/cloudinary');
 const { verifyToken } = require('./auth');
@@ -284,27 +285,41 @@ router.get('/view/:id', async (req, res) => {
     if (!isAdmin && pdf.is_protected) {
       // 3.0 Pro Access Check (Unlock All)
       if (lead.is_pro) {
-        // Grant access instantly if they are a Pro member
+        console.log(`[PDF] Lead ${lead.id} is PRO. Access Granted.`);
       } 
       else {
-        // 3.1 Check if this specific document was already purchased
+        // 3.1 Check for any relevant purchase records (Specific PDF OR Pro Access)
+        const targetPdfId = parseInt(pdf.id, 10);
+        
+        console.log(`[PDF] Checking access for Lead ${lead.id} on PDF ${targetPdfId}`);
+
         const purchase = await PdfPurchase.findOne({
-          where: { lead_id: lead.id, pdf_id: pdf.id }
+          where: { 
+            lead_id: lead.id, 
+            pdf_id: { [Op.in]: [targetPdfId, 0] }, // 0 is PRO_ACCESS
+            status: { [Op.in]: ['completed', 'awaiting_approval'] }
+          },
+          order: [['updatedAt', 'DESC']]
         });
 
-        if (purchase && purchase.status === 'completed') {
-          // Access granted
-        } else if (purchase && purchase.status === 'awaiting_approval') {
-          return res.status(402).json({ 
-            error: 'Payment Awaiting Approval',
-            status: 'awaiting_approval',
-            message: 'Your payment details are being verified by the Admin.'
-          });
+        if (purchase) {
+          console.log(`[PDF] Found purchase record: ID ${purchase.id}, Status ${purchase.status}`);
+          if (purchase.status === 'completed') {
+            // Access granted
+          } else if (purchase.status === 'awaiting_approval') {
+            return res.status(402).json({ 
+              error: 'Payment Awaiting Approval',
+              status: 'awaiting_approval',
+              message: 'Your payment details are being verified by the Admin.',
+              leadId: lead.id
+            });
+          }
         }
         else {
+          console.log(`[PDF] No active purchase found for Lead ${lead.id} on PDF ${targetPdfId}`);
+          
           // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
-          // PDF ID 19 is the designated free trial document.
-          const isTrialDocument = String(pdf.id) === '19';
+          const isTrialDocument = targetPdfId === 19;
 
           if (isTrialDocument) {
             // Allow viewing PDF 19 as a trial
@@ -315,7 +330,8 @@ router.get('/view/:id', async (req, res) => {
               requiresPayment: true,
               amount: 10, 
               currency: 'INR',
-              message: 'This is a premium document. You can unlock it individually or get Pro access for all documents.'
+              message: 'This is a premium document. You can unlock it individually or get Pro access for all documents.',
+              leadId: lead.id
             });
           }
         }
