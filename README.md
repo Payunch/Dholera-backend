@@ -423,12 +423,16 @@ The following technical enhancements are scheduled to elevate the Dholera Platfo
 *   **Node.js Streams & Pipes:** Full refactor of the PDF delivery engine.
 *   **Benefit:** Faster loading for large technical maps and 90% reduction in server memory usage. Resilient to slow internet connections.
 
-### Phase 3: Enterprise Database Migration (3-4 Hours)
-*   **SQLite to PostgreSQL:** Migration to a robust, hosted relational database on Railway.
-*   **Data Integrity:** Automated migration script to move existing Leads, Purchases, and Logs with zero data loss.
-*   **Scalability:** Supports thousands of concurrent users and secure automated backups.
+### Phase 3: Enterprise Database Migration (READY)
+*   **SQLite to PostgreSQL:** Transition to a robust, hosted relational database on Railway.
+*   **Migration Tool:** Use `scripts/migrate_to_postgres.js` to port data.
+*   **Usage:** 
+    ```bash
+    TARGET_DATABASE_URL=your_postgres_url node scripts/migrate_to_postgres.js
+    ```
+*   **Status:** Backend drivers (`pg`) installed. Migration logic verified.
 
-### Phase 4: "Unbreakable" Security Hardening (1-2 Hours)
+### Phase 4: "Unbreakable" Security Hardening (DONE)
 *   **JWT Rotation:** Implementation of Access + Refresh token pairs.
 *   **Device Binding:** Optional binding of Admin sessions to specific devices for maximum security.
 *   **DDoS Protection:** Advanced rate-limiting and request signing for all sensitive API routes.
@@ -614,3 +618,4 @@ TEST_USER_PASSCODE (default: 123456)
        97 - 
        98 - ## 5. Storage Notes
        99 - *   **Dialect:** Currently using **SQLite** (`database.sqlite`).
+ /app/data/database.sqlite
