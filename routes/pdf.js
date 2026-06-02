@@ -294,22 +294,20 @@ router.get('/view/:id', async (req, res) => {
 
         if (!purchase) {
           // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
-          // We mark documents with the category "Trial" or "Test" as free for everyone.
+          // We mark PDF ID 19 as the designated free document for testing.
           // All other documents require payment immediately.
-          const isTrialDocument = (pdf.category || '').toLowerCase().includes('trial') || 
-                                 (pdf.category || '').toLowerCase().includes('test') ||
-                                 pdf.id === 1; // ID 1 is always free for testing
+          const isTrialDocument = String(pdf.id) === '19';
 
           if (isTrialDocument) {
-            // Allow viewing this specific test/trial document
+            // Allow viewing PDF 19 as a trial
           } else {
             // Block all other documents
             return res.status(402).json({ 
               error: 'Premium Document',
               requiresPayment: true,
-              amount: 10,
+              amount: 499,
               currency: 'INR',
-              message: 'Only the test document is free. Please unlock this premium archive to continue.'
+              message: 'Only the designated test document (PDF 19) is free. Please unlock the premium archive to continue.'
             });
           }
         }
