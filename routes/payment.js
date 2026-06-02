@@ -196,13 +196,16 @@ router.post('/create-order', async (req, res) => {
     const includeFull = String(process.env.PHONEPE_DEBUG).toLowerCase() === 'true';
     const responsePayload = {
       error: 'Failed to initiate payment',
-      details: err.response?.data?.message || err.message
+      details: err.response?.data?.message || err.message,
+      activeEnv: PHONEPE_ENV,
+      merchantId: MERCHANT_ID
     };
 
     if (includeFull && err.response && err.response.data) {
       // Include raw upstream response for debugging when PHONEPE_DEBUG=true
       responsePayload.upstream = err.response.data;
       responsePayload.upstreamStatus = err.response.status;
+      responsePayload.targetUrl = `${HOST_URL}/pg/v1/pay`;
     }
 
     res.status(500).json(responsePayload);
