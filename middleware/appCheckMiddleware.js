@@ -12,14 +12,19 @@ const admin = require('firebase-admin');
  * Middleware to enforce Firebase App Check
  */
 async function appCheckVerification(req, res, next) {
-  // Allow bypassing App Check in non-production environments if needed
+  // 1. Allow bypassing App Check in non-production environments
   if (process.env.NODE_ENV !== 'production' && process.env.BYPASS_APP_CHECK === 'true') {
     return next();
   }
 
-  // MOBILE & SESSION COMPATIBILITY: If a valid JWT token is in the query string or header,
-  // we prioritize the user's authenticated identity over the device integrity handshake.
+  // 2. MOBILE & SESSION COMPATIBILITY: Priority to authenticated identity
   if (req.query.token || req.headers.authorization) {
+    return next();
+  }
+
+  // 3. TRIAL DOCUMENT COMPATIBILITY: Allow trial PDF to bypass App Check
+  const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
+  if (req.params.id === String(freeTrialId)) {
     return next();
   }
 
