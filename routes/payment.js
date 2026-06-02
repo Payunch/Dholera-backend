@@ -240,6 +240,30 @@ router.get('/landing/:merchantTransactionId', async (req, res) => {
 });
 
 /**
+ * GET /api/payment/debug-env
+ * Dev-only helper to verify which PhonePe config the running backend sees.
+ * Returns only non-sensitive fields and requires PHONEPE_DEBUG=true.
+ */
+router.get('/debug-env', (req, res) => {
+  const debugEnabled = String(process.env.PHONEPE_DEBUG).toLowerCase() === 'true';
+
+  if (!debugEnabled) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  return res.json({
+    phonepeEnv: PHONEPE_ENV,
+    merchantId: MERCHANT_ID,
+    saltIndex: SALT_INDEX,
+    redirectUrl: process.env.PHONEPE_REDIRECT_URL || null,
+    webhookUrl: process.env.PHONEPE_WEBHOOK_URL || null,
+    frontendUrl: process.env.FRONTEND_URL || null,
+    hostUrl: HOST_URL,
+    debugEnabled: true
+  });
+});
+
+/**
  * GET /api/payment/status/:merchantTransactionId
  * Handles the redirect from PhonePe after payment attempt.
  */
