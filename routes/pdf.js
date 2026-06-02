@@ -319,12 +319,12 @@ router.get('/view/:id', async (req, res) => {
           console.log(`[PDF] No active purchase found for Lead ${lead.id} on PDF ${targetPdfId}`);
           
           // 3.2 THE "ONLY ONE TEST PDF IS FREE" RULE
-          const isTrialDocument = targetPdfId === 19;
+          const freeTrialId = parseInt(process.env.FREE_TRIAL_PDF_ID || '19', 10);
+          const isTrialDocument = targetPdfId === freeTrialId;
 
           if (isTrialDocument) {
-            // Allow viewing PDF 19 as a trial
+            console.log(`[PDF] PDF ${freeTrialId} is free trial. Access Granted.`);
           } else {
-            // Block all other documents unless Pro or Purchased
             return res.status(402).json({ 
               error: 'Premium Document',
               requiresPayment: true,

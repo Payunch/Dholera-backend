@@ -1056,11 +1056,13 @@ router.post('/register-request', otpSendLimiter, async (req, res) => {
       userAgent: req.headers['user-agent'],
       details: { email }
     });
+if (!emailResult.sent) {
+  // If real email fails, we check if bypass is explicitly enabled as a backup
+  // CRITICAL: Only allow bypass in non-production environments
+  const isBypassEnabled = process.env.NODE_ENV !== 'production' && process.env.BYPASS_EMAIL_VERIFICATION === 'true';
+  if (isBypassEnabled) {
+    // ...
 
-    if (!emailResult.sent) {
-      // If real email fails, we check if bypass is explicitly enabled as a backup
-      const isBypassEnabled = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
-      if (isBypassEnabled) {
         // CRITICAL: Update the lead with the bypass OTP so it can actually be verified
         const bypassOtp = '123456';
         await lead.update({
@@ -1264,12 +1266,13 @@ router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
     if (!localPhone || !passcode) {
       return res.status(400).json({ error: 'Phone and passcode are required.' });
     }
+// --- TRIAL CREDENTIAL HANDLING ---
+const TRIAL_PHONE = process.env.TRIAL_USER_PHONE;
+const TRIAL_PASSCODE = process.env.TRIAL_USER_PASSCODE;
 
-    // --- TRIAL CREDENTIAL HANDLING ---
-    const TRIAL_PHONE = '1234567890';
-    const TRIAL_PASSCODE = '123456';
+if (process.env.NODE_ENV !== 'production' && TRIAL_PHONE && TRIAL_PASSCODE && localPhone === TRIAL_PHONE && passcode === TRIAL_PASSCODE) {
+  // ...
 
-    if (localPhone === TRIAL_PHONE && passcode === TRIAL_PASSCODE) {
       // Create a unique trial lead per visitor fingerprint to track independent trial limits
       const fingerprintSuffix = browserFingerprint ? `-${browserFingerprint.substring(0, 30)}` : '';
       const trialIdentifier = `${TRIAL_PHONE}${fingerprintSuffix}`;
