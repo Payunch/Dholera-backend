@@ -21,6 +21,27 @@ const HOST_URL = BASE_URLS[PHONEPE_ENV];
 const PDF_PRICE_PAISE = 1000; // 10 INR
 const CURRENCY = 'INR';
 
+const buildPhonePeRedirectUrl = (req, merchantTransactionId) => {
+  const defaultRedirectUrl = `${req.protocol}://${req.get('host')}/api/payment/status/${merchantTransactionId}`;
+  const configuredRedirectUrl = process.env.PHONEPE_REDIRECT_URL?.trim();
+
+  if (!configuredRedirectUrl) return defaultRedirectUrl;
+
+  if (configuredRedirectUrl.includes(':merchantTransactionId')) {
+    return configuredRedirectUrl.replace(':merchantTransactionId', merchantTransactionId);
+  }
+
+  if (configuredRedirectUrl.includes(merchantTransactionId)) {
+    return configuredRedirectUrl;
+  }
+
+  if (/\/api\/payment\/status\/?$/.test(configuredRedirectUrl)) {
+    return `${configuredRedirectUrl.replace(/\/$/, '')}/${merchantTransactionId}`;
+  }
+
+  return defaultRedirectUrl;
+};
+
 const extractToken = (authHeader = '') => {
   if (!authHeader) return '';
   if (authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice(7).trim();
@@ -63,7 +84,7 @@ router.post('/create-order', async (req, res) => {
     }
 
     const merchantTransactionId = `TXN_${uniqid().toUpperCase()}`;
-    const redirectUrl = process.env.PHONEPE_REDIRECT_URL || `${req.protocol}://${req.get('host')}/api/payment/status/${merchantTransactionId}`;
+    const redirectUrl = buildPhonePeRedirectUrl(req, merchantTransactionId);
     
     const payload = {
       merchantId: MERCHANT_ID,
