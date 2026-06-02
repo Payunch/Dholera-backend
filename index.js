@@ -102,21 +102,22 @@ const imagesDir = path.join(uploadsDir, 'images');
   }
 });
 
-// Session store: use Redis when REDIS_URL provided, otherwise fallback to in-memory store (not for production)
+// Session store: use PostgreSQL for persistent sessions in production
 let sessionStore = undefined;
-if (process.env.REDIS_URL) {
+if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
   try {
-    const { default: RedisStore } = require('connect-redis');
-    const IORedis = require('ioredis');
-    const client = new IORedis(process.env.REDIS_URL);
-    sessionStore = new RedisStore({ client });
-    console.log('Using Redis session store');
+    const pgSession = require('connect-pg-simple')(session);
+    sessionStore = new pgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: 'UserSessions_Store', // Custom table name to avoid conflict with model
+      createTableIfMissing: true
+    });
+    console.log('[Session] Using PostgreSQL persistent store');
   } catch (err) {
-    console.warn('Redis packages not available, falling back to in-memory session store:', err.message);
+    console.error('[Session] Failed to initialize Postgres store:', err.message);
   }
-} else {
-  console.warn('REDIS_URL not set: using in-memory session store (not suitable for production)');
-}
+} else if (process.env.REDIS_URL) {
+// ...
 
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-session-secret';
 const isProd = process.env.NODE_ENV === 'production';
