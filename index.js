@@ -193,6 +193,11 @@ app.get('/healthz', (req, res) => {
   res.json({ ok: true, service: 'dholera-backend' });
 });
 
+// Global /api/track endpoint to prevent 404s
+app.post('/api/track', (req, res) => {
+  res.status(204).end();
+});
+
 app.get('/healthz/runtime', (req, res) => {
   const configuredPort = Number.parseInt(process.env.PORT || '3000', 10);
   res.json({
