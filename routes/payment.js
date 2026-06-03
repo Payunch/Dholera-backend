@@ -87,8 +87,13 @@ router.post('/request-manual', async (req, res) => {
       });
     }
 
-    leadToken = extractToken(leadToken);
-    const lead = await Lead.findOne({ where: { lead_token: leadToken } });
+    // Extract token from body OR header
+    let rawToken = leadToken || req.headers.authorization;
+    const cleanToken = extractToken(rawToken);
+    
+    if (!cleanToken) return res.status(403).json({ error: 'No lead token provided' });
+
+    const lead = await Lead.findOne({ where: { lead_token: cleanToken } });
     if (!lead) return res.status(403).json({ error: 'Invalid lead token' });
 
     let amountPaise = 0;
