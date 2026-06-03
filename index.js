@@ -165,9 +165,7 @@ app.use((req, res, next) => {
     '/api/leads',
     '/api/leads/onboard',
     '/api/leads/save-direct',
-    '/api/leads/track-returning',
-    '/api/payment/request-manual',
-    '/api/payment/verify-utr'
+    '/api/leads/track-returning'
   ].includes(req.path);
 
   if (isAuthMutation || (isAdminSessionMutation && !isPublicLeadMutation)) {

@@ -151,12 +151,9 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
             where: { 
               lead_id: lead.id, 
               pdf_id: { [Op.in]: [pdf.id, 0] }, // 0 is PRO_ACCESS
-              status: { [Op.in]: ['completed', 'awaiting_approval'] }
+              status: 'completed'
             },
-            order: [
-              ['status', 'ASC'], // 'completed' < 'awaiting_approval' alphabetically
-              ['updatedAt', 'DESC']
-            ]
+            order: [['updatedAt', 'DESC']]
           });
 
           if (!purchase) {
@@ -164,12 +161,6 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
               error: 'Premium Document',
               requiresPayment: true,
               message: 'Unlock this document or get Pro access.'
-            });
-          }
-          if (purchase.status === 'awaiting_approval') {
-            return res.status(402).json({ 
-              error: 'Payment Awaiting Approval',
-              status: 'awaiting_approval'
             });
           }
         }
