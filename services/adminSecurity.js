@@ -96,8 +96,19 @@ const setAuthCookies = (res, { accessToken, refreshToken }) => {
 };
 
 const clearAuthCookies = (res) => {
-  res.clearCookie('admin_access_token', { path: '/' });
-  res.clearCookie('admin_refresh_token', { path: '/' });
+  const isProd = process.env.NODE_ENV === 'production';
+  let domain = process.env.COOKIE_DOMAIN;
+  if (!domain && isProd) {
+    domain = '.dholeraplatform.com';
+  }
+
+  const clearOptions = {
+    path: '/',
+    ...(domain && { domain })
+  };
+
+  res.clearCookie('admin_access_token', clearOptions);
+  res.clearCookie('admin_refresh_token', clearOptions);
 };
 
 const issueAdminTokens = ({ username }) => {

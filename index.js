@@ -172,7 +172,9 @@ app.use((req, res, next) => {
     '/api/leads/save-direct',
     '/api/leads/verify',
     '/api/leads/track-returning',
-    '/api/track'
+    '/api/track',
+    '/api/payment/request-manual',
+    '/api/payment/verify-utr'
   ].includes(req.path);
 
   if (isAuthMutation || (isAdminSessionMutation && !isPublicLeadMutation)) {
