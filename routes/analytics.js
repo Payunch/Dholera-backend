@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Lead, Update, VisitorSession, PdfDocument, UserSession, sequelize } = require('../models');
+const { Lead, Update, PdfDocument, sequelize } = require('../models');
 const { verifyToken } = require('./auth');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
@@ -35,20 +35,8 @@ router.get('/', verifyToken, async (req, res) => {
       return 0;
     });
 
-    // 4. Total Visitors (unique fingerprints from sessions)
+    // 4. Total Visitors (Session tracking removed)
     let totalVisitors = 0;
-    try {
-      const totalVisitorsResult = await VisitorSession.findAll({
-        attributes: [
-          [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('browserFingerprint'))), 'count']
-        ],
-        raw: true
-      });
-      totalVisitors = totalVisitorsResult[0]?.count || 0;
-    } catch (err) {
-      console.error('[Analytics] Error counting visitors via fingerprint, falling back to simple count:', err.message);
-      totalVisitors = await VisitorSession.count().catch(() => 0);
-    }
 
     console.log(`[Analytics] Success: leads=${totalLeads}, monthly=${leadsThisMonth}, updates=${totalUpdates}, visitors=${totalVisitors}`);
 
@@ -149,7 +137,7 @@ router.get('/detailed', verifyToken, async (req, res) => {
     endDate.setHours(23, 59, 59, 999);
 
     // Fetch records in range
-    const [leads, updates, visitors] = await Promise.all([
+    const [leads, updates] = await Promise.all([
       Lead.findAll({
         where: { createdAt: { [Op.between]: [startDate, endDate] } },
         attributes: ['createdAt']
@@ -157,12 +145,9 @@ router.get('/detailed', verifyToken, async (req, res) => {
       Update.findAll({
         where: { createdAt: { [Op.between]: [startDate, endDate] } },
         attributes: ['createdAt']
-      }),
-      VisitorSession.findAll({
-        where: { createdAt: { [Op.between]: [startDate, endDate] } },
-        attributes: ['createdAt', 'browserFingerprint']
       })
     ]);
+    const visitors = []; // Session tracking removed
 
     // Grouping helper
     const groupByDate = (items) => {
@@ -252,37 +237,6 @@ router.get('/detailed', verifyToken, async (req, res) => {
   }
 });
 
-// GET separate export for User Sessions
-router.get('/export/sessions', verifyToken, async (req, res) => {
-  try {
-    const sessions = await UserSession.findAll({ order: [['loginAt', 'DESC']] });
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('User Sessions');
-    
-    sheet.columns = [
-      { header: 'Username', key: 'username', width: 20 },
-      { header: 'Login At', key: 'loginAt', width: 25 },
-      { header: 'Logout At', key: 'logoutAt', width: 25 },
-      { header: 'Duration (s)', key: 'duration', width: 15 },
-      { header: 'IP', key: 'ip', width: 15 }
-    ];
-
-    sessions.forEach(s => sheet.addRow({
-      username: s.username,
-      loginAt: s.loginAt.toLocaleString(),
-      logoutAt: s.logoutAt ? s.logoutAt.toLocaleString() : 'Active',
-      duration: s.duration,
-      ip: s.ip
-    }));
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=user_sessions.xlsx');
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // GET separate export for Blogs/Updates
 router.get('/export/updates', verifyToken, async (req, res) => {
