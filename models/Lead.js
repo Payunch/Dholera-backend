@@ -10,10 +10,6 @@ const Lead = sequelize.define('Lead', {
     type: DataTypes.STRING,
     allowNull: false
   },
-  email: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
   source: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -63,10 +59,6 @@ const Lead = sequelize.define('Lead', {
     allowNull: true
   },
   high_interest_whatsapp_notified_at: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  high_interest_email_notified_at: {
     type: DataTypes.DATE,
     allowNull: true
   },

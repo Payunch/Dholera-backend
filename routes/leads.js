@@ -38,11 +38,12 @@ const safeJsonParse = (value, fallback = []) => {
 
 const getLeadContext = async (lead) => {
   const plainLead = lead?.get ? lead.get({ plain: true }) : { ...lead };
-  const sessions = plainLead.browserFingerprint
-    ? await (require('../models').VisitorSession?.findAll({
+  const VisitorSession = require('../models').VisitorSession;
+  const sessions = plainLead.browserFingerprint && VisitorSession
+    ? await VisitorSession.findAll({
         where: { browserFingerprint: plainLead.browserFingerprint },
         order: [['createdAt', 'DESC']]
-      }) || Promise.resolve([]))
+      })
     : [];
 
   const pdfViews = plainLead.id
@@ -85,7 +86,7 @@ const maybeNotifyLeadIfHighInterest = async (lead, context = {}) => {
     return { notified: false, reason: 'not_high_interest' };
   }
 
-  if (leadData.high_interest_whatsapp_notified_at && leadData.high_interest_email_notified_at) {
+  if (leadData.high_interest_whatsapp_notified_at) {
     return { notified: false, reason: 'already_notified' };
   }
 
@@ -93,9 +94,6 @@ const maybeNotifyLeadIfHighInterest = async (lead, context = {}) => {
   const updates = {};
   if (result.whatsapp?.sent && !leadData.high_interest_whatsapp_notified_at) {
     updates.high_interest_whatsapp_notified_at = new Date();
-  }
-  if (result.email?.sent && !leadData.high_interest_email_notified_at) {
-    updates.high_interest_email_notified_at = new Date();
   }
   if (Object.keys(updates).length && lead?.update) {
     await lead.update(updates);
@@ -129,8 +127,7 @@ router.get('/', verifyToken, async (req, res) => {
     if (search) {
       where[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
-        { phone: { [Op.like]: `%${search}%` } },
-        { email: { [Op.like]: `%${search}%` } }
+        { phone: { [Op.like]: `%${search}%` } }
       ];
     }
 
@@ -197,7 +194,7 @@ router.get('/check-visitor/:fingerprint', async (req, res) => {
         returning_visitor: true,
         visit_count: lead.visit_count + 1
       });
-      return res.json({ verified: true, lead_token: lead.lead_token, lead: { name: lead.name, email: lead.email, phone: lead.phone } });
+      return res.json({ verified: true, lead_token: lead.lead_token, lead: { name: lead.name, phone: lead.phone } });
     }
     
     res.json({ verified: false });
@@ -317,7 +314,7 @@ router.post('/track-returning', async (req, res) => {
     const leadContext = await getLeadContext(lead);
     await maybeNotifyLeadIfHighInterest(lead, leadContext);
 
-    res.json({ success: true, lead: { name: lead.name, email: lead.email, phone: lead.phone } });
+    res.json({ success: true, lead: { name: lead.name, phone: lead.phone } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -339,7 +336,6 @@ router.get('/verify-token', async (req, res) => {
       lead: { 
         id: lead.id,
         name: lead.name, 
-        email: lead.email, 
         phone: lead.phone,
         status: lead.status,
         source: lead.source,
@@ -368,16 +364,9 @@ router.patch('/profile', async (req, res) => {
     }
 
     const nextName = cleanText(req.body?.name, 120);
-    const rawEmail = typeof req.body?.email === 'string' ? req.body.email : undefined;
-    const nextEmail = rawEmail === undefined ? undefined : cleanEmail(rawEmail);
-
-    if (rawEmail !== undefined && rawEmail.trim() && !nextEmail) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
 
     const updates = {};
     if (nextName) updates.name = nextName;
-    if (rawEmail !== undefined) updates.email = nextEmail || null;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No profile changes provided' });
@@ -390,7 +379,6 @@ router.patch('/profile', async (req, res) => {
       lead: {
         id: lead.id,
         name: lead.name,
-        email: lead.email,
         phone: lead.phone,
         status: lead.status,
         source: lead.source,
@@ -424,7 +412,6 @@ router.get('/export', verifyToken, async (req, res) => {
     worksheet.columns = [
       { header: 'Name', key: 'name', width: 20 },
       { header: 'Phone', key: 'phone', width: 15 },
-      { header: 'Email', key: 'email', width: 25 },
       { header: 'Status', key: 'status', width: 15 },
       { header: 'Time Spent (s)', key: 'time_spent', width: 15 },
       { header: 'Source', key: 'source', width: 15 },
@@ -469,7 +456,6 @@ router.get('/export', verifyToken, async (req, res) => {
       worksheet.addRow({
         name: lead.name,
         phone: lead.phone,
-        email: lead.email,
         status: lead.status,
         time_spent: lead.timeSpent,
         source: lead.source,
@@ -506,7 +492,6 @@ router.get('/export', verifyToken, async (req, res) => {
     }
 
     // Add updates to sheet
-    const { Update } = require('../models');
     const updates = await Update.findAll({ order: [['createdAt', 'DESC']] });
     updates.forEach((update) => {
       updatesSheet.addRow({
@@ -533,7 +518,6 @@ router.get('/export', verifyToken, async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120);
-    const email = cleanEmail(req.body?.email);
     const source = cleanText(req.body?.source, 80);
     const sessionId = cleanText(req.body?.sessionId, 100);
     const phone = cleanText(req.body?.phone, 20);
@@ -550,7 +534,8 @@ router.post('/', async (req, res) => {
     let timeSpent = 0;
     let visitedPages = '[]';
     
-    if (sessionId) {
+    const VisitorSession = require('../models').VisitorSession;
+    if (sessionId && VisitorSession) {
       const session = await VisitorSession.findOne({ where: { sessionId } });
       if (session) {
         timeSpent = session.timeSpent;
@@ -561,7 +546,6 @@ router.post('/', async (req, res) => {
     const lead = await Lead.create({
       name,
       phone: localPhone,
-      email,
       source: source || 'Website',
       timeSpent,
       visited_pages: visitedPages
@@ -721,7 +705,6 @@ router.post('/import', verifyToken, memoryUpload.single('file'), async (req, res
 
       const name = cleanText(row.getCell(1).value, 120);
       const phone = cleanText(row.getCell(2).value, 20);
-      const email = cleanEmail(row.getCell(3).value);
       const status = cleanText(row.getCell(4).value, 40);
 
       const normalizedPhone = normalizePhone(phone);
@@ -733,7 +716,6 @@ router.post('/import', verifyToken, memoryUpload.single('file'), async (req, res
         leadsToCreate.push({
           name,
           phone: localPhone,
-          email,
           status: ALLOWED_LEAD_STATUSES.has(status) ? status : 'New',
           source: 'Import'
         });
