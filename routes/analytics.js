@@ -5,6 +5,11 @@ const { verifyToken } = require('./auth');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 
+// POST dummy track route to stop 404s
+router.post('/track', (req, res) => {
+  res.status(204).end();
+});
+
 // GET analytics data summary (Admin)
 router.get('/', verifyToken, async (req, res) => {
   try {
