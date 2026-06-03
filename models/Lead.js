@@ -62,14 +62,6 @@ const Lead = sequelize.define('Lead', {
     type: DataTypes.STRING(500),
     allowNull: true
   },
-  otp: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  otp_expiry: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
   high_interest_whatsapp_notified_at: {
     type: DataTypes.DATE,
     allowNull: true
@@ -86,19 +78,7 @@ const Lead = sequelize.define('Lead', {
     type: DataTypes.DATE,
     allowNull: true
   },
-  passcode: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  is_registered: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
   isRead: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
-  is_trial: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },

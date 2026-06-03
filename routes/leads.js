@@ -20,41 +20,6 @@ const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('
 const multer = require('multer');
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
-const OTP_TTL_MS = 5 * 60 * 1000;
-const PASSCODE_SETUP_TTL_MS = Number.parseInt(process.env.PASSCODE_SETUP_TTL_MS || `${10 * 60 * 1000}`, 10);
-const OTP_SEND_WINDOW_MS = Number.parseInt(process.env.OTP_SEND_WINDOW_MS || `${15 * 60 * 1000}`, 10);
-const OTP_SEND_MAX = Number.parseInt(process.env.OTP_SEND_MAX || '10', 10);
-const OTP_VERIFY_WINDOW_MS = Number.parseInt(process.env.OTP_VERIFY_WINDOW_MS || `${15 * 60 * 1000}`, 10);
-const OTP_VERIFY_MAX = Number.parseInt(process.env.OTP_VERIFY_MAX || '15', 10);
-const PASSCODE_LOGIN_WINDOW_MS = Number.parseInt(process.env.PASSCODE_LOGIN_WINDOW_MS || `${15 * 60 * 1000}`, 10);
-const PASSCODE_LOGIN_MAX = Number.parseInt(process.env.PASSCODE_LOGIN_MAX || '10', 10);
-
-const otpSendLimiter = rateLimit({
-  windowMs: OTP_SEND_WINDOW_MS,
-  max: OTP_SEND_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many OTP requests. Please wait and try again.' }
-});
-
-const otpVerifyLimiter = rateLimit({
-  windowMs: OTP_VERIFY_WINDOW_MS,
-  max: OTP_VERIFY_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many verification attempts. Please wait and try again.' }
-});
-
-const passcodeLoginLimiter = rateLimit({
-  windowMs: PASSCODE_LOGIN_WINDOW_MS,
-  max: PASSCODE_LOGIN_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many login attempts. Please wait and try again.' }
-});
-
-const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
-const hashSetupToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 const isValidPhone = (phone) => /^[6-9]\d{9}$/.test(phone);
 const ALLOWED_LEAD_STATUSES = new Set(['New', 'Contacted', 'Converted', 'Follow-up', 'Not Interested', 'Closed']);
 
@@ -76,10 +41,10 @@ const safeJsonParse = (value, fallback = []) => {
 const getLeadContext = async (lead) => {
   const plainLead = lead?.get ? lead.get({ plain: true }) : { ...lead };
   const sessions = plainLead.browserFingerprint
-    ? await VisitorSession.findAll({
+    ? await (require('../models').VisitorSession?.findAll({
         where: { browserFingerprint: plainLead.browserFingerprint },
         order: [['createdAt', 'DESC']]
-      })
+      }) || Promise.resolve([]))
     : [];
 
   const pdfViews = plainLead.id
@@ -182,10 +147,11 @@ router.get('/', verifyToken, async (req, res) => {
       offset
     });
 
+    const VisitorSession = require('../models').VisitorSession;
     // Manually attach VisitorSession data for each lead based on fingerprint
     const leadsWithIntelligence = await Promise.all(leads.map(async (lead) => {
       const plainLead = lead.get({ plain: true });
-      if (plainLead.browserFingerprint) {
+      if (plainLead.browserFingerprint && VisitorSession) {
         const sessions = await VisitorSession.findAll({
           where: { browserFingerprint: plainLead.browserFingerprint },
           order: [['createdAt', 'DESC']]
@@ -242,343 +208,86 @@ router.get('/check-visitor/:fingerprint', async (req, res) => {
   }
 });
 
-// POST save lead directly (without OTP verification)
-router.post('/save-direct', async (req, res) => {
+/**
+ * POST /api/leads/onboard
+ * Required: name, phone
+ * No OTP verification. Just stores the lead and returns a token.
+ */
+router.post('/onboard', async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120);
-    const email = cleanEmail(req.body?.email);
-    const sessionId = cleanText(req.body?.sessionId, 100);
-    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
     const phone = cleanText(req.body?.phone, 20);
+    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
+    const sessionId = cleanText(req.body?.sessionId, 100);
+
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Name and Phone Number are required' });
+    }
 
     const normalizedPhone = normalizePhone(phone);
     const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
       ? normalizedPhone.slice(2)
       : normalizedPhone;
 
-    if (!name || !localPhone) {
-      await logAuditEvent({
-        eventType: 'lead.save.direct.failed',
-        actorType: 'lead',
-        actorId: localPhone || null,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'missing_name_or_phone' }
-      });
-      return res.status(400).json({ error: 'Name and phone are required.' });
-    }
-
     if (!isValidPhone(localPhone)) {
-      await logAuditEvent({
-        eventType: 'lead.save.direct.failed',
-        actorType: 'lead',
-        actorId: localPhone,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'invalid_phone' }
-      });
-      return res.status(400).json({ error: 'Please enter a valid 10-digit Indian mobile number.' });
+      return res.status(400).json({ error: 'Invalid phone number format' });
     }
 
-    // Generate lead token
-    const leadToken = crypto.randomBytes(16).toString('hex');
-    let timeSpent = 0;
-    let visitedPages = '[]';
+    // Find or create lead
+    let lead = await Lead.findOne({ where: { phone: localPhone } });
     
-    if (sessionId) {
-      const session = await VisitorSession.findOne({ where: { sessionId } });
-      if (session) {
-        timeSpent = session.timeSpent;
-        visitedPages = session.visitedPages;
-      }
-    }
-
-    // Create or update lead
-    let lead = await Lead.findOne({ where: { phone: localPhone } });
-
     if (lead) {
-      // Update existing lead
-      await lead.update({
-        name: name || lead.name,
-        email: email || lead.email,
-        browserFingerprint: browserFingerprint || lead.browserFingerprint,
-        lead_token: leadToken,
-        verified: true,
-        status: lead.status || 'New'
-      });
-    } else {
-      // Create new lead
-      lead = await Lead.create({
-        name,
-        phone: localPhone,
-        email,
-        source: 'Direct Save',
-        browserFingerprint,
-        lead_token: leadToken,
-        verified: true,
-        status: 'New'
-      });
-    }
-
-    await logAuditEvent({
-      eventType: 'lead.save.direct.success',
-      actorType: 'lead',
-      actorId: localPhone,
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { source: 'Direct Save', leadId: lead.id }
-    });
-
-    const leadContext = await getLeadContext(lead);
-    await maybeNotifyLeadIfHighInterest(lead, leadContext);
-
-    res.json({ 
-      success: true, 
-      lead_token: leadToken,
-      lead: {
-        id: lead.id,
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email
-      }
-    });
-  } catch (err) {
-    console.error('Error in save-direct:', err);
-    await logAuditEvent({
-      eventType: 'lead.save.direct.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { reason: 'exception', message: err.message }
-    });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST send OTP to mobile
-router.post('/send-otp', otpSendLimiter, async (req, res) => {
-  try {
-    const name = cleanText(req.body?.name, 120);
-    const email = cleanEmail(req.body?.email);
-    const sessionId = cleanText(req.body?.sessionId, 100);
-    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
-    const phone = cleanText(req.body?.phone, 20);
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!name || !localPhone) {
-      await logAuditEvent({
-        eventType: 'lead.otp.send.failed',
-        actorType: 'lead',
-        actorId: localPhone || null,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'missing_name_or_phone' }
-      });
-      return res.status(400).json({ error: 'Name and phone are required.' });
-    }
-
-    if (!isValidPhone(localPhone)) {
-      await logAuditEvent({
-        eventType: 'lead.otp.send.failed',
-        actorType: 'lead',
-        actorId: localPhone,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'invalid_phone' }
-      });
-      return res.status(400).json({ error: 'Please enter a valid 10-digit Indian mobile number.' });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + OTP_TTL_MS);
-    const otpHash = hashOtp(otp);
-
-    let lead = await Lead.findOne({ where: { phone: localPhone } });
-
-    if (lead) {
+      // Update existing lead name if provided
       await lead.update({ 
-        name: name || lead.name,
-        email: email || lead.email,
-        otp: otpHash,
-        otp_expiry: expiry,
-        browserFingerprint: browserFingerprint || lead.browserFingerprint
+        name: name || lead.name, 
+        browserFingerprint: browserFingerprint || lead.browserFingerprint,
+        verified: true
       });
     } else {
+      const leadToken = `LT_${crypto.randomBytes(16).toString('hex')}`;
       lead = await Lead.create({
         name,
         phone: localPhone,
-        email,
-        source: 'OTP Verification',
-        otp: otpHash,
-        otp_expiry: expiry,
+        lead_token: leadToken,
         browserFingerprint,
-        verified: false
+        verified: true,
+        source: 'Quick Onboard'
       });
     }
 
-    const whatsappResult = await sendOtpOnWhatsapp({ phone: localPhone, otp });
-
     await logAuditEvent({
-      eventType: 'lead.otp.send.success',
+      eventType: 'lead.onboard.success',
       actorType: 'lead',
       actorId: localPhone,
       success: true,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
-      details: {
-        provider: whatsappResult.provider,
-        fallback: whatsappResult.provider === 'fallback'
-      }
+      details: { leadId: lead.id }
     });
 
-    res.json({ success: true, message: 'OTP sent successfully' });
-  } catch (err) {
-    await logAuditEvent({
-      eventType: 'lead.otp.send.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { reason: 'exception', message: err.message }
-    });
-    res.status(500).json({ error: err.message });
-  }
-});
+    const { sendAdminNotification } = require('../services/notificationService');
+    await sendAdminNotification(
+      'New User Onboarded',
+      `${lead.name} (${lead.phone}) joined the platform.`,
+      { type: 'lead', leadId: lead.id }
+    );
 
-// POST verify OTP
-router.post('/verify-otp', otpVerifyLimiter, async (req, res) => {
-  try {
-    const otp = cleanText(req.body?.otp, 10);
-    const sessionId = cleanText(req.body?.sessionId, 100);
-    const phone = cleanText(req.body?.phone, 20);
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!isValidPhone(localPhone) || !/^\d{6}$/.test(String(otp || ''))) {
-      await logAuditEvent({
-        eventType: 'lead.otp.verify.failed',
-        actorType: 'lead',
-        actorId: localPhone || null,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'invalid_format' }
-      });
-      return res.status(400).json({ error: 'Invalid phone or OTP format.' });
-    }
-
-    const lead = await Lead.findOne({ where: { phone: localPhone } });
-
-    if (!lead) {
-      await logAuditEvent({
-        eventType: 'lead.otp.verify.failed',
-        actorType: 'lead',
-        actorId: localPhone,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'lead_not_found' }
-      });
-      return res.status(404).json({ error: 'Lead not found' });
-    }
-    if (!lead.otp || hashOtp(otp) !== lead.otp) {
-      await logAuditEvent({
-        eventType: 'lead.otp.verify.failed',
-        actorType: 'lead',
-        actorId: localPhone,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'invalid_otp' }
-      });
-      return res.status(400).json({ error: 'Invalid OTP' });
-    }
-    if (new Date() > lead.otp_expiry) {
-      await logAuditEvent({
-        eventType: 'lead.otp.verify.failed',
-        actorType: 'lead',
-        actorId: localPhone,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: { reason: 'otp_expired' }
-      });
-      return res.status(400).json({ error: 'OTP expired' });
-    }
-
-    // Success -> Verify Lead
-    const leadToken = crypto.randomBytes(16).toString('hex');
-    let session = null;
-    
-    if (sessionId) {
-      session = await VisitorSession.findOne({ where: { sessionId } });
-    }
-
-    await lead.update({
-      verified: true,
-      lead_token: leadToken,
-      otp: null, // Clear OTP
-      otp_expiry: null,
-      visit_count: lead.visit_count + 1,
-      returning_visitor: lead.visit_count > 0
-    });
-
-    // Calculate full context for notification (without double counting by summing dynamically)
-    const sessions = await VisitorSession.findAll({ where: { browserFingerprint: lead.browserFingerprint } });
-    const sessionPages = sessions.flatMap((s) => safeJsonParse(s.visitedPages, []));
-    const leadPages = safeJsonParse(lead.visited_pages, []);
-    const mergedPages = [...new Set([...leadPages, ...sessionPages])];
-    const totalTimeSpent = (lead.timeSpent || 0) + sessions.reduce((acc, s) => acc + (s.timeSpent || 0), 0);
-
-    await maybeNotifyLeadIfHighInterest(lead, {
-      sessions,
-      pages: mergedPages,
-      totalTimeSpent,
-      pdfViews: await PdfView.findAll({ where: { lead_id: lead.id }, include: [PdfDocument], order: [['createdAt', 'DESC']] })
-    });
-
-    await logAuditEvent({
-      eventType: 'lead.otp.verify.success',
-      actorType: 'lead',
-      actorId: localPhone,
+    res.json({
       success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent']
+      lead_token: lead.lead_token,
+      name: lead.name,
+      phone: lead.phone
     });
-
-    res.json({ success: true, lead_token: leadToken, lead: { name: lead.name, email: lead.email, phone: lead.phone } });
   } catch (err) {
-    await logAuditEvent({
-      eventType: 'lead.otp.verify.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { reason: 'exception', message: err.message }
-    });
-    res.status(500).json({ error: err.message });
+    console.error('Onboard error:', err);
+    res.status(500).json({ error: 'Failed to onboard user' });
   }
 });
 
-// POST verify lead from PDF lock (LEGACY - keeping for compatibility but redirecting to OTP flow or updating)
-router.post('/verify', async (req, res) => {
-  // We can keep this for direct verification if needed, or point it to OTP
-  // For now, let's keep it but mark it as "Auto-verify" for convenience or remove it.
-  // The user asked for OTP, so we should prioritize that.
-  res.status(400).json({ error: 'Please use /send-otp and /verify-otp flow.' });
+// POST save lead directly (LEGACY -> Redirect to onboard)
+router.post('/save-direct', async (req, res) => {
+  req.url = '/onboard';
+  return router.handle(req, res);
 });
 
 // POST track returning verified user
@@ -995,385 +704,6 @@ router.post('/:id/whatsapp-log', verifyToken, async (req, res) => {
   }
 });
 
-// --- NEW AUTH FLOW ROUTES ---
-
-// 1. Onboard / Request OTP
-router.post('/register-request', otpSendLimiter, async (req, res) => {
-  try {
-    const name = cleanText(req.body?.name, 120);
-    const email = cleanEmail(req.body?.email);
-    const phone = cleanText(req.body?.phone, 20);
-    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!name || !email || !localPhone) {
-      return res.status(400).json({ error: 'Name, Email and Phone are required.' });
-    }
-
-    if (!isValidPhone(localPhone)) {
-      return res.status(400).json({ error: 'Invalid 10-digit mobile number.' });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + OTP_TTL_MS);
-    const otpHash = hashOtp(otp);
-
-    let lead = await Lead.findOne({ where: { phone: localPhone } });
-
-    if (lead) {
-      // If already registered and has passcode, suggest login instead
-      if (lead.is_registered && lead.passcode) {
-        return res.status(409).json({ error: 'User already registered. Please login.', alreadyRegistered: true });
-      }
-
-      await lead.update({ 
-        name: name || lead.name,
-        email: email || lead.email,
-        otp: otpHash,
-        otp_expiry: expiry,
-        browserFingerprint: browserFingerprint || lead.browserFingerprint
-      });
-    } else {
-      lead = await Lead.create({
-        name,
-        phone: localPhone,
-        email,
-        source: 'Email Registration',
-        otp: otpHash,
-        otp_expiry: expiry,
-        browserFingerprint,
-        verified: false,
-        is_registered: false
-      });
-    }
-
-    // Send Email OTP
-    const emailResult = await sendOtpEmail({ email, otp, name });
-
-    await logAuditEvent({
-      eventType: 'lead.email_otp.send.success',
-      actorType: 'lead',
-      actorId: localPhone,
-      success: emailResult.sent,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { email }
-    });
-if (!emailResult.sent) {
-  // If real email fails, we check if bypass is explicitly enabled as a backup
-  // CRITICAL: Only allow bypass in non-production environments
-  const isBypassEnabled = process.env.NODE_ENV !== 'production' && process.env.BYPASS_EMAIL_VERIFICATION === 'true';
-  if (isBypassEnabled) {
-    // ...
-
-        // CRITICAL: Update the lead with the bypass OTP so it can actually be verified
-        const bypassOtp = '123456';
-        await lead.update({
-          otp: hashOtp(bypassOtp)
-        });
-
-        return res.json({ 
-          success: true, 
-          message: 'Email delivery delayed. Use test code 123456 to continue.' 
-        });
-      }
-
-      return res.status(500).json({ 
-        error: `Email delivery failed (${emailResult.error}). Please check your settings.` 
-      });
-    }
-
-    res.json({ success: true, message: 'Verification code sent to your email.' });
-  } catch (err) {
-    console.error('Register request error:', err);
-    await logAuditEvent({
-      eventType: 'lead.register_request.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { 
-        reason: 'exception', 
-        message: err.message,
-        stack: err.stack?.slice(0, 500)
-      }
-    });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 2. Verify Registration OTP
-router.post('/verify-registration-otp', otpVerifyLimiter, async (req, res) => {
-  try {
-    const otp = cleanText(req.body?.otp, 10);
-    const phone = cleanText(req.body?.phone, 20);
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!localPhone || !/^\d{6}$/.test(String(otp || ''))) {
-      return res.status(400).json({ error: 'Invalid phone or OTP format.' });
-    }
-
-    const lead = await Lead.findOne({ where: { phone: localPhone } });
-
-    // --- BYPASS LOGIC ---
-    const isBypassEnabled = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
-    if (isBypassEnabled && otp === '123456') {
-      console.log(`[AuthBypass] Manually verifying lead: ${localPhone}`);
-      const verificationToken = crypto.randomBytes(24).toString('hex');
-      const verificationExpiry = new Date(Date.now() + PASSCODE_SETUP_TTL_MS);
-      
-      if (lead) {
-        await lead.update({
-          verified: true,
-          otp: hashSetupToken(verificationToken),
-          otp_expiry: verificationExpiry
-        });
-      }
-      
-      return res.json({
-        success: true,
-        verification_token: verificationToken,
-        message: 'Bypass active: Verification successful.'
-      });
-    }
-    // --- END BYPASS LOGIC ---
-
-    if (!lead || !lead.otp || hashOtp(otp) !== lead.otp) {
-      return res.status(400).json({ error: 'Invalid or expired OTP.' });
-    }
-
-    if (new Date() > lead.otp_expiry) {
-      return res.status(400).json({ error: 'OTP has expired.' });
-    }
-
-    const verificationToken = crypto.randomBytes(24).toString('hex');
-    const verificationExpiry = new Date(Date.now() + PASSCODE_SETUP_TTL_MS);
-
-    // Replace the OTP with a short-lived setup token. The frontend must
-    // present this token when creating the passcode, which prevents
-    // unauthenticated passcode resets on any verified lead.
-    await lead.update({
-      verified: true,
-      otp: hashSetupToken(verificationToken),
-      otp_expiry: verificationExpiry
-    });
-
-    res.json({
-      success: true,
-      verification_token: verificationToken,
-      message: 'Email verified. Please set your 6-digit passcode.'
-    });
-  } catch (err) {
-    console.error('Verify registration OTP error:', err);
-    await logAuditEvent({
-      eventType: 'lead.verify_registration_otp.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { reason: 'exception', message: err.message }
-    });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 3. Setup Passcode
-router.post('/setup-passcode', async (req, res) => {
-  try {
-    const phone = cleanText(req.body?.phone, 20);
-    const passcode = cleanText(req.body?.passcode, 6);
-    const verificationToken = cleanText(req.body?.verificationToken, 80);
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!localPhone || !/^\d{6}$/.test(passcode) || !verificationToken) {
-      return res.status(400).json({ error: 'Verification token and 6-digit passcode are required.' });
-    }
-
-    const lead = await Lead.findOne({ where: { phone: localPhone, verified: true } });
-    if (!lead) {
-      return res.status(403).json({ error: 'Verification required before setting passcode.' });
-    }
-
-    if (lead.is_registered && lead.passcode) {
-      return res.status(409).json({ error: 'User already registered. Please login.' });
-    }
-
-    if (!lead.otp || hashSetupToken(verificationToken) !== lead.otp) {
-      return res.status(403).json({ error: 'Verification expired. Please request a new OTP.' });
-    }
-
-    if (!lead.otp_expiry || new Date() > lead.otp_expiry) {
-      return res.status(403).json({ error: 'Verification expired. Please request a new OTP.' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPasscode = await bcrypt.hash(passcode, salt);
-    const leadToken = crypto.randomBytes(16).toString('hex');
-
-    await lead.update({
-      passcode: hashedPasscode,
-      is_registered: true,
-      lead_token: leadToken,
-      otp: null,
-      otp_expiry: null
-    });
-
-    await logAuditEvent({
-      eventType: 'lead.passcode.setup',
-      actorType: 'lead',
-      actorId: localPhone,
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-
-    res.json({ 
-      success: true, 
-      lead_token: leadToken,
-      lead: { name: lead.name, email: lead.email, phone: lead.phone } 
-    });
-  } catch (err) {
-    console.error('Setup passcode error:', err);
-    await logAuditEvent({
-      eventType: 'lead.setup_passcode.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { reason: 'exception', message: err.message }
-    });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 4. Login with Passcode
-router.post('/login-with-passcode', passcodeLoginLimiter, async (req, res) => {
-  try {
-    const phone = cleanText(req.body?.phone, 20);
-    const passcode = cleanText(req.body?.passcode, 6);
-    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!localPhone || !passcode) {
-      return res.status(400).json({ error: 'Phone and passcode are required.' });
-    }
-// --- TRIAL CREDENTIAL HANDLING ---
-const TRIAL_PHONE = process.env.TRIAL_USER_PHONE;
-const TRIAL_PASSCODE = process.env.TRIAL_USER_PASSCODE;
-
-if (process.env.NODE_ENV !== 'production' && TRIAL_PHONE && TRIAL_PASSCODE && localPhone === TRIAL_PHONE && passcode === TRIAL_PASSCODE) {
-  // ...
-
-      // Create a unique trial lead per visitor fingerprint to track independent trial limits
-      const fingerprintSuffix = browserFingerprint ? `-${browserFingerprint.substring(0, 30)}` : '';
-      const trialIdentifier = `${TRIAL_PHONE}${fingerprintSuffix}`;
-
-      let [trialLead] = await Lead.findOrCreate({
-        where: { phone: trialIdentifier },
-        defaults: {
-          name: 'Trial User',
-          phone: trialIdentifier,
-          email: 'trial@dholera.local',
-          is_trial: true,
-          verified: true,
-          is_registered: true,
-          source: 'Trial Account'
-        }
-      });
-
-      const leadToken = crypto.randomBytes(16).toString('hex');
-      await trialLead.update({ 
-        lead_token: leadToken,
-        visit_count: trialLead.visit_count + 1,
-        returning_visitor: true
-      });
-
-      await logAuditEvent({
-        eventType: 'lead.trial_login.success',
-        actorType: 'lead',
-        actorId: trialIdentifier,
-        success: true,
-        ip: req.ip,
-        userAgent: req.headers['user-agent']
-      });
-
-      return res.json({ 
-        success: true, 
-        lead_token: leadToken, 
-        lead: { name: 'Trial User', email: trialLead.email, phone: TRIAL_PHONE } 
-      });
-    }
-    // --- END TRIAL CREDENTIAL HANDLING ---
-
-    const lead = await Lead.findOne({ where: { phone: localPhone, is_registered: true } });
-    if (!lead || !lead.passcode) {
-      return res.status(401).json({ error: 'Invalid credentials or user not registered.' });
-    }
-
-    const isMatch = await bcrypt.compare(passcode, lead.passcode);
-    if (!isMatch) {
-      await logAuditEvent({
-        eventType: 'lead.login.failed',
-        actorType: 'lead',
-        actorId: localPhone,
-        success: false,
-        ip: req.ip,
-        userAgent: req.headers['user-agent']
-      });
-      return res.status(401).json({ error: 'Invalid passcode.' });
-    }
-
-    const leadToken = crypto.randomBytes(16).toString('hex');
-    await lead.update({ 
-      lead_token: leadToken,
-      visit_count: lead.visit_count + 1,
-      returning_visitor: true
-    });
-
-    await logAuditEvent({
-      eventType: 'lead.login.success',
-      actorType: 'lead',
-      actorId: localPhone,
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-
-    res.json({ 
-      success: true, 
-      lead_token: leadToken, 
-      lead: { name: lead.name, email: lead.email, phone: lead.phone } 
-    });
-  } catch (err) {
-    console.error('Login with passcode error:', err);
-    await logAuditEvent({
-      eventType: 'lead.login_with_passcode.failed',
-      actorType: 'lead',
-      success: false,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { reason: 'exception', message: err.message }
-    });
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // POST import leads from Excel (Admin)
 router.post('/import', verifyToken, memoryUpload.single('file'), async (req, res) => {
   try {
@@ -1462,13 +792,14 @@ router.put('/:id/read', verifyToken, async (req, res) => {
 // GET full system backup (JSON)
 router.get('/system/backup', verifyToken, async (req, res) => {
   try {
+    const { UserSession, AuditLog } = require('../models');
     const data = {
       leads: await Lead.findAll(),
       updates: await Update.findAll(),
-      sessions: await UserSession.findAll(),
+      sessions: await (UserSession?.findAll() || Promise.resolve([])),
       pdfs: await PdfDocument.findAll(),
       settings: await Setting.findAll(),
-      auditLogs: await AuditLog.findAll()
+      auditLogs: await (AuditLog?.findAll() || Promise.resolve([]))
     };
     
     res.setHeader('Content-Type', 'application/json');
@@ -1485,7 +816,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     
     const root = JSON.parse(req.file.buffer.toString());
-    // Handle both { leads: [] } and { data: { Lead: [] } } formats
     const data = root.data || root;
     
     const results = {
@@ -1495,7 +825,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       pdfs: { created: 0, updated: 0 }
     };
 
-    // Restore Leads
     const leadList = data.Lead || data.leads;
     if (leadList) {
       for (const item of leadList) {
@@ -1512,7 +841,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       }
     }
 
-    // Restore Updates
     const updateList = data.Update || data.updates;
     if (updateList) {
       for (const item of updateList) {
@@ -1529,7 +857,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       }
     }
 
-    // Restore PDFs
     const pdfList = data.PdfDocument || data.pdfs;
     if (pdfList) {
       for (const item of pdfList) {
@@ -1546,9 +873,9 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
       }
     }
 
-    // Restore Sessions
+    const { UserSession } = require('../models');
     const sessionList = data.UserSession || data.sessions;
-    if (sessionList) {
+    if (sessionList && UserSession) {
       for (const item of sessionList) {
         await UserSession.create(item);
         results.sessions.created++;
@@ -1568,73 +895,6 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
     res.json({ success: true, results });
   } catch (err) {
     console.error('Restore error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// NOTE: Test-only endpoint for QA/third-party testers (staging only)
-// Usage: enable TEST_LOGIN_ALLOWED=true in env (or run when NODE_ENV !== 'production')
-// Creates or updates a lead and returns a lead_token for passcode-less testing.
-router.post('/test-login', async (req, res) => {
-  try {
-    const allow = process.env.TEST_LOGIN_ALLOWED === 'true' || process.env.NODE_ENV !== 'production';
-    if (!allow) return res.status(403).json({ error: 'Test login disabled.' });
-
-    const name = cleanText(req.body?.name || process.env.TEST_USER_NAME || 'QA Tester', 120);
-    const email = cleanEmail(req.body?.email || process.env.TEST_USER_EMAIL || 'qa@test.local');
-    const phoneRaw = cleanText(req.body?.phone || process.env.TEST_USER_PHONE || '74358080310', 20);
-    const passcodePlain = req.body?.passcode || process.env.TEST_USER_PASSCODE || '123456';
-
-    const normalizedPhone = normalizePhone(phoneRaw);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!localPhone || !/^[0-9]{10,}$/.test(localPhone)) {
-      return res.status(400).json({ error: 'Invalid phone provided.' });
-    }
-
-    let lead = await Lead.findOne({ where: { phone: localPhone } });
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPass = await bcrypt.hash(passcodePlain, salt);
-    const leadToken = crypto.randomBytes(16).toString('hex');
-
-    if (lead) {
-      await lead.update({
-        name,
-        email,
-        verified: true,
-        is_registered: true,
-        passcode: hashedPass,
-        lead_token: leadToken
-      });
-    } else {
-      lead = await Lead.create({
-        name,
-        phone: localPhone,
-        email,
-        verified: true,
-        is_registered: true,
-        passcode: hashedPass,
-        lead_token: leadToken
-      });
-    }
-
-    const { logAuditEvent } = require('../services/auditLogger');
-    await logAuditEvent({
-      eventType: 'lead.test_login.created',
-      actorType: 'system',
-      actorId: 'test-login',
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { phone: localPhone }
-    });
-
-    res.json({ success: true, lead_token: leadToken, lead: { name: lead.name, email: lead.email, phone: lead.phone } });
-  } catch (err) {
-    console.error('Test-login error:', err);
     res.status(500).json({ error: err.message });
   }
 });

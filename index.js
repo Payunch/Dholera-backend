@@ -163,14 +163,8 @@ app.use((req, res, next) => {
   const isAdminSessionMutation = Boolean(req.session?.isAdmin || req.cookies?.admin_access_token || req.cookies?.admin_refresh_token);
   const isPublicLeadMutation = [
     '/api/leads',
-    '/api/leads/send-otp',
-    '/api/leads/verify-otp',
-    '/api/leads/register-request',
-    '/api/leads/verify-registration-otp',
-    '/api/leads/setup-passcode',
-    '/api/leads/login-with-passcode',
+    '/api/leads/onboard',
     '/api/leads/save-direct',
-    '/api/leads/verify',
     '/api/leads/track-returning',
     '/api/payment/request-manual',
     '/api/payment/verify-utr'

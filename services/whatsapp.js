@@ -178,17 +178,6 @@ const sendTemplateMessage = async ({ phone, templateName, languageCode = WHATSAP
 };
 
 /**
- * Specialized: Send OTP
- */
-const sendOtpOnWhatsapp = async ({ phone, otp }) => {
-  return sendTemplateMessage({
-    phone,
-    templateName: WHATSAPP_OTP_TEMPLATE_NAME,
-    parameters: [otp]
-  });
-};
-
-/**
  * Specialized: Send Lead Alert to Admin
  */
 const sendLeadAlertOnWhatsapp = async ({ phone, lead }) => {
@@ -206,7 +195,6 @@ const sendLeadAlertOnWhatsapp = async ({ phone, lead }) => {
 };
 
 module.exports = {
-  sendOtpOnWhatsapp,
   sendLeadAlertOnWhatsapp,
   sendTemplateMessage,
   normalizePhone,

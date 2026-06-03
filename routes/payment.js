@@ -54,7 +54,7 @@ router.get('/my-purchases', async (req, res) => {
         amount: p.amount / 100,
         transactionId: p.transaction_id,
         createdAt: p.createdAt,
-        documentTitle: p.PdfDocument?.title || (p.pdf_id === 0 ? 'PRO ACCESS' : 'Unknown'),
+        documentTitle: p.PdfDocument?.title || 'Unknown',
         category: p.PdfDocument?.category
       }))
     });
@@ -274,7 +274,7 @@ router.get('/admin/pending', adminVerify, async (req, res) => {
         };
       }
       grouped[baseId].amount += p.amount;
-      grouped[baseId].items.push(p.PdfDocument?.title || (p.pdf_id === 0 ? 'PRO ACCESS' : 'PDF Access'));
+      grouped[baseId].items.push(p.PdfDocument?.title || 'PDF Access');
       
       // If any item in the batch is awaiting_approval, the whole batch is pending
       if (p.status === 'awaiting_approval') {
