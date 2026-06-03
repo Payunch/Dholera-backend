@@ -71,7 +71,7 @@ router.get('/my-purchases', async (req, res) => {
  */
 router.post('/request-manual', async (req, res) => {
   try {
-    let { pdfId, pdfIds, leadToken } = req.body;
+    let { pdfId, pdfIds, type = 'view', leadToken } = req.body;
     if (!pdfId && (!pdfIds || !Array.isArray(pdfIds)) && !leadToken) {
       return res.status(400).json({ error: 'Selection and Lead Token are required' });
     }
@@ -104,34 +104,28 @@ router.post('/request-manual', async (req, res) => {
 
     let amountPaise = 0;
     let targetPdfIds = [];
-    let isPro = false;
+    const pricePerPdf = type === 'download' ? 1000 : 500; // ₹10 for download, ₹5 for view
 
-    // All Access (Pro)
-    if (pdfId === 'all') {
-      if (lead.is_pro) return res.json({ alreadyPurchased: true });
-      amountPaise = 49900;
-      targetPdfIds = [0];
-      isPro = true;
-    } 
     // Multi-select (Cart)
-    else if (Array.isArray(pdfIds) && pdfIds.length > 0) {
-      amountPaise = pdfIds.length * 1000;
+    if (Array.isArray(pdfIds) && pdfIds.length > 0) {
+      amountPaise = pdfIds.length * pricePerPdf;
       targetPdfIds = pdfIds;
     }
     // Single Select
     else if (pdfId) {
       const pdf = await PdfDocument.findByPk(pdfId);
       if (!pdf) return res.status(404).json({ error: 'PDF not found' });
-      const existing = await PdfPurchase.findOne({ where: { lead_id: lead.id, pdf_id: pdfId, status: 'completed' } });
-      if (existing || lead.is_pro) return res.json({ alreadyPurchased: true });
-      amountPaise = 1000;
+      // We don't block existing purchases anymore because views might be one-time, 
+      // but let's assume we still want to block if they already bought a 'download'.
+      // For simplicity, we just allow re-purchasing if it's a view, or they can re-purchase anyway.
+      amountPaise = pricePerPdf;
       targetPdfIds = [pdfId];
     }
     else {
       return res.status(400).json({ error: 'No documents selected for purchase' });
     }
 
-    const baseTransactionId = `${isPro ? 'PRO' : 'PDF'}_${uniqid().toUpperCase()}`;
+    const baseTransactionId = `PDF_${uniqid().toUpperCase()}`;
 
     // Create pending records for each PDF
     for (let i = 0; i < targetPdfIds.length; i++) {
@@ -162,7 +156,7 @@ router.post('/request-manual', async (req, res) => {
       upiId: upiId,
       merchantName: merchantName,
       amount: amountPaise / 100,
-      isPro
+      type
     });
 
   } catch (err) {

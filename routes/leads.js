@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Lead, VisitorSession, PdfView, PdfDocument, Update, UserSession, Setting, AuditLog } = require('../models');
+const { Lead, PdfView, PdfDocument, Update, Setting } = require('../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const crypto = require('crypto');

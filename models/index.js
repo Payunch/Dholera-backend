@@ -2,14 +2,11 @@ const sequelize = require('../config/database');
 const Lead = require('./Lead');
 const Update = require('./Update');
 const Analytics = require('./Analytics');
-const VisitorSession = require('./VisitorSession');
 const PdfDocument = require('./PdfDocument');
 const PdfView = require('./PdfView');
 const PdfPurchase = require('./PdfPurchase');
-const AuditLog = require('./AuditLog');
 const WhatsAppLog = require('./WhatsAppLog');
 const Setting = require('./Setting');
-const UserSession = require('./UserSession');
 const ClearanceModel = require('./ClearanceModel');
 
 // Define Relationships
@@ -36,13 +33,10 @@ module.exports = {
   Lead,
   Update,
   Analytics,
-  VisitorSession,
   PdfDocument,
   PdfView,
   PdfPurchase,
-  AuditLog,
   WhatsAppLog,
   Setting,
-  UserSession,
   ClearanceModel
 };

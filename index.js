@@ -172,7 +172,6 @@ app.use((req, res, next) => {
     '/api/leads/save-direct',
     '/api/leads/verify',
     '/api/leads/track-returning',
-    '/api/track',
     '/api/payment/request-manual',
     '/api/payment/verify-utr'
   ].includes(req.path);
@@ -224,7 +223,6 @@ app.use('/api/leads', require('./routes/leads'));
 app.use('/api/updates', require('./routes/updates'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/track', require('./routes/track'));
 app.use('/api/pdf', require('./routes/pdf'));
 app.use('/api/payment', require('./routes/payment'));
 app.use('/api/bi', require('./routes/bi'));
