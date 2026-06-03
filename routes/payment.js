@@ -91,10 +91,16 @@ router.post('/request-manual', async (req, res) => {
     let rawToken = leadToken || req.headers.authorization;
     const cleanToken = extractToken(rawToken);
     
-    if (!cleanToken) return res.status(403).json({ error: 'No lead token provided' });
+    if (!cleanToken) {
+      console.warn('[Payment] Blocked: No token in body or header');
+      return res.status(403).json({ error: 'No lead token provided' });
+    }
 
     const lead = await Lead.findOne({ where: { lead_token: cleanToken } });
-    if (!lead) return res.status(403).json({ error: 'Invalid lead token' });
+    if (!lead) {
+      console.warn(`[Payment] Blocked: Token not found in DB: ${cleanToken.substring(0, 8)}...`);
+      return res.status(403).json({ error: 'Invalid lead token' });
+    }
 
     let amountPaise = 0;
     let targetPdfIds = [];
