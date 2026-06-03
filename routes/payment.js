@@ -1,357 +1,156 @@
 const express = require('express');
 const router = express.Router();
-const uniqid = require('uniqid');
-const { PdfPurchase, PdfDocument, Lead } = require('../models');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
+const { PdfPurchase, PdfDocument, Lead, sequelize } = require('../models');
+const { logAuditEvent } = require('../services/auditLogger');
 
-// REVENUE SAFETY LIMIT: 18 Lakh INR in Paise
-const REVENUE_LIMIT_PAISE = 1800000 * 100;
-
-const extractToken = (token) => {
-  if (!token) return '';
-  return token.toLowerCase().startsWith('bearer ') ? token.slice(7).trim() : token.trim();
-};
-
-/**
- * Helper to calculate current total revenue from completed PDF purchases.
- * This counts manual payments that the Admin has marked as 'completed'.
- */
-async function getTotalRevenue() {
-  try {
-    const result = await PdfPurchase.sum('amount', { where: { status: 'completed' } });
-    return result || 0;
-  } catch (err) {
-    console.error('[Payment] Revenue Calc Error:', err);
-    return 0;
-  }
-}
+// Initialize Razorpay
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'placeholder_secret'
+});
 
 /**
- * GET /api/payment/my-purchases
- * Lists all completed and pending purchases for the current user.
+ * POST /api/payment/create-order
+ * Payload: { pdfIds: [], type: 'view' | 'download' }
  */
-router.get('/my-purchases', async (req, res) => {
+router.post('/create-order', async (req, res) => {
   try {
-    let leadToken = req.headers.authorization || '';
-    leadToken = extractToken(leadToken);
+    const { pdfIds, type } = req.body;
+    const leadToken = req.headers['authorization'];
+
+    if (!pdfIds || !Array.isArray(pdfIds) || pdfIds.length === 0) {
+      return res.status(400).json({ error: 'No PDFs selected' });
+    }
 
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
-    if (!lead) return res.status(403).json({ error: 'Invalid lead token' });
+    if (!lead) return res.status(401).json({ error: 'Unauthorized' });
 
-    const purchases = await PdfPurchase.findAll({
-      where: { lead_id: lead.id },
-      include: [
-        { model: PdfDocument, attributes: ['title', 'category'] }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
+    // Pricing logic
+    const pricePerPdf = type === 'download' ? 10 : 5;
+    const totalAmount = pdfIds.length * pricePerPdf;
+
+    const options = {
+      amount: totalAmount * 100, // Amount in paise
+      currency: "INR",
+      receipt: `rcpt_${Date.now()}`,
+      notes: {
+        leadId: lead.id,
+        pdfIds: pdfIds.join(','),
+        type: type
+      }
+    };
+
+    const order = await razorpay.orders.create(options);
 
     res.json({
       success: true,
-      purchases: purchases.map(p => ({
-        id: p.id,
-        pdfId: p.pdf_id,
-        status: p.status,
-        amount: p.amount / 100,
-        transactionId: p.transaction_id,
-        createdAt: p.createdAt,
-        documentTitle: p.PdfDocument?.title || 'Unknown',
-        category: p.PdfDocument?.category
-      }))
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: process.env.RAZORPAY_KEY_ID
     });
   } catch (err) {
-    console.error('[Payment] My Purchases Error:', err);
-    res.status(500).json({ error: 'Failed to fetch purchases' });
+    console.error('Razorpay Order Error:', err);
+    res.status(500).json({ error: 'Failed to create payment order' });
   }
 });
 
 /**
- * POST /api/payment/request-manual
- * Logs a user's intent to pay via UPI QR and returns UPI details.
- * Also checks the 18 Lakh revenue limit.
+ * POST /api/payment/verify
+ * Verification after frontend payment success
  */
-router.post('/request-manual', async (req, res) => {
+router.post('/verify', async (req, res) => {
   try {
-    let { pdfId, pdfIds, type = 'view', leadToken } = req.body;
-    if (!pdfId && (!pdfIds || !Array.isArray(pdfIds)) && !leadToken) {
-      return res.status(400).json({ error: 'Selection and Lead Token are required' });
-    }
-
-    // 1. REVENUE THRESHOLD CHECK (Safety First)
-    const currentRevenue = await getTotalRevenue();
-    if (currentRevenue >= REVENUE_LIMIT_PAISE) {
-      console.warn(`[Payment] REVENUE LIMIT HIT (Current: ${currentRevenue / 100}). Blocking new requests.`);
-      return res.status(403).json({ 
-        error: 'System Paused',
-        details: 'The platform has reached its threshold for the current cycle. Please contact the Admin directly for access.',
-        limitHit: true
-      });
-    }
-
-    // Extract token from body OR header
-    let rawToken = leadToken || req.headers.authorization;
-    const cleanToken = extractToken(rawToken);
-    
-    if (!cleanToken) {
-      console.warn('[Payment] Blocked: No token in body or header');
-      return res.status(403).json({ error: 'No lead token provided' });
-    }
-
-    const lead = await Lead.findOne({ where: { lead_token: cleanToken } });
-    if (!lead) {
-      console.warn(`[Payment] Blocked: Token not found in DB: ${cleanToken.substring(0, 8)}...`);
-      return res.status(403).json({ error: 'Invalid lead token' });
-    }
-
-    let amountPaise = 0;
-    let targetPdfIds = [];
-    const pricePerPdf = type === 'download' ? 1000 : 500; // ₹10 for download, ₹5 for view
-
-    // Multi-select (Cart)
-    if (Array.isArray(pdfIds) && pdfIds.length > 0) {
-      amountPaise = pdfIds.length * pricePerPdf;
-      targetPdfIds = pdfIds;
-    }
-    // Single Select
-    else if (pdfId) {
-      const pdf = await PdfDocument.findByPk(pdfId);
-      if (!pdf) return res.status(404).json({ error: 'PDF not found' });
-      // We don't block existing purchases anymore because views might be one-time, 
-      // but let's assume we still want to block if they already bought a 'download'.
-      // For simplicity, we just allow re-purchasing if it's a view, or they can re-purchase anyway.
-      amountPaise = pricePerPdf;
-      targetPdfIds = [pdfId];
-    }
-    else {
-      return res.status(400).json({ error: 'No documents selected for purchase' });
-    }
-
-    const baseTransactionId = `PDF_${uniqid().toUpperCase()}`;
-
-    // Create pending records for each PDF
-    for (let i = 0; i < targetPdfIds.length; i++) {
-      const tid = targetPdfIds[i];
-      // Ensure tid is an integer
-      const pdfIdInt = parseInt(tid, 10);
-      
-      // Make transaction_id unique by adding a suffix for multi-items
-      const uniqueTxnId = targetPdfIds.length > 1 ? `${baseTransactionId}_${i+1}` : baseTransactionId;
-      
-      await PdfPurchase.create({
-        lead_id: lead.id,
-        pdf_id: isNaN(pdfIdInt) ? 0 : pdfIdInt,
-        amount: Math.round(amountPaise / targetPdfIds.length),
-        transaction_id: uniqueTxnId,
-        status: 'pending'
-      });
-    }
-
-    const upiId = (process.env.ADMIN_UPI_ID || '917435808310@ybl').trim();
-    const merchantName = (process.env.ADMIN_NAME || 'Dholera Platform').trim();
-
-    console.log(`[Payment] Manual Request Created. ID: ${baseTransactionId}, UPI: ${upiId}, Name: ${merchantName}`);
-
-    res.json({
-      success: true,
-      transactionId: baseTransactionId,
-      upiId: upiId,
-      merchantName: merchantName,
-      amount: amountPaise / 100,
+    const { 
+      razorpay_order_id, 
+      razorpay_payment_id, 
+      razorpay_signature,
+      pdfIds,
       type
-    });
+    } = req.body;
 
-  } catch (err) {
-    console.error('[Payment] Manual Request Error:', err.message);
-    if (err.name === 'SequelizeUniqueConstraintError') {
-      console.error('[Payment] Unique Constraint Error Details:', err.errors.map(e => e.message));
-    }
-    res.status(500).json({ error: 'Failed to initiate payment request', details: err.message });
-  }
-});
-
-/**
- * POST /api/payment/verify-utr
- * User submits their UTR for verification. 
- * Sets status to 'awaiting_approval'.
- */
-router.post('/verify-utr', async (req, res) => {
-  try {
-    let { utr, transactionId, leadToken } = req.body;
-    if (!utr || !transactionId || !leadToken) {
-      return res.status(400).json({ error: 'UTR and Transaction ID required' });
-    }
-
-    if (!/^\d{10,14}$/.test(utr)) {
-      return res.status(400).json({ error: 'Please enter a valid Transaction/UTR number (10-14 digits).' });
-    }
-
-    leadToken = extractToken(leadToken);
+    const leadToken = req.headers['authorization'];
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
-    if (!lead) return res.status(403).json({ error: 'Invalid session' });
 
-    // Handle batch transactions: find records starting with this transactionId
-    const { Op } = require('sequelize');
-    const purchases = await PdfPurchase.findAll({ 
-      where: { 
-        lead_id: lead.id,
-        [Op.or]: [
-          { transaction_id: transactionId },
-          { transaction_id: { [Op.like]: `${transactionId}_%` } }
-        ]
-      } 
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'placeholder_secret')
+      .update(body.toString())
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ error: 'Invalid payment signature' });
+    }
+
+    // Payment Verified -> Grant Access
+    const purchases = pdfIds.map(pdfId => ({
+      LeadId: lead.id,
+      pdfId: pdfId,
+      transactionId: razorpay_payment_id,
+      amount: type === 'download' ? 10 : 5,
+      status: 'completed',
+      type: type, // view or download
+      purchase_date: new Date()
+    }));
+
+    await PdfPurchase.bulkCreate(purchases);
+
+    await logAuditEvent({
+      eventType: 'payment.success',
+      actorType: 'lead',
+      actorId: lead.phone,
+      success: true,
+      details: { order_id: razorpay_order_id, payment_id: razorpay_payment_id, pdfCount: pdfIds.length }
     });
 
-    if (purchases.length === 0) {
-      console.warn(`[Payment] No pending records for ${transactionId}`);
-      return res.status(404).json({ error: 'Transaction record not found.' });
-    }
-
-    // Set to awaiting_approval
-    for (const purchase of purchases) {
-      await purchase.update({ 
-        status: 'awaiting_approval', 
-        gateway_payment_id: utr 
-      });
-    }
-
-    // ROADMAP PHASE 1: NOTIFY ADMIN OF SUBMITTED UTR
-    try {
-      const { sendAdminNotification } = require('../services/notificationService');
-      await sendAdminNotification(
-        'Payment Proof Submitted',
-        `${lead.name} submitted UTR: ${utr}. Verify and approve now.`,
-        { type: 'payment', transactionId: transactionId, utr: utr }
-      );
-    } catch (notifyErr) {
-      console.error('[Payment] Push notification failed:', notifyErr.message);
-    }
-
-    res.json({ 
-      success: true, 
-      message: 'Payment submitted for approval. Admin will verify and unlock your access shortly.' 
-    });
-
+    res.json({ success: true, message: 'Payment verified and access granted' });
   } catch (err) {
-    console.error('[Payment] UTR Submit Error:', err);
-    res.status(500).json({ error: 'Failed to submit payment details' });
+    console.error('Payment Verification Error:', err);
+    res.status(500).json({ error: 'Verification failed' });
   }
 });
 
 /**
- * ADMIN ONLY ROUTES
+ * Webhook for Razorpay (Safety fallback)
  */
-const { verifyToken: adminVerify } = require('./auth');
+router.post('/webhook', async (req, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const signature = req.headers['x-razorpay-signature'];
 
-// GET /api/payment/admin/pending
-router.get('/admin/pending', adminVerify, async (req, res) => {
-  try {
-    const { Op } = require('sequelize');
-    // Fetch both pending and completed records for history
-    const allRecords = await PdfPurchase.findAll({
-      where: { 
-        status: { [Op.in]: ['awaiting_approval', 'completed'] } 
-      },
-      include: [
-        { model: Lead, attributes: ['id', 'name', 'phone', 'email'] },
-        { model: PdfDocument, attributes: ['id', 'title'] }
-      ],
-      order: [['updatedAt', 'DESC']]
-    });
+  if (!secret || !signature) return res.status(400).send('Missing secret or signature');
 
-    // Group by base transactionId (before the _) to avoid duplicates in Admin view
-    const grouped = {};
-    for (const p of allRecords) {
-      const baseId = p.transaction_id.split('_').slice(0, 2).join('_'); // TXN_ABC or PRO_ABC
-      if (!grouped[baseId]) {
-        grouped[baseId] = {
-          id: p.id,
-          transaction_id: baseId,
-          utr: p.gateway_payment_id,
-          amount: 0,
-          status: p.status, // Group status
-          lead: p.Lead,
-          items: [],
-          updatedAt: p.updatedAt
-        };
-      }
-      grouped[baseId].amount += p.amount;
-      grouped[baseId].items.push(p.PdfDocument?.title || 'PDF Access');
-      
-      // If any item in the batch is awaiting_approval, the whole batch is pending
-      if (p.status === 'awaiting_approval') {
-        grouped[baseId].status = 'awaiting_approval';
-      }
-    }
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
 
-    res.json(Object.values(grouped));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  if (expectedSignature !== signature) return res.status(400).send('Invalid signature');
 
-// GET /api/payment/admin/count-pending
-router.get('/admin/count-pending', adminVerify, async (req, res) => {
-  try {
-    const count = await PdfPurchase.count({ 
-      where: { status: 'awaiting_approval' },
-      distinct: true,
-      col: 'transaction_id' 
-    });
-    res.json({ count });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/payment/admin/approve/:transactionId
-router.post('/admin/approve/:transactionId', adminVerify, async (req, res) => {
-  try {
-    const { transactionId } = req.params;
-    const { Op } = require('sequelize');
-
-    // Find all matching records (handle suffixes like _1, _2)
-    const purchases = await PdfPurchase.findAll({ 
-      where: { 
-        [Op.or]: [
-          { transaction_id: transactionId },
-          { transaction_id: { [Op.like]: `${transactionId}_%` } }
-        ]
-      } 
-    });
+  const event = req.body.event;
+  if (event === 'payment.captured') {
+    const payment = req.body.payload.payment.entity;
+    const { leadId, pdfIds, type } = payment.notes;
     
-    if (purchases.length === 0) {
-      console.warn(`[Admin] Approval failed: No records for ${transactionId}`);
-      return res.status(404).json({ error: 'Transaction record not found' });
-    }
-
-    const leadId = purchases[0].lead_id;
-    const lead = await Lead.findByPk(leadId);
-
-    for (const p of purchases) {
-      await p.update({ status: 'completed' });
-      
-      // If it was a PRO purchase, update lead
-      if (p.pdf_id === 0 && lead) {
-        await lead.update({ is_pro: true });
-        console.log(`[Admin] User ${lead.id} upgraded to PRO`);
-      }
-    }
-
-    // REAL-TIME UNLOCK (Roadmap Phase 1)
-    const io = req.app.get('io');
-    if (io && lead?.lead_token) {
-      io.to(`lead_${lead.lead_token}`).emit('payment_approved', {
-        transactionId: transactionId,
-        message: 'Access granted by Admin'
+    // Grant access if not already granted by the verify route
+    const ids = pdfIds.split(',');
+    for (const pdfId of ids) {
+      await PdfPurchase.findOrCreate({
+        where: { transactionId: payment.id, pdfId },
+        defaults: {
+          LeadId: leadId,
+          pdfId: pdfId,
+          transactionId: payment.id,
+          amount: payment.amount / 100,
+          status: 'completed',
+          type: type || 'view'
+        }
       });
-      console.log(`[Socket] Unlock signal emitted to lead_${lead.lead_token.substring(0, 8)}...`);
     }
-
-    console.log(`[Admin] Approved transaction: ${transactionId} (${purchases.length} items)`);
-    res.json({ success: true, message: 'Payment approved. Access granted.' });
-  } catch (err) {
-    console.error('[Admin] Approval Error:', err);
-    res.status(500).json({ error: err.message });
   }
+
+  res.json({ status: 'ok' });
 });
 
 module.exports = router;
