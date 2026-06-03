@@ -144,7 +144,9 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
       if (!isTrial) {
         if (!lead || !lead.verified) return res.status(403).json({ error: 'Invalid or unverified lead token.' });
-        if (!lead.is_pro) {
+        
+        // CRITICAL CHECK: Lead.is_pro MUST be non-null and boolean
+        if (lead.is_pro !== true) {
           const purchase = await PdfPurchase.findOne({
             where: { 
               lead_id: lead.id, 
@@ -152,7 +154,7 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
               status: { [Op.in]: ['completed', 'awaiting_approval'] }
             },
             order: [
-              [sequelize.literal("CASE WHEN status = 'completed' THEN 1 ELSE 2 END"), 'ASC'],
+              ['status', 'ASC'], // 'completed' < 'awaiting_approval' alphabetically
               ['updatedAt', 'DESC']
             ]
           });
@@ -195,7 +197,13 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
           
           if (typeIndex !== -1) {
             let publicIdParts = parts.slice(typeIndex + 1);
-            if (publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
+            
+            // Skip signature if present
+            if (publicIdParts[0] && publicIdParts[0].startsWith('s--') && publicIdParts[0].endsWith('--')) {
+              publicIdParts = publicIdParts.slice(1);
+            }
+
+            if (publicIdParts[0] && publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
               publicIdParts = publicIdParts.slice(1);
             }
             
@@ -209,11 +217,10 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
               resource_type: pdf.resource_type || 'image',
               type: pdf.storage_type || parts[typeIndex]
             });
-            console.log(`[PDF] Securely signed ${pdf.title} (Type: ${pdf.storage_type || 'auto'})`);
           }
         }
       } catch (err) {
-        console.warn('[PDF] Cloudinary handshake failed:', err.message);
+        console.warn('[PDF] Cloudinary signing failed:', err.message);
       }
 
       await pipeRemoteUrl(streamUrl, res);
