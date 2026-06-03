@@ -39,6 +39,10 @@ const PdfPurchase = sequelize.define('PdfPurchase', {
   status: {
     type: DataTypes.STRING, // 'pending', 'completed', 'failed'
     defaultValue: 'pending'
+  },
+  type: {
+    type: DataTypes.STRING, // 'view', 'download'
+    defaultValue: 'view'
   }
 });
 

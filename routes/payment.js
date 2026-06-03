@@ -86,13 +86,12 @@ router.post('/verify', async (req, res) => {
 
     // Payment Verified -> Grant Access
     const purchases = pdfIds.map(pdfId => ({
-      LeadId: lead.id,
-      pdfId: pdfId,
-      transactionId: razorpay_payment_id,
-      amount: type === 'download' ? 10 : 5,
+      lead_id: lead.id,
+      pdf_id: pdfId,
+      transaction_id: razorpay_payment_id,
+      amount: (type === 'download' ? 10 : 5) * 100, // stored in paise
       status: 'completed',
-      type: type, // view or download
-      purchase_date: new Date()
+      type: type || 'view'
     }));
 
     await PdfPurchase.bulkCreate(purchases);
@@ -137,12 +136,12 @@ router.post('/webhook', async (req, res) => {
     const ids = pdfIds.split(',');
     for (const pdfId of ids) {
       await PdfPurchase.findOrCreate({
-        where: { transactionId: payment.id, pdfId },
+        where: { transaction_id: payment.id, pdf_id: pdfId },
         defaults: {
-          LeadId: leadId,
-          pdfId: pdfId,
-          transactionId: payment.id,
-          amount: payment.amount / 100,
+          lead_id: leadId,
+          pdf_id: pdfId,
+          transaction_id: payment.id,
+          amount: payment.amount, // already in paise from gateway
           status: 'completed',
           type: type || 'view'
         }
