@@ -13,6 +13,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "24"
       - key: DATABASE_URL
         value: /data/database.sqlite
       - key: DB_SYNC_ALTER
