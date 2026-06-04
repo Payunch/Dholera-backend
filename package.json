@@ -9,8 +9,7 @@
   "scripts": {
     "start": "node index.js",
     "create-test-user": "node scripts/create_test_user.js",
-    "test": "NODE_ENV=test DATABASE_URL=:memory: mocha \"tests/**/*.test.js\" --timeout 30000",
-    "postinstall": "npm rebuild sqlite3 --build-from-source"
+    "test": "NODE_ENV=test DATABASE_URL=:memory: mocha \"tests/**/*.test.js\" --timeout 30000"
   },
   "keywords": [],
   "author": "",
