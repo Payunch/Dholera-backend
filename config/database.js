@@ -100,34 +100,45 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   const persistentCandidates = [
     process.env.RAILWAY_VOLUME_MOUNT_PATH ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'database.sqlite') : null,
     '/data/database.sqlite',
-    '/app/data/database.sqlite'
+    '/app/data/database.sqlite',
+    path.join(__dirname, '../data/database.sqlite')
   ].filter(Boolean);
 
-  let persistentStoragePath = persistentCandidates.find((candidate) => fs.existsSync(path.dirname(candidate)));
+  let validatedPath = null;
   
-  // Only try to create a directory if we are NOT on Render (which uses /data) 
-  // and we are in production without a detected volume.
-  if (!persistentStoragePath && process.env.NODE_ENV === 'production') {
-    // If DATABASE_URL is an absolute path, try to ensure its parent exists if it's in a likely-writable area
-    if (path.isAbsolute(storagePath)) {
-      const dir = path.dirname(storagePath);
-      try {
-        if (!fs.existsSync(dir) && (dir.startsWith('/tmp') || dir.includes('dholera'))) {
+  for (const candidate of persistentCandidates) {
+    const dir = path.dirname(candidate);
+    try {
+      // Check if directory exists and is writable
+      if (fs.existsSync(dir)) {
+        fs.accessSync(dir, fs.constants.W_OK);
+        validatedPath = candidate;
+        break;
+      } else {
+        // Try to create it if it's a local project path
+        if (dir.includes('Dholera-backend') || dir.includes('data')) {
           fs.mkdirSync(dir, { recursive: true });
-          console.log(`[DB] Created directory at ${dir}`);
+          fs.accessSync(dir, fs.constants.W_OK);
+          validatedPath = candidate;
+          break;
         }
-      } catch (err) {
-        console.warn(`[DB] Directory check failed for ${dir}: ${err.message}`);
       }
+    } catch (err) {
+      // Path not suitable, continue to next
     }
   }
 
-  if (persistentStoragePath) {
-    storagePath = persistentStoragePath;
+  if (validatedPath) {
+    storagePath = validatedPath;
+  }
+
+  const isPersistent = storagePath.startsWith('/data') || storagePath.includes('RAILWAY');
+  
+  if (isPersistent) {
     console.log(`[DB] Using persistent volume storage at ${storagePath}`);
-  } else if (process.env.NODE_ENV === 'production' && !storagePath.startsWith('/data')) {
-    console.warn('[DB] ⚠️ Production is using SQLite without a detected persistent volume. Redeploys will lose data.');
-    console.warn('[DB] Ensure a Render Disk is mounted at /data');
+  } else if (process.env.NODE_ENV === 'production') {
+    console.warn(`[DB] ⚠️ Production is using local SQLite storage at ${storagePath}.`);
+    console.warn('[DB] DATA WILL BE LOST ON REDEPLOY. Mount a Render Disk at /data to fix this.');
   }
 
   sequelize = new Sequelize({
@@ -137,9 +148,9 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   });
   databaseInfo = {
     mode: 'sqlite',
-    source: persistentStoragePath ? 'persistent-volume' : 'local-fallback',
+    source: isPersistent ? 'persistent-volume' : 'local-fallback',
     storagePath,
-    persistent: Boolean(persistentStoragePath)
+    persistent: isPersistent
   };
   console.log(`[DB] SQLite → ${storagePath}`);
 }

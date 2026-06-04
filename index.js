@@ -123,7 +123,18 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
     const dbInfo = getDatabaseInfo();
     
     // Use the same directory as the main database for the session store
-    const sessionDir = dbInfo.storagePath ? path.dirname(dbInfo.storagePath) : __dirname;
+    let sessionDir = dbInfo.storagePath ? path.dirname(dbInfo.storagePath) : __dirname;
+    
+    // Final check for sessionDir writability
+    try {
+      if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true });
+      }
+      fs.accessSync(sessionDir, fs.constants.W_OK);
+    } catch (err) {
+      console.warn(`[Session] Warning: ${sessionDir} is not writable, falling back to OS temp dir.`);
+      sessionDir = require('os').tmpdir();
+    }
     
     sessionStore = new SQLiteStore({
       db: 'sessions.sqlite',
