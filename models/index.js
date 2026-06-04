@@ -11,6 +11,7 @@ const ClearanceModel = require('./ClearanceModel');
 const Translation = require('./Translation');
 const Project = require('./Project');
 const TpMap = require('./TpMap');
+const Portal = require('./Portal');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -44,5 +45,6 @@ module.exports = {
   ClearanceModel,
   Translation,
   Project,
-  TpMap
+  TpMap,
+  Portal
 };

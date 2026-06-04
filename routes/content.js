@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Project, TpMap } = require('../models');
+const { Project, TpMap, Portal } = require('../models');
 
 // GET all projects
 router.get('/projects', async (req, res) => {
@@ -34,6 +34,17 @@ router.get('/tp-maps', async (req, res) => {
       order: [['tp_id', 'ASC']]
     });
     res.json(maps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/portals', async (req, res) => {
+  try {
+    const portals = await Portal.findAll({
+      order: [['id', 'ASC']]
+    });
+    res.json(portals);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
