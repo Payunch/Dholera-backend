@@ -51,7 +51,7 @@ const invokeHandler = async (handler, req = {}) => {
 };
 
 describe('Lead Registration Auth Flow', () => {
-  const phone = '74358080310';
+  const phone = '7435808031';
   const email = 'lead-auth@example.com';
   const otp = '123456';
 
