@@ -264,7 +264,14 @@ router.post('/onboard', async (req, res) => {
     await sendAdminNotification(
       'New User Onboarded',
       `${lead.name} (${lead.phone}) joined the platform.`,
-      { type: 'lead', leadId: lead.id }
+      { 
+        type: 'lead_onboard', 
+        lead_id: lead.id.toString(),
+        name: lead.name,
+        phone: lead.phone,
+        source: lead.source || 'Website',
+        createdAt: lead.createdAt.toISOString()
+      }
     );
 
     res.json({
@@ -555,7 +562,14 @@ router.post('/', async (req, res) => {
     await sendAdminNotification(
       'New Lead Registered',
       `${lead.name} has joined the platform via ${lead.source}`,
-      { type: 'lead', leadId: lead.id }
+      { 
+        type: 'lead_registration', 
+        lead_id: lead.id.toString(),
+        name: lead.name,
+        phone: lead.phone,
+        source: lead.source || 'Website',
+        createdAt: lead.createdAt.toISOString()
+      }
     );
 
     await maybeNotifyLeadIfHighInterest(lead, { pages: safeJsonParse(visitedPages, []), totalTimeSpent: timeSpent });
