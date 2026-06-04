@@ -77,6 +77,16 @@ const Lead = sequelize.define('Lead', {
   is_pro: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  preferred_language: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'en'
+  },
+  preferred_theme: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'light'
   }
 });
 
