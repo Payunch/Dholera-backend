@@ -1,0 +1,67 @@
+services:
+  - type: web
+    name: dholera-backend
+    env: node
+    plan: starter # Starter plan is required for disks
+    rootDir: Dholera-backend
+    buildCommand: npm install
+    startCommand: npm start
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: /data/database.sqlite
+      - key: DB_SYNC_ALTER
+        value: "true"
+      - key: PORT
+        value: 3000
+      - key: DB_DIALECT
+        value: sqlite
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "*" # Update with your frontend URL
+      # --- Admin Settings ---
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASS
+        sync: false
+      - key: ADMIN_NAME
+        sync: false
+      - key: ADMIN_UPI_ID
+        sync: false
+      - key: NEXT_PUBLIC_ADMIN_PHONE
+        sync: false
+      # --- Cloudinary ---
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # --- SMTP / Email ---
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_SECURE
+        value: "false"
+      - key: BYPASS_EMAIL_VERIFICATION
+        value: "false"
+      # --- Misc ---
+      - key: COOKIE_DOMAIN
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

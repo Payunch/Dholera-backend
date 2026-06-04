@@ -116,6 +116,24 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   } catch (err) {
     console.error('[Session] Failed to initialize Postgres store:', err.message);
   }
+} else if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL?.includes('sqlite')) {
+  try {
+    const SQLiteStore = require('connect-sqlite3')(session);
+    const { getDatabaseInfo } = require('./config/database');
+    const dbInfo = getDatabaseInfo();
+    
+    // Use the same directory as the main database for the session store
+    const sessionDir = dbInfo.storagePath ? path.dirname(dbInfo.storagePath) : __dirname;
+    
+    sessionStore = new SQLiteStore({
+      db: 'sessions.sqlite',
+      dir: sessionDir,
+      concurrentDB: true
+    });
+    console.log(`[Session] Using SQLite persistent store at ${path.join(sessionDir, 'sessions.sqlite')}`);
+  } catch (err) {
+    console.error('[Session] Failed to initialize SQLite store:', err.message);
+  }
 } else {
   console.warn('PostgreSQL not detected: using in-memory session store (not suitable for production)');
 }
