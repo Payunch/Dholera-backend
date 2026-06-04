@@ -99,6 +99,62 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// GET user's unlocked PDFs
+router.get('/my-vault', async (req, res) => {
+  try {
+    let leadToken = req.headers.authorization || req.query.token || '';
+    if (leadToken.toLowerCase().startsWith('bearer ')) {
+      leadToken = leadToken.slice(7).trim();
+    }
+
+    if (!leadToken) return res.status(401).json({ error: 'Token required' });
+
+    const lead = await Lead.findOne({ where: { lead_token: leadToken } });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    // If Pro, they have access to everything
+    if (lead.is_pro) {
+       const allPdfs = await PdfDocument.findAll({
+         attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
+         order: [['id', 'ASC']]
+       });
+       return res.json(allPdfs.map(p => ({ ...p.toJSON(), unlocked: true })));
+    }
+
+    const purchases = await PdfPurchase.findAll({
+      where: { lead_id: lead.id, status: 'completed' },
+      attributes: ['pdf_id']
+    });
+
+    const unlockedIds = purchases.map(p => p.pdf_id);
+    
+    // If they have PRO_ACCESS (pdf_id: 0), they see everything
+    if (unlockedIds.includes(0)) {
+       const allPdfs = await PdfDocument.findAll({
+         attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
+         order: [['id', 'ASC']]
+       });
+       return res.json(allPdfs.map(p => ({ ...p.toJSON(), unlocked: true })));
+    }
+
+    // Always include the free trial PDF
+    const freeTrialId = parseInt(process.env.FREE_TRIAL_PDF_ID || '19', 10);
+    if (!unlockedIds.includes(freeTrialId)) {
+      unlockedIds.push(freeTrialId);
+    }
+
+    const pdfs = await PdfDocument.findAll({
+      where: { id: { [Op.in]: unlockedIds } },
+      attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
+      order: [['id', 'ASC']]
+    });
+
+    res.json(pdfs.map(p => ({ ...p.toJSON(), unlocked: true })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET secure PDF stream
 router.get('/view/:id', appCheckVerification, async (req, res) => {
   try {
