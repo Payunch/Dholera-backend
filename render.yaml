@@ -4,7 +4,7 @@ services:
     env: node
     plan: starter # Starter plan is required for disks
     rootDir: Dholera-backend
-    buildCommand: npm install
+    buildCommand: npm install && npm rebuild sqlite3 --build-from-source
     startCommand: npm start
     disk:
       name: sqlite-data
@@ -14,7 +14,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
-        value: "24"
+        value: "20"
       - key: DATABASE_URL
         value: /data/database.sqlite
       - key: DB_SYNC_ALTER
