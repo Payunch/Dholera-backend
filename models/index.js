@@ -9,6 +9,8 @@ const WhatsAppLog = require('./WhatsAppLog');
 const Setting = require('./Setting');
 const ClearanceModel = require('./ClearanceModel');
 const Translation = require('./Translation');
+const Project = require('./Project');
+const TpMap = require('./TpMap');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -40,5 +42,7 @@ module.exports = {
   WhatsAppLog,
   Setting,
   ClearanceModel,
-  Translation
+  Translation,
+  Project,
+  TpMap
 };

@@ -257,6 +257,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/clearance', require('./routes/clearance'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/preferences', require('./routes/preferences'));
+app.use('/api/content', require('./routes/content'));
 
 const PORT = process.env.PORT || 3000;
 
