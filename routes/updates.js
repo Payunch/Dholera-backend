@@ -5,6 +5,7 @@ const { verifyToken } = require('./auth');
 const { Op } = require('sequelize');
 const { cleanText } = require('../utils/sanitize');
 const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
+const { sendInvestorNotification } = require('../services/notificationService');
 const upload = require('../middleware/upload');
 const path = require('path');
 
@@ -92,6 +93,15 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
       imagePosition: imagePosition || 'top',
       publishedAt: publishedAt || new Date()
     });
+
+    // Send push notification if published
+    if (update.published) {
+      sendInvestorNotification(
+        'New Market Insight',
+        update.title,
+        { type: 'insight', id: update.id.toString() }
+      );
+    }
 
     res.status(201).json(update);
   } catch (err) {

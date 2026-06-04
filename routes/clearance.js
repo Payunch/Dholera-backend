@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { ClearanceModel, Lead } = require('../models');
+const { sendAdminNotification } = require('../services/notificationService');
 
 const extractToken = (authHeader = '') => {
   if (!authHeader) return '';
@@ -24,6 +25,13 @@ router.post('/save', async (req, res) => {
       LeadId: LeadId || null,
       status: status || 'Draft'
     });
+
+    // Notify admin
+    sendAdminNotification(
+      'New Fee Calculation Saved',
+      `A user has saved a ${modelType} calculation for "${projectName || 'Unnamed Project'}".`,
+      { type: 'clearance_saved', id: clearance.id.toString() }
+    );
 
     res.status(201).json({ message: 'Clearance model saved successfully', data: clearance });
   } catch (error) {

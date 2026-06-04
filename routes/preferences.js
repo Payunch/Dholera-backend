@@ -60,6 +60,27 @@ router.post('/user', async (req, res) => {
   }
 });
 
+// POST register FCM token
+router.post('/fcm-token', async (req, res) => {
+  try {
+    const token = req.headers['x-lead-token'];
+    const { fcmToken } = req.body;
+
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    if (!fcmToken) return res.status(400).json({ error: 'FCM Token required' });
+
+    const lead = await Lead.findOne({ where: { lead_token: token } });
+    if (!lead) return res.status(404).json({ error: 'User not found' });
+
+    lead.fcm_token = fcmToken;
+    await lead.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST seed translations (Admin or one-time)
 router.post('/translations/seed', async (req, res) => {
   try {

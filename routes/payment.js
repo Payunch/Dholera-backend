@@ -4,6 +4,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { PdfPurchase, PdfDocument, Lead, sequelize } = require('../models');
 const { logAuditEvent } = require('../services/auditLogger');
+const { sendDirectNotification } = require('../services/notificationService');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -95,6 +96,16 @@ router.post('/verify', async (req, res) => {
     }));
 
     await PdfPurchase.bulkCreate(purchases);
+
+    // Send push notification to the user
+    if (lead.fcm_token) {
+      sendDirectNotification(
+        lead.fcm_token,
+        'Map Unlocked! 🔓',
+        `Your access to ${pdfIds.length} official document(s) is now active in your Vault.`,
+        { type: 'payment_success', pdfCount: pdfIds.length.toString() }
+      );
+    }
 
     await logAuditEvent({
       eventType: 'payment.success',

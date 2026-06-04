@@ -87,6 +87,10 @@ const Lead = sequelize.define('Lead', {
     type: DataTypes.STRING,
     allowNull: true,
     defaultValue: 'light'
+  },
+  fcm_token: {
+    type: DataTypes.TEXT,
+    allowNull: true
   }
 });
 
