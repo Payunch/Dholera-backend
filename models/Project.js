@@ -62,6 +62,14 @@ const Project = sequelize.define('Project', {
   image: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  portal_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Portals',
+      key: 'id'
+    }
   }
 });
 

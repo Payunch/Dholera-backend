@@ -91,6 +91,23 @@ const Lead = sequelize.define('Lead', {
   fcm_token: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  score: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false
+  },
+  interest_profile: {
+    type: DataTypes.TEXT, // Storing AI-generated interest analysis as JSON string
+    allowNull: true
+  },
+  portal_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Portals',
+      key: 'id'
+    }
   }
 });
 

@@ -250,6 +250,9 @@ router.post('/onboard', async (req, res) => {
       });
     }
 
+    // AI Intelligence Update
+    await LeadIntelligenceService.updateLeadIntelligence(lead);
+
     await logAuditEvent({
       eventType: 'lead.onboard.success',
       actorType: 'lead',
@@ -317,6 +320,9 @@ router.post('/track-returning', async (req, res) => {
       visited_pages: JSON.stringify(pages),
       last_contacted: new Date()
     });
+
+    // AI Intelligence Update
+    await LeadIntelligenceService.updateLeadIntelligence(lead);
 
     const leadContext = await getLeadContext(lead);
     await maybeNotifyLeadIfHighInterest(lead, leadContext);
@@ -557,6 +563,9 @@ router.post('/', async (req, res) => {
       timeSpent,
       visited_pages: visitedPages
     });
+
+    // AI Intelligence Update
+    await LeadIntelligenceService.updateLeadIntelligence(lead);
 
     const { sendAdminNotification } = require('../services/notificationService');
     await sendAdminNotification(

@@ -33,6 +33,14 @@ const Update = sequelize.define('Update', {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
+  },
+  portal_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Portals',
+      key: 'id'
+    }
   }
 });
 

@@ -1,125 +1,115 @@
 /**
- * migrate_to_postgres.js
+ * PostgreSQL Migration Utility
+ * Transfers all data from SQLite to PostgreSQL.
  * 
- * Migrates all data from the current SQLite database to a new PostgreSQL instance.
- * 
- * Usage:
- *   TARGET_DATABASE_URL=postgres://user:pass@host:port/db node scripts/migrate_to_postgres.js
+ * Usage: 
+ * 1. Set DATABASE_URL_POSTGRES in your environment.
+ * 2. Run: node scripts/migrate_to_postgres.js
  */
 
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config();
 const { Sequelize } = require('sequelize');
+const path = require('path');
 const models = require('../models');
 
-const sourceSequelize = models.sequelize; // Current DB (SQLite)
-const targetUrl = process.env.TARGET_DATABASE_URL;
+const SQLITE_URL = `sqlite:${path.join(__dirname, '../database.sqlite')}`;
+const POSTGRES_URL = process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;
 
-if (!targetUrl) {
-  console.error('❌ Error: TARGET_DATABASE_URL environment variable is required.');
-  console.error('Usage: TARGET_DATABASE_URL=postgres://user:pass@host:port/db node scripts/migrate_to_postgres.js');
+if (!POSTGRES_URL || !POSTGRES_URL.startsWith('postgres')) {
+  console.error('❌ Error: DATABASE_URL_POSTGRES is not set or is not a postgres URL.');
   process.exit(1);
 }
 
-const targetSequelize = new Sequelize(targetUrl, {
-  dialect: 'postgres',
-  logging: false,
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false
-    }
-  }
-});
-
-const tableOrder = [
-  'Lead',
-  'Update',
-  'PdfDocument',
-  'Analytics',
-  'VisitorSession',
-  'PdfView',
-  'PdfPurchase',
-  'AuditLog',
-  'WhatsAppLog',
-  'Setting',
-  'UserSession',
-  'ClearanceModel'
-];
-
 async function migrate() {
-  try {
-    console.log('[Source] Connecting to SQLite...');
-    await sourceSequelize.authenticate();
-    console.log('[Source] Connected.');
+  console.log('🚀 Starting Migration: SQLite -> PostgreSQL');
+  
+  // 1. Initialize Connections
+  const sqlite = new Sequelize({
+    dialect: 'sqlite',
+    storage: path.join(__dirname, '../database.sqlite'),
+    logging: false
+  });
 
-    console.log('[Target] Connecting to PostgreSQL...');
-    await targetSequelize.authenticate();
-    console.log('[Target] Connected.');
-
-    // Initialize target models
-    const TargetModels = {};
-    const modelEntries = Object.entries(models).filter(([key]) => tableOrder.includes(key));
-
-    for (const [name, sourceModel] of modelEntries) {
-      // Define target model with the same attributes
-      TargetModels[name] = targetSequelize.define(name, sourceModel.rawAttributes, {
-        tableName: sourceModel.tableName,
-        timestamps: sourceModel.options.timestamps
-      });
+  const postgres = new Sequelize(POSTGRES_URL, {
+    dialect: 'postgres',
+    logging: false,
+    dialectOptions: {
+      ssl: POSTGRES_URL.includes('localhost') ? false : {
+        require: true,
+        rejectUnauthorized: false
+      }
     }
+  });
 
-    console.log('[Target] Syncing schema...');
-    await targetSequelize.sync({ force: true }); // Warning: wipes target DB
-    console.log('[Target] Schema ready.');
+  try {
+    await sqlite.authenticate();
+    console.log('✅ SQLite Connection Verified');
+    
+    await postgres.authenticate();
+    console.log('✅ PostgreSQL Connection Verified');
+
+    // 2. Sync PostgreSQL Schema
+    console.log('📦 Syncing PostgreSQL Schema...');
+    // We use the models defined in the app but bind them to the postgres instance
+    for (const modelName of Object.keys(models)) {
+      if (modelName === 'sequelize') continue;
+      // Note: This is a simplified approach. In a production app, 
+      // you would use migrations or a more robust schema sync.
+    }
+    
+    // Use the actual models from the app
+    const appModels = require('../models');
+    await appModels.sequelize.sync({ force: false }); // Ensure local schema is correct
+    
+    // 3. Migrate Data Table by Table
+    const tableOrder = [
+      'Portal', 'Lead', 'Project', 'Update', 'PdfDocument', 
+      'PdfView', 'PdfPurchase', 'WhatsAppLog', 'Setting', 
+      'ClearanceModel', 'Translation', 'TpMap', 'Analytics'
+    ];
 
     for (const modelName of tableOrder) {
-      console.log(`[Migrate] Moving table: ${modelName}...`);
-      const sourceModel = models[modelName];
-      const targetModel = TargetModels[modelName];
+      const Model = appModels[modelName];
+      if (!Model) continue;
 
-      // Get columns actually present in SQLite for this model
-      const [columns] = await sourceSequelize.query(`PRAGMA table_info("${sourceModel.tableName}")`);
-      const availableCols = columns.map(c => c.name);
+      console.log(`\n--- Migrating ${modelName} ---`);
       
-      // Filter model attributes to only those present in the physical DB
-      const targetCols = Object.keys(sourceModel.rawAttributes);
-      const queryCols = targetCols.filter(c => availableCols.includes(c));
+      const records = await Model.findAll({ raw: true });
+      console.log(`Found ${records.length} records in SQLite.`);
 
-      const rows = await sourceSequelize.query(
-        `SELECT ${queryCols.map(c => `"${c}"`).join(', ')} FROM "${sourceModel.tableName}"`,
-        { type: sourceSequelize.QueryTypes.SELECT }
-      );
+      if (records.length === 0) continue;
 
-      if (rows.length === 0) {
-        console.log(`  - Table is empty. Skipping.`);
-        continue;
+      // Switch connection to Postgres temporarily for this task
+      // This is a bit hacky with Sequelize's singleton-like behavior 
+      // but effective for a one-off script.
+      
+      // Better way: Use the postgres instance directly for inserts
+      const PostgresModel = postgres.define(Model.name, Model.rawAttributes, Model.options);
+      
+      await PostgresModel.sync({ force: true }); // Wipe and recreate target table
+      
+      // Batch insert for performance
+      const batchSize = 100;
+      for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+        await PostgresModel.bulkCreate(batch);
+        process.stdout.write(`.`);
       }
-
-      // Batch insert into target
-      await targetModel.bulkCreate(rows, { ignoreDuplicates: true });
-      console.log(`  - ✅ Migrated ${rows.length} rows using columns: ${queryCols.join(', ')}`);
-
-      // Fix sequence for PostgreSQL (important for ID increments)
-      try {
-        await targetSequelize.query(`
-          SELECT setval(pg_get_serial_sequence('"${sourceModel.tableName}"', 'id'), 
-          COALESCE((SELECT MAX(id) FROM "${sourceModel.tableName}"), 1));
-        `);
-      } catch (seqErr) {
-        // Some tables might not have an auto-increment ID
-      }
+      console.log(`\n✅ ${modelName} Migrated Successfully.`);
     }
 
-    console.log('\nMigration Complete! 🚀');
-    console.log('Update your Railway environment variables:');
-    console.log(`DATABASE_URL=${targetUrl}`);
+    console.log('\n\n✨ MIGRATION COMPLETE! ✨');
+    console.log('Next Steps:');
+    console.log('1. Update your .env to use DB_DIALECT=postgres');
+    console.log('2. Set DATABASE_URL to your PostgreSQL connection string.');
+    console.log('3. Restart the server.');
 
-  } catch (err) {
-    console.error('❌ Migration failed:', err);
+  } catch (error) {
+    console.error('❌ Migration Failed:', error);
   } finally {
-    await sourceSequelize.close();
-    await targetSequelize.close();
+    await sqlite.close();
+    await postgres.close();
+    process.exit(0);
   }
 }
 

@@ -32,6 +32,16 @@ PdfPurchase.belongsTo(PdfDocument, { foreignKey: 'pdf_id' });
 Lead.hasMany(ClearanceModel, { foreignKey: 'LeadId' });
 ClearanceModel.belongsTo(Lead, { foreignKey: 'LeadId' });
 
+// Multi-Tenant Portal Associations
+Portal.hasMany(Lead, { foreignKey: 'portal_id' });
+Lead.belongsTo(Portal, { foreignKey: 'portal_id' });
+
+Portal.hasMany(Update, { foreignKey: 'portal_id' });
+Update.belongsTo(Portal, { foreignKey: 'portal_id' });
+
+Portal.hasMany(Project, { foreignKey: 'portal_id' });
+Project.belongsTo(Portal, { foreignKey: 'portal_id' });
+
 module.exports = {
   sequelize,
   Lead,

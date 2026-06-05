@@ -48,18 +48,23 @@ const buildLeadSummary = (lead = {}, context = {}) => {
   const sessions = Array.isArray(context.sessions) ? context.sessions : [];
   const views = Array.isArray(context.views) ? context.views : [];
 
-  return [
+  const summary = [
     `Name: ${lead.name || 'Unknown'}`,
     `Phone: ${lead.phone || 'Unknown'}`,
-    `Email: ${lead.email || 'N/A'}`,
+    `Score: ${lead.score || 0} (AI Ranked)`,
     `Status: ${status}`,
-    `Created: ${createdAt}`,
     `Visits: ${lead.visit_count || 0}`,
-    `Time Spent: ${Math.round((lead.timeSpent || 0) / 60)} min`,
-    `Pages: ${pages.length ? pages.join(', ') : 'None'}`,
-    `Sessions: ${sessions.length}`,
-    `Document Views: ${views.length}`
-  ].join('\n');
+    `Time Spent: ${Math.round((lead.timeSpent || 0) / 60)} min`
+  ];
+
+  if (context.isAiHotTrigger) {
+    summary.push(`🔥 AI ALERT: This is a HOT lead!`);
+    summary.push(`Interests: ${context.topInterests?.join(', ') || 'N/A'}`);
+  }
+
+  summary.push(`Pages: ${pages.length ? pages.join(', ') : 'None'}`);
+
+  return summary.join('\n');
 };
 
 const sendAdminWhatsAppAlert = async (lead, context = {}) => {
