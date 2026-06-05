@@ -14,6 +14,7 @@ const { testConnection, getDatabaseInfo } = require('./config/database');
 const { buildOriginMatcher } = require('./utils/originMatcher');
 const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
 const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
+const BackupService = require('./services/backupService');
 
 const http = require('http');
 const { Server } = require('socket.io');
@@ -258,6 +259,7 @@ app.use('/api/clearance', require('./routes/clearance'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/preferences', require('./routes/preferences'));
 app.use('/api/content', require('./routes/content'));
+app.use('/api/intelligence', require('./routes/intelligence'));
 
 const PORT = process.env.PORT || 3000;
 
@@ -287,6 +289,9 @@ const startServer = async () => {
     // Run background tasks after server is up to avoid blocking health checks
     seedPdfsIfEmpty(PdfDocument).catch(err => console.error('[Seed] PDF seed failed:', err));
     seedBlogIfEmpty().catch(err => console.error('[Seed] Blog seed failed:', err));
+    
+    // Initialize Backup Service
+    BackupService.init();
   });
 };
 
