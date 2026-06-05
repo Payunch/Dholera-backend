@@ -14,6 +14,7 @@ const {
 } = require('../services/whatsapp');
 const { logAuditEvent } = require('../services/auditLogger');
 const { maybeNotifyHighInterestLead, isHighInterestLead } = require('../services/leadNotifications');
+const LeadIntelligenceService = require('../services/leadIntelligence');
 const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('../utils/sanitize');
 const multer = require('multer');
 const memoryUpload = multer({ storage: multer.memoryStorage() });
