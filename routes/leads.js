@@ -13,7 +13,7 @@ const {
   logWhatsAppActivity 
 } = require('../services/whatsapp');
 const { logAuditEvent } = require('../services/auditLogger');
-const { maybeNotifyHighInterestLead, isHighInterestLead } = require('../services/leadNotifications');
+const { maybeNotifyHighInterestLead, isHighInterestLead, maybeSendWelcomeMessage } = require('../services/leadNotifications');
 const LeadIntelligenceService = require('../services/leadIntelligence');
 const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('../utils/sanitize');
 const multer = require('multer');
@@ -215,6 +215,7 @@ router.post('/onboard', async (req, res) => {
     const phone = cleanText(req.body?.phone, 20);
     const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
     const sessionId = cleanText(req.body?.sessionId, 100);
+    const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
 
     if (!name || !phone) {
       return res.status(400).json({ error: 'Name and Phone Number are required' });
@@ -237,7 +238,8 @@ router.post('/onboard', async (req, res) => {
       await lead.update({ 
         name: name || lead.name, 
         browserFingerprint: browserFingerprint || lead.browserFingerprint,
-        verified: true
+        verified: true,
+        preferred_language: preferred_language || lead.preferred_language
       });
     } else {
       const leadToken = `LT_${crypto.randomBytes(16).toString('hex')}`;
@@ -247,7 +249,8 @@ router.post('/onboard', async (req, res) => {
         lead_token: leadToken,
         browserFingerprint,
         verified: true,
-        source: 'Quick Onboard'
+        source: 'Quick Onboard',
+        preferred_language
       });
     }
 
@@ -535,6 +538,7 @@ router.post('/', async (req, res) => {
     const source = cleanText(req.body?.source, 80);
     const sessionId = cleanText(req.body?.sessionId, 100);
     const phone = cleanText(req.body?.phone, 20);
+    const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
 
     const normalizedPhone = normalizePhone(phone);
     const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
@@ -562,11 +566,15 @@ router.post('/', async (req, res) => {
       phone: localPhone,
       source: source || 'Website',
       timeSpent,
-      visited_pages: visitedPages
+      visited_pages: visitedPages,
+      preferred_language
     });
 
     // AI Intelligence Update
     await LeadIntelligenceService.updateLeadIntelligence(lead);
+    
+    // Automated Welcome Message
+    await maybeSendWelcomeMessage(lead);
 
     const { sendAdminNotification } = require('../services/notificationService');
     await sendAdminNotification(

@@ -5,7 +5,7 @@ try {
 } catch (err) {
   nodemailer = null;
 }
-const { sendLeadAlertOnWhatsapp } = require('./whatsapp');
+const { sendLeadAlertOnWhatsapp, sendWelcomeMessageOnWhatsapp } = require('./whatsapp');
 
 const ADMIN_EMAIL_TO = (process.env.ADMIN_EMAIL_TO || '').split(',').map((value) => value.trim()).filter(Boolean);
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -42,27 +42,72 @@ const isHighInterestLead = (lead = {}) => {
 };
 
 const buildLeadSummary = (lead = {}, context = {}) => {
-  const createdAt = lead.createdAt ? new Date(lead.createdAt).toLocaleString() : 'Unknown';
+  const lang = lead.preferred_language || 'en';
+  const templates = {
+    en: {
+      name: 'Name',
+      phone: 'Phone',
+      score: 'Score (AI Ranked)',
+      status: 'Status',
+      visits: 'Visits',
+      time: 'Time Spent',
+      min: 'min',
+      lang: 'Preferred Language',
+      ai_alert: '🔥 AI ALERT: This is a HOT lead!',
+      interests: 'Interests',
+      pages: 'Pages',
+      none: 'None'
+    },
+    hi: {
+      name: 'नाम',
+      phone: 'फ़ोन',
+      score: 'स्कोर (AI रैंक)',
+      status: 'स्थिति',
+      visits: 'विजिट',
+      time: 'बिताया गया समय',
+      min: 'मिनट',
+      lang: 'पसंदीदा भाषा',
+      ai_alert: '🔥 AI अलर्ट: यह एक HOT लीड है!',
+      interests: 'रुचि',
+      pages: 'पेज',
+      none: 'कोई नहीं'
+    },
+    gu: {
+      name: 'નામ',
+      phone: 'ફોન',
+      score: 'સ્કોર (AI રેન્ક)',
+      status: 'સ્થિતિ',
+      visits: 'વિઝિટ',
+      time: 'વિતાવેલો સમય',
+      min: 'મિનિટ',
+      lang: 'પસંદગીની ભાષા',
+      ai_alert: '🔥 AI એલર્ટ: આ એક HOT લીડ છે!',
+      interests: 'રુચિ',
+      pages: 'પેજ',
+      none: 'કોઈ નહીં'
+    }
+  };
+
+  const t = templates[lang] || templates.en;
   const status = lead.status || 'New';
   const pages = Array.isArray(context.pages) ? context.pages : [];
-  const sessions = Array.isArray(context.sessions) ? context.sessions : [];
-  const views = Array.isArray(context.views) ? context.views : [];
 
   const summary = [
-    `Name: ${lead.name || 'Unknown'}`,
-    `Phone: ${lead.phone || 'Unknown'}`,
-    `Score: ${lead.score || 0} (AI Ranked)`,
-    `Status: ${status}`,
-    `Visits: ${lead.visit_count || 0}`,
-    `Time Spent: ${Math.round((lead.timeSpent || 0) / 60)} min`
+    `${t.name}: ${lead.name || 'Unknown'}`,
+    `${t.phone}: ${lead.phone || 'Unknown'}`,
+    `${t.score}: ${lead.score || 0}`,
+    `${t.status}: ${status}`,
+    `${t.visits}: ${lead.visit_count || 0}`,
+    `${t.time}: ${Math.round((lead.timeSpent || 0) / 60)} ${t.min}`,
+    `${t.lang}: ${lang.toUpperCase()}`
   ];
 
   if (context.isAiHotTrigger) {
-    summary.push(`🔥 AI ALERT: This is a HOT lead!`);
-    summary.push(`Interests: ${context.topInterests?.join(', ') || 'N/A'}`);
+    summary.push(`\n${t.ai_alert}`);
+    summary.push(`${t.interests}: ${context.topInterests?.join(', ') || t.none}`);
   }
 
-  summary.push(`Pages: ${pages.length ? pages.join(', ') : 'None'}`);
+  summary.push(`${t.pages}: ${pages.length ? pages.join(', ') : t.none}`);
 
   return summary.join('\n');
 };
@@ -135,9 +180,21 @@ const maybeNotifyHighInterestLead = async (lead, context = {}) => {
   return result;
 };
 
+const maybeSendWelcomeMessage = async (lead) => {
+  if (!lead?.phone) return { sent: false, error: 'no_phone' };
+
+  try {
+    const result = await sendWelcomeMessageOnWhatsapp({ lead });
+    return result;
+  } catch (err) {
+    return { sent: false, error: err.message };
+  }
+};
+
 module.exports = {
   isHighInterestLead,
   maybeNotifyHighInterestLead,
+  maybeSendWelcomeMessage,
   sendAdminWhatsAppAlert,
   sendAdminEmailAlert,
   buildLeadSummary

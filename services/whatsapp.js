@@ -184,6 +184,7 @@ const sendLeadAlertOnWhatsapp = async ({ phone, lead }) => {
   const parameters = [
     lead?.name || 'New Lead',
     lead?.phone || 'N/A',
+    lead?.preferred_language?.toUpperCase() || 'EN',
     new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
   ];
 
@@ -194,8 +195,30 @@ const sendLeadAlertOnWhatsapp = async ({ phone, lead }) => {
   });
 };
 
+/**
+ * Specialized: Send Welcome Message to Lead
+ */
+const sendWelcomeMessageOnWhatsapp = async ({ lead }) => {
+  if (!lead?.phone) return { sent: false, error: 'no_phone' };
+
+  const lang = lead.preferred_language || 'en';
+  const templateName = lang === 'hi' ? 'welcome_hi' : lang === 'gu' ? 'welcome_gu' : 'welcome_en';
+
+  const parameters = [
+    lead.name || 'Investor'
+  ];
+
+  return sendTemplateMessage({
+    phone: lead.phone,
+    templateName,
+    languageCode: lang === 'hi' ? 'hi' : lang === 'gu' ? 'gu' : 'en_US',
+    parameters
+  });
+};
+
 module.exports = {
   sendLeadAlertOnWhatsapp,
+  sendWelcomeMessageOnWhatsapp,
   sendTemplateMessage,
   normalizePhone,
   getBusinessSettings,
