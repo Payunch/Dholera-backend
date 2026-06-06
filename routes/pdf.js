@@ -213,18 +213,18 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
           });
 
           if (!purchase) {
-            // Serve a beautiful Razorpay Checkout Page if payment is required
+            // Serve a beautiful Manual UPI Checkout Page
             const leadName = lead.name || 'Guest';
             const leadPhone = lead.phone || '';
-            const razorpayKey = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder';
+            const upiId = process.env.ADMIN_UPI_ID || 'solankiparesh1183@okaxis';
+            const adminPhone = process.env.NEXT_PUBLIC_ADMIN_PHONE || '917435808310';
 
             return res.status(200).send(`
               <!DOCTYPE html>
               <html>
               <head>
-                <title>Unlock Official Document - Dholera Platform</title>
+                <title>Unlock Document - Dholera Platform</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1">
-                <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
                 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
                 <style>
                   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -232,6 +232,8 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                   .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
                   .btn-orange { background: #ea580c; transition: all 0.3s; }
                   .btn-orange:hover { background: #c2410c; transform: translateY(-2px); }
+                  .btn-green { background: #22c55e; transition: all 0.3s; }
+                  .btn-green:hover { background: #16a34a; transform: translateY(-2px); }
                 </style>
               </head>
               <body class="min-h-screen flex items-center justify-center p-6">
@@ -241,82 +243,44 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                   </div>
                   
                   <h1 class="text-3xl font-black uppercase tracking-tight mb-4">Premium Document</h1>
-                  <p class="text-slate-400 font-medium text-sm leading-relaxed mb-10">
-                    This official DSIRDA document is protected. Unlocking it grants you instant access to the intelligence archive.
+                  <p class="text-slate-400 font-medium text-sm leading-relaxed mb-8">
+                    To unlock this official DSIRDA document, please complete a small maintenance payment.
                   </p>
 
-                  <div class="space-y-4">
-                    <button onclick="pay(5, 'view')" class="w-full btn-orange py-5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-between px-8">
-                      <span>View Online</span>
-                      <span class="text-lg">₹5</span>
-                    </button>
+                  <div class="space-y-6">
+                    <!-- UPI Selection -->
+                    <div class="grid grid-cols-2 gap-4">
+                      <div class="p-4 glass rounded-2xl border-2 border-orange-500/20">
+                        <span class="block text-[10px] font-black text-orange-500 uppercase mb-1">View Access</span>
+                        <span class="text-2xl font-black italic">₹5</span>
+                      </div>
+                      <div class="p-4 glass rounded-2xl border-white/5 opacity-50">
+                        <span class="block text-[10px] font-black text-slate-500 uppercase mb-1">Download</span>
+                        <span class="text-2xl font-black italic text-slate-500">₹10</span>
+                      </div>
+                    </div>
 
-                    <button onclick="pay(10, 'download')" class="w-full glass py-5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-between px-8 hover:bg-white/5">
-                      <span>Download PDF</span>
-                      <span class="text-lg">₹10</span>
-                    </button>
+                    <div class="p-6 glass rounded-3xl border border-white/10 space-y-4">
+                       <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Click below to pay via UPI</p>
+                       <a href="upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=5.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}" 
+                          class="block w-full btn-orange py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3">
+                         <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                         Pay ₹5 with UPI App
+                       </a>
+                       <p class="text-[9px] font-bold text-slate-600">${upiId}</p>
+                    </div>
+
+                    <div class="pt-4 border-t border-white/5">
+                       <p class="text-xs font-medium text-slate-400 mb-4">After payment, click below to send screenshot for instant activation.</p>
+                       <a href="https://wa.me/${adminPhone}?text=Hi%20Naresh,%20I%20have%20paid%20Rs.5%20for%20PDF%20ID:%20${pdf.id}%20from%20phone:%20${leadPhone}.%20Please%20activate." 
+                          class="block w-full border border-green-500/30 text-green-500 py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-green-500/10">
+                         Verify via WhatsApp
+                       </a>
+                    </div>
                   </div>
 
-                  <p class="mt-8 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Secure Payment via Razorpay</p>
+                  <button onclick="window.location.reload()" class="mt-8 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">Check Access Status</button>
                 </div>
-
-                <script>
-                  async function pay(amount, type) {
-                    try {
-                      // 1. Create order
-                      const res = await fetch('/api/payment/create-order', {
-                        method: 'POST',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          'Authorization': '${leadToken}'
-                        },
-                        body: JSON.stringify({ pdfIds: [${pdf.id}], type })
-                      });
-                      const order = await res.json();
-                      
-                      if (!order.success) {
-                        alert('Failed to initialize payment. Please try again.');
-                        return;
-                      }
-
-                      const options = {
-                        key: order.key_id || '${razorpayKey}',
-                        amount: order.amount,
-                        currency: order.currency,
-                        name: "Dholera Platform",
-                        description: "Unlocking " + (type === 'view' ? "View" : "Download") + " Access",
-                        order_id: order.order_id,
-                        handler: async function (response) {
-                          // 2. Verify
-                          const verifyRes = await fetch('/api/payment/verify', {
-                            method: 'POST',
-                            headers: { 
-                              'Content-Type': 'application/json',
-                              'Authorization': '${leadToken}'
-                            },
-                            body: JSON.stringify({ ...response, pdfIds: [${pdf.id}], type })
-                          });
-                          const verify = await verifyRes.json();
-                          if (verify.success) {
-                            window.location.reload(); // Reload to see the PDF
-                          } else {
-                            alert('Payment verification failed.');
-                          }
-                        },
-                        prefill: {
-                          name: "${leadName}",
-                          contact: "${leadPhone}"
-                        },
-                        theme: { color: "#ea580c" }
-                      };
-                      const rzp = new Razorpay(options);
-                      rzp.open();
-                    } catch (err) {
-                      console.error(err);
-                      alert('Connection error. Please check your internet.');
-                    }
-                  }
-                </script>
               </body>
               </html>
             `);
