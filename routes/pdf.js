@@ -304,10 +304,8 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                     
                     // Update Links (Using simple string concatenation for reliability)
                     var upiBase = "upi://pay?pa=" + "${upiId}" + "&pn=Dholera%20Platform&am=" + amt + ".00&cu=INR&tn=PDF%20Unlock%20" + "${pdf.id}" + "_" + type;
-                    var waBase = "https://wa.me/" + "${adminPhone}" + "?text=Paid%20Rs." + amt + "%20for%20" + type.toUpperCase() + "%20access%20to%20PDF%20ID:%20" + "${pdf.id}" + ".%20Please%20activate.";
                     
                     document.getElementById('upi-link').href = upiBase;
-                    document.getElementById('wa-link').href = waBase;
                   }
                 </script>
               </body>
