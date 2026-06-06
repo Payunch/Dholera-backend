@@ -248,6 +248,7 @@ app.get('/healthz/runtime', (req, res) => {
 // Routes
 app.use('/api/leads', require('./routes/leads'));
 app.use('/api/updates', require('./routes/updates'));
+app.use('/api/content/updates', require('./routes/updates'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pdf', require('./routes/pdf'));
