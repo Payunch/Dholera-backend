@@ -219,6 +219,16 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
               message: 'Unlock this document or get Pro access.'
             });
           }
+
+          // If they only paid for 'view' but are trying to download (if we had a download param)
+          // For now, we allow streaming for both, but we can set Content-Disposition
+          if (req.query.download === 'true' && purchase.type !== 'download' && lead.is_pro !== true) {
+            return res.status(403).json({ error: 'Download access required. Please upgrade your purchase.' });
+          }
+          
+          if (req.query.download === 'true' || purchase.type === 'download') {
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+          }
         }
       }
     }
