@@ -250,37 +250,56 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                   <div class="space-y-6">
                     <!-- UPI Selection -->
                     <div class="grid grid-cols-2 gap-4">
-                      <div class="p-4 glass rounded-2xl border-2 border-orange-500/20">
+                      <button onclick="selectOption(5, 'view')" id="btn-view" class="p-4 glass rounded-2xl border-2 border-orange-500 shadow-lg transition-all text-left">
                         <span class="block text-[10px] font-black text-orange-500 uppercase mb-1">View Access</span>
                         <span class="text-2xl font-black italic">₹5</span>
-                      </div>
-                      <div class="p-4 glass rounded-2xl border-white/5 opacity-50">
-                        <span class="block text-[10px] font-black text-slate-500 uppercase mb-1">Download</span>
-                        <span class="text-2xl font-black italic text-slate-500">₹10</span>
-                      </div>
+                      </button>
+                      <button onclick="selectOption(10, 'download')" id="btn-download" class="p-4 glass rounded-2xl border-2 border-transparent transition-all text-left hover:border-white/10">
+                        <span class="block text-[10px] font-black text-slate-500 uppercase mb-1">Download PDF</span>
+                        <span class="text-2xl font-black italic">₹10</span>
+                      </button>
                     </div>
 
                     <div class="p-6 glass rounded-3xl border border-white/10 space-y-4">
                        <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Click below to pay via UPI</p>
-                       <a href="upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=5.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}" 
+                       <a id="upi-link" href="upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=5.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}" 
                           class="block w-full btn-orange py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3">
                          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                         Pay ₹5 with UPI App
+                         Pay <span id="display-amount">₹5</span> with UPI App
                        </a>
                        <p class="text-[9px] font-bold text-slate-600">${upiId}</p>
                     </div>
 
                     <div class="pt-4 border-t border-white/5">
-                       <p class="text-xs font-medium text-slate-400 mb-4">After payment, click below to send screenshot for instant activation.</p>
-                       <a href="https://wa.me/${adminPhone}?text=Hi%20Naresh,%20I%20have%20paid%20Rs.5%20for%20PDF%20ID:%20${pdf.id}%20from%20phone:%20${leadPhone}.%20Please%20activate." 
+                       <p class="text-xs font-medium text-slate-400 mb-4">Send payment screenshot for instant activation.</p>
+                       <a id="wa-link" href="https://wa.me/${adminPhone}?text=Paid%20for%20PDF%20ID:%20${pdf.id}.%20Please%20activate%20access." 
                           class="block w-full border border-green-500/30 text-green-500 py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-green-500/10">
                          Verify via WhatsApp
                        </a>
                     </div>
                   </div>
 
-                  <button onclick="window.location.reload()" class="mt-8 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">Check Access Status</button>
+                  <button onclick="window.location.reload()" class="mt-8 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">I have Paid (Refresh Page)</button>
                 </div>
+
+                <script>
+                  let currentType = 'view';
+                  let currentAmount = 5;
+
+                  function selectOption(amt, type) {
+                    currentAmount = amt;
+                    currentType = type;
+                    
+                    // Update UI
+                    document.getElementById('btn-view').style.borderColor = type === 'view' ? '#ea580c' : 'transparent';
+                    document.getElementById('btn-download').style.borderColor = type === 'download' ? '#ea580c' : 'transparent';
+                    document.getElementById('display-amount').innerText = '₹' + amt;
+                    
+                    // Update Links
+                    document.getElementById('upi-link').href = \`upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=\${amt}.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}_\${type}\`;
+                    document.getElementById('wa-link').href = \`https://wa.me/${adminPhone}?text=Paid%20Rs.\${amt}%20for%20\${type.toUpperCase()}%20access%20to%20PDF%20ID:%20${pdf.id}.%20Please%20activate.\`;
+                  }
+                </script>
               </body>
               </html>
             `);
