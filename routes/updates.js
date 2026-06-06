@@ -6,6 +6,7 @@ const { Op } = require('sequelize');
 const { cleanText } = require('../utils/sanitize');
 const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
+const { translateBlogPost } = require('../services/translationService');
 const upload = require('../middleware/upload');
 const path = require('path');
 
@@ -15,6 +16,7 @@ const isRemotePath = (value = '') => /^https?:\/\//i.test(String(value).trim());
 router.get('/', async (req, res) => {
   try {
     const { search, all, lang } = req.query;
+    const targetLang = lang || 'en';
     const where = {};
     
     // Only show published updates unless 'all' is true (for admin)
@@ -22,12 +24,8 @@ router.get('/', async (req, res) => {
       where.published = true;
     }
 
-    // Default to requested language, fallback to English if not specified
-    if (lang) {
-      where.lang = lang;
-    } else {
-      where.lang = 'en';
-    }
+    // Filter by language
+    where.lang = targetLang;
 
     if (search) {
       where[Op.or] = [
@@ -37,10 +35,48 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    const updates = await Update.findAll({
+    let updates = await Update.findAll({
       where,
       order: [['publishedAt', 'DESC']]
     });
+
+    // AUTO-TRANSLATE TOOL (FALLBACK)
+    // If no updates found for this language, try to translate the English ones
+    if (updates.length === 0 && targetLang !== 'en') {
+       const englishUpdates = await Update.findAll({
+         where: { ...where, lang: 'en' },
+         order: [['publishedAt', 'DESC']]
+       });
+
+       if (englishUpdates.length > 0) {
+         console.log(`[Auto-Translate] Listing fallback to ${targetLang}...`);
+         const translatedList = [];
+         for (const post of englishUpdates) {
+            try {
+              let trans = await Update.findOne({ where: { original_id: post.id, lang: targetLang } });
+              if (!trans) {
+                const results = await translateBlogPost(post, [targetLang]);
+                if (results && results[0]) {
+                  trans = await Update.create({
+                    ...results[0],
+                    lang: targetLang,
+                    original_id: post.id,
+                    published: true,
+                    publishedAt: post.publishedAt,
+                    imageUrl: post.imageUrl
+                  });
+                }
+              }
+              if (trans) translatedList.push(trans);
+              else translatedList.push(post);
+            } catch (err) {
+              translatedList.push(post);
+            }
+         }
+         updates = translatedList;
+       }
+    }
+
     res.json(updates);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -51,6 +87,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { all, lang } = req.query;
+    const targetLang = lang || 'en';
     let update = await Update.findByPk(req.params.id);
     
     if (!update) {
@@ -58,17 +95,36 @@ router.get('/:id', async (req, res) => {
     }
 
     // If a different language is requested, try to find the linked translation
-    if (lang && update.lang !== lang) {
+    if (targetLang !== update.lang) {
       const originalId = update.original_id || update.id;
-      const translated = await Update.findOne({
+      let translated = await Update.findOne({
         where: {
           [Op.or]: [
-            { id: originalId, lang: lang },
-            { original_id: originalId, lang: lang }
-          ],
-          published: true
+            { id: originalId, lang: targetLang },
+            { original_id: originalId, lang: targetLang }
+          ]
         }
       });
+
+      // AUTO-TRANSLATE FALLBACK
+      if (!translated && targetLang !== 'en') {
+         try {
+           const original = update.lang === 'en' ? update : await Update.findByPk(originalId);
+           if (original) {
+             const results = await translateBlogPost(original, [targetLang]);
+             if (results && results[0]) {
+               translated = await Update.create({
+                 ...results[0],
+                 lang: targetLang,
+                 original_id: original.id,
+                 published: true,
+                 publishedAt: original.publishedAt,
+                 imageUrl: original.imageUrl
+               });
+             }
+           }
+         } catch (e) {}
+      }
       if (translated) update = translated;
     }
 
