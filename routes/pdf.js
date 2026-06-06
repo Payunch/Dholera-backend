@@ -48,7 +48,7 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
       if (statusCode >= 300 && statusCode < 400 && redirectLocation) {
         upstream.resume();
         const nextUrl = new URL(redirectLocation, remoteUrl).toString();
-        
+
         const parsedNext = new URL(nextUrl);
         if (parsedNext.hostname !== 'res.cloudinary.com' && !isAllowedRemotePdfUrl(nextUrl)) {
           reject(new Error('Remote PDF redirect target is not allowed.'));
@@ -127,7 +127,7 @@ router.get('/my-vault', async (req, res) => {
     });
 
     const unlockedIds = purchases.map(p => p.pdf_id);
-    
+
     // If they have PRO_ACCESS (pdf_id: 0), they see everything
     if (unlockedIds.includes(0)) {
        const allPdfs = await PdfDocument.findAll({
@@ -182,7 +182,7 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
       if (leadToken) {
         lead = await Lead.findOne({ where: { lead_token: leadToken } });
       }
-      
+
       // If no token and it's not a trial, block it early
       const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
       if (!lead && String(req.params.id) !== String(freeTrialId)) {
@@ -200,12 +200,12 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
       if (!isTrial) {
         if (!lead || !lead.verified) return res.status(403).json({ error: 'Invalid or unverified lead token.' });
-        
+
         // CRITICAL CHECK: Lead.is_pro MUST be non-null and boolean
         if (lead.is_pro !== true) {
           const purchase = await PdfPurchase.findOne({
-            where: { 
-              lead_id: lead.id, 
+            where: {
+              lead_id: lead.id,
               pdf_id: { [Op.in]: [pdf.id, 0] }, // 0 is PRO_ACCESS
               status: 'completed'
             },
@@ -214,10 +214,9 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
           if (!purchase) {
             // Serve a beautiful Manual UPI Checkout Page
-            const leadName = lead.name || 'Guest';
-            const leadPhone = lead.phone || '';
             const upiId = process.env.ADMIN_UPI_ID || 'solankiparesh1183@okaxis';
-            const adminPhone = process.env.NEXT_PUBLIC_ADMIN_PHONE || '917435808310';
+            const initialType = req.query.type === 'download' ? 'download' : 'view';
+            const initialAmount = initialType === 'download' ? 10 : 5;
 
             return res.status(200).send(`
               <!DOCTYPE html>
@@ -232,8 +231,6 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                   .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
                   .btn-orange { background: #ea580c; transition: all 0.3s; }
                   .btn-orange:hover { background: #c2410c; transform: translateY(-2px); }
-                  .btn-green { background: #22c55e; transition: all 0.3s; }
-                  .btn-green:hover { background: #16a34a; transform: translateY(-2px); }
                 </style>
               </head>
               <body class="min-h-screen flex items-center justify-center p-6">
@@ -241,7 +238,7 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                   <div class="h-20 w-20 bg-orange-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-orange-500/20">
                     <svg class="h-10 w-10 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                   </div>
-                  
+
                   <h1 class="text-3xl font-black uppercase tracking-tight mb-4">Premium Document</h1>
                   <p class="text-slate-400 font-medium text-sm leading-relaxed mb-8">
                     To unlock this official DSIRDA document, please complete a small maintenance payment.
@@ -262,32 +259,36 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
                     <div class="p-6 glass rounded-3xl border border-white/10 space-y-4">
                        <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Click below to pay via UPI</p>
-                       <a id="upi-link" href="upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=5.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}" 
+                       <a id="upi-link" href="upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=${initialAmount}.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}"
                           class="block w-full btn-orange py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3">
                          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                         Pay <span id="display-amount">₹5</span> with UPI App
+                         Pay <span id="display-amount">₹${initialAmount}</span> with UPI App
                        </a>
                        <p class="text-[9px] font-bold text-slate-600">${upiId}</p>
                     </div>
 
+                    <button onclick="window.location.reload()" class="mt-4 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">I have Paid (Refresh Page)</button>
                   </div>
-
-                  <button onclick="window.location.reload()" class="mt-8 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">I have Paid (Refresh Page)</button>
                 </div>
 
                 <script>
-                  var currentType = 'view';
-                  var currentAmount = 5;
+                  var currentType = '${initialType}';
+                  var currentAmount = ${initialAmount};
+
+                  // Run once on load to set initial state correctly
+                  window.onload = function() {
+                    selectOption(currentAmount, currentType);
+                  };
 
                   function selectOption(amt, type) {
                     currentAmount = amt;
                     currentType = type;
-                    
+
                     // Update UI Colors and Borders
                     var btnView = document.getElementById('btn-view');
                     var btnDownload = document.getElementById('btn-download');
                     var displayAmt = document.getElementById('display-amount');
-                    
+
                     if (type === 'view') {
                       btnView.style.borderColor = '#ea580c';
                       btnView.classList.add('shadow-lg');
@@ -299,12 +300,12 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                       btnView.style.borderColor = 'transparent';
                       btnView.classList.remove('shadow-lg');
                     }
-                    
+
                     displayAmt.innerText = '₹' + amt;
-                    
+
                     // Update Links (Using simple string concatenation for reliability)
                     var upiBase = "upi://pay?pa=" + "${upiId}" + "&pn=Dholera%20Platform&am=" + amt + ".00&cu=INR&tn=PDF%20Unlock%20" + "${pdf.id}" + "_" + type;
-                    
+
                     document.getElementById('upi-link').href = upiBase;
                   }
                 </script>
@@ -334,10 +335,10 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
           const privateIndex = parts.indexOf('private');
           const authenticatedIndex = parts.indexOf('authenticated');
           const typeIndex = uploadIndex !== -1 ? uploadIndex : (privateIndex !== -1 ? privateIndex : authenticatedIndex);
-          
+
           if (typeIndex !== -1) {
             let publicIdParts = parts.slice(typeIndex + 1);
-            
+
             // Skip signature if present
             if (publicIdParts[0] && publicIdParts[0].startsWith('s--') && publicIdParts[0].endsWith('--')) {
               publicIdParts = publicIdParts.slice(1);
@@ -346,7 +347,7 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
             if (publicIdParts[0] && publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
               publicIdParts = publicIdParts.slice(1);
             }
-            
+
             const fullPublicId = publicIdParts.join('/');
             const extMatch = fullPublicId.match(/\.([a-z0-9]+)$/i);
             const format = extMatch ? extMatch[1] : 'pdf';
