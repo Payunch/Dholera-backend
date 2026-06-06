@@ -213,21 +213,113 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
           });
 
           if (!purchase) {
-            return res.status(402).json({ 
-              error: 'Premium Document',
-              requiresPayment: true,
-              message: 'Unlock this document or get Pro access.'
-            });
-          }
+            // Serve a beautiful Razorpay Checkout Page if payment is required
+            const leadName = lead.name || 'Guest';
+            const leadPhone = lead.phone || '';
+            const razorpayKey = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder';
 
-          // If they only paid for 'view' but are trying to download (if we had a download param)
-          // For now, we allow streaming for both, but we can set Content-Disposition
-          if (req.query.download === 'true' && purchase.type !== 'download' && lead.is_pro !== true) {
-            return res.status(403).json({ error: 'Download access required. Please upgrade your purchase.' });
-          }
-          
-          if (req.query.download === 'true' || purchase.type === 'download') {
-            res.setHeader('Content-Disposition', `attachment; filename="${pdf.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+            return res.status(200).send(`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Unlock Official Document - Dholera Platform</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                <style>
+                  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+                  body { font-family: 'Inter', sans-serif; background: #020617; color: white; }
+                  .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+                  .btn-orange { background: #ea580c; transition: all 0.3s; }
+                  .btn-orange:hover { background: #c2410c; transform: translateY(-2px); }
+                </style>
+              </head>
+              <body class="min-h-screen flex items-center justify-center p-6">
+                <div class="max-w-md w-full glass rounded-[2.5rem] p-10 text-center shadow-2xl">
+                  <div class="h-20 w-20 bg-orange-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-orange-500/20">
+                    <svg class="h-10 w-10 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  </div>
+                  
+                  <h1 class="text-3xl font-black uppercase tracking-tight mb-4">Premium Document</h1>
+                  <p class="text-slate-400 font-medium text-sm leading-relaxed mb-10">
+                    This official DSIRDA document is protected. Unlocking it grants you instant access to the intelligence archive.
+                  </p>
+
+                  <div class="space-y-4">
+                    <button onclick="pay(5, 'view')" class="w-full btn-orange py-5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-between px-8">
+                      <span>View Online</span>
+                      <span class="text-lg">₹5</span>
+                    </button>
+
+                    <button onclick="pay(10, 'download')" class="w-full glass py-5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-between px-8 hover:bg-white/5">
+                      <span>Download PDF</span>
+                      <span class="text-lg">₹10</span>
+                    </button>
+                  </div>
+
+                  <p class="mt-8 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Secure Payment via Razorpay</p>
+                </div>
+
+                <script>
+                  async function pay(amount, type) {
+                    try {
+                      // 1. Create order
+                      const res = await fetch('/api/payment/create-order', {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': '${leadToken}'
+                        },
+                        body: JSON.stringify({ pdfIds: [${pdf.id}], type })
+                      });
+                      const order = await res.json();
+                      
+                      if (!order.success) {
+                        alert('Failed to initialize payment. Please try again.');
+                        return;
+                      }
+
+                      const options = {
+                        key: order.key_id || '${razorpayKey}',
+                        amount: order.amount,
+                        currency: order.currency,
+                        name: "Dholera Platform",
+                        description: "Unlocking " + (type === 'view' ? "View" : "Download") + " Access",
+                        order_id: order.order_id,
+                        handler: async function (response) {
+                          // 2. Verify
+                          const verifyRes = await fetch('/api/payment/verify', {
+                            method: 'POST',
+                            headers: { 
+                              'Content-Type': 'application/json',
+                              'Authorization': '${leadToken}'
+                            },
+                            body: JSON.stringify({ ...response, pdfIds: [${pdf.id}], type })
+                          });
+                          const verify = await verifyRes.json();
+                          if (verify.success) {
+                            window.location.reload(); // Reload to see the PDF
+                          } else {
+                            alert('Payment verification failed.');
+                          }
+                        },
+                        prefill: {
+                          name: "${leadName}",
+                          contact: "${leadPhone}"
+                        },
+                        theme: { color: "#ea580c" }
+                      };
+                      const rzp = new Razorpay(options);
+                      rzp.open();
+                    } catch (err) {
+                      console.error(err);
+                      alert('Connection error. Please check your internet.');
+                    }
+                  }
+                </script>
+              </body>
+              </html>
+            `);
           }
         }
       }
