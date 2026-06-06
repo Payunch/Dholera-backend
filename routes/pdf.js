@@ -283,21 +283,38 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                 </div>
 
                 <script>
-                  let currentType = 'view';
-                  let currentAmount = 5;
+                  var currentType = 'view';
+                  var currentAmount = 5;
 
                   function selectOption(amt, type) {
                     currentAmount = amt;
                     currentType = type;
                     
-                    // Update UI
-                    document.getElementById('btn-view').style.borderColor = type === 'view' ? '#ea580c' : 'transparent';
-                    document.getElementById('btn-download').style.borderColor = type === 'download' ? '#ea580c' : 'transparent';
-                    document.getElementById('display-amount').innerText = '₹' + amt;
+                    // Update UI Colors and Borders
+                    var btnView = document.getElementById('btn-view');
+                    var btnDownload = document.getElementById('btn-download');
+                    var displayAmt = document.getElementById('display-amount');
                     
-                    // Update Links
-                    document.getElementById('upi-link').href = \`upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=\${amt}.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}_\${type}\`;
-                    document.getElementById('wa-link').href = \`https://wa.me/${adminPhone}?text=Paid%20Rs.\${amt}%20for%20\${type.toUpperCase()}%20access%20to%20PDF%20ID:%20${pdf.id}.%20Please%20activate.\`;
+                    if (type === 'view') {
+                      btnView.style.borderColor = '#ea580c';
+                      btnView.classList.add('shadow-lg');
+                      btnDownload.style.borderColor = 'transparent';
+                      btnDownload.classList.remove('shadow-lg');
+                    } else {
+                      btnDownload.style.borderColor = '#ea580c';
+                      btnDownload.classList.add('shadow-lg');
+                      btnView.style.borderColor = 'transparent';
+                      btnView.classList.remove('shadow-lg');
+                    }
+                    
+                    displayAmt.innerText = '₹' + amt;
+                    
+                    // Update Links (Using simple string concatenation for reliability)
+                    var upiBase = "upi://pay?pa=" + "${upiId}" + "&pn=Dholera%20Platform&am=" + amt + ".00&cu=INR&tn=PDF%20Unlock%20" + "${pdf.id}" + "_" + type;
+                    var waBase = "https://wa.me/" + "${adminPhone}" + "?text=Paid%20Rs." + amt + "%20for%20" + type.toUpperCase() + "%20access%20to%20PDF%20ID:%20" + "${pdf.id}" + ".%20Please%20activate.";
+                    
+                    document.getElementById('upi-link').href = upiBase;
+                    document.getElementById('wa-link').href = waBase;
                   }
                 </script>
               </body>
