@@ -74,7 +74,7 @@ const getCookieOptions = (maxAgeMs) => {
   return {
     httpOnly: true,
     secure: true, // Always secure for modern browsers handling cross-site cookies
-    sameSite: isProd ? 'none' : 'lax',
+    sameSite: 'lax',
     path: '/',
     maxAge: maxAgeMs,
     ...(domain && { domain })

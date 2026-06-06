@@ -165,7 +165,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     secure: true, // Always secure for modern browser cross-site compatibility
-    sameSite: isProd ? 'none' : 'lax',
+    sameSite: 'lax',
     path: '/',
     maxAge: 24 * 60 * 60 * 1000, // 1 day
     ...(cookieDomain && { domain: cookieDomain })

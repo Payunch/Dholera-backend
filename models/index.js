@@ -1,6 +1,7 @@
 const sequelize = require('../config/database');
 const Lead = require('./Lead');
 const Update = require('./Update');
+const UserSession = require('./UserSession');
 const Analytics = require('./Analytics');
 const PdfDocument = require('./PdfDocument');
 const PdfView = require('./PdfView');
@@ -46,6 +47,7 @@ module.exports = {
   sequelize,
   Lead,
   Update,
+  UserSession,
   Analytics,
   PdfDocument,
   PdfView,

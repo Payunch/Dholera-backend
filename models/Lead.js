@@ -109,14 +109,6 @@ const Lead = sequelize.define('Lead', {
       key: 'id'
     }
   },
-  otp: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  otp_expires_at: {
-    type: DataTypes.DATE,
-    allowNull: true
-  }
 });
 
 module.exports = Lead;
