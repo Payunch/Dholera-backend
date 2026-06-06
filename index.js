@@ -122,10 +122,10 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
     const SQLiteStore = require('connect-sqlite3')(session);
     const { getDatabaseInfo } = require('./config/database');
     const dbInfo = getDatabaseInfo();
-    
+
     // Use the same directory as the main database for the session store
     let sessionDir = dbInfo.storagePath ? path.dirname(dbInfo.storagePath) : __dirname;
-    
+
     // Final check for sessionDir writability
     try {
       if (!fs.existsSync(sessionDir)) {
@@ -136,7 +136,7 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
       console.warn(`[Session] Warning: ${sessionDir} is not writable, falling back to OS temp dir.`);
       sessionDir = require('os').tmpdir();
     }
-    
+
     sessionStore = new SQLiteStore({
       db: 'sessions.sqlite',
       dir: sessionDir,
@@ -185,11 +185,16 @@ const csrfProtection = csurf();
 // Apply CSRF only to admin/session-protected mutations.
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'test') return next();
-  
+
   const isSafeMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
   if (isSafeMethod) return next();
 
   const isAuthMutation = req.path === '/api/auth/login' || req.path === '/api/auth/logout';
+  
+  // FIXED: Explicitly exclude login from CSRF during the credential check phase
+  // CSRF is still enforced for all other admin mutations via the logic below.
+  if (isAuthMutation) return next();
+
   const isAdminSessionMutation = Boolean(req.session?.isAdmin || req.cookies?.admin_access_token || req.cookies?.admin_refresh_token);
   const isPublicLeadMutation = [
     '/api/leads',
@@ -198,7 +203,7 @@ app.use((req, res, next) => {
     '/api/leads/track-returning'
   ].includes(req.path);
 
-  if (isAuthMutation || (isAdminSessionMutation && !isPublicLeadMutation)) {
+  if (isAdminSessionMutation && !isPublicLeadMutation) {
     return csrfProtection(req, res, next);
   }
   return next();
@@ -286,11 +291,11 @@ const startServer = async () => {
   server.listen(PORT, () => {
     console.log(`[Server] ✅ Running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
     console.log(`[Socket] ⚡ Engine active`);
-    
+
     // Run background tasks after server is up to avoid blocking health checks
     seedPdfsIfEmpty(PdfDocument).catch(err => console.error('[Seed] PDF seed failed:', err));
     seedBlogIfEmpty().catch(err => console.error('[Seed] Blog seed failed:', err));
-    
+
     // Initialize Backup Service
     BackupService.init();
   });
@@ -303,7 +308,7 @@ if (require.main === module) {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
-  
+
   if (err && err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ error: 'Invalid CSRF token. Please refresh the page.' });
   }
@@ -313,7 +318,7 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: `Upload error: ${err.message}` });
   }
 
-  res.status(err.status || 500).json({ 
+  res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
