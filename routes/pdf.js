@@ -270,13 +270,6 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
                        <p class="text-[9px] font-bold text-slate-600">${upiId}</p>
                     </div>
 
-                    <div class="pt-4 border-t border-white/5">
-                       <p class="text-xs font-medium text-slate-400 mb-4">Send payment screenshot for instant activation.</p>
-                       <a id="wa-link" href="https://wa.me/${adminPhone}?text=Paid%20for%20PDF%20ID:%20${pdf.id}.%20Please%20activate%20access." 
-                          class="block w-full border border-green-500/30 text-green-500 py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-green-500/10">
-                         Verify via WhatsApp
-                       </a>
-                    </div>
                   </div>
 
                   <button onclick="window.location.reload()" class="mt-8 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">I have Paid (Refresh Page)</button>
