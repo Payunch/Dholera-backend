@@ -14,12 +14,19 @@ const isRemotePath = (value = '') => /^https?:\/\//i.test(String(value).trim());
 // GET all updates
 router.get('/', async (req, res) => {
   try {
-    const { search, all } = req.query;
+    const { search, all, lang } = req.query;
     const where = {};
     
     // Only show published updates unless 'all' is true (for admin)
     if (all !== 'true') {
       where.published = true;
+    }
+
+    // Default to requested language, fallback to English if not specified
+    if (lang) {
+      where.lang = lang;
+    } else {
+      where.lang = 'en';
     }
 
     if (search) {
@@ -43,11 +50,26 @@ router.get('/', async (req, res) => {
 // GET single update by ID
 router.get('/:id', async (req, res) => {
   try {
-    const { all } = req.query;
-    const update = await Update.findByPk(req.params.id);
+    const { all, lang } = req.query;
+    let update = await Update.findByPk(req.params.id);
     
     if (!update) {
       return res.status(404).json({ error: 'Update not found' });
+    }
+
+    // If a different language is requested, try to find the linked translation
+    if (lang && update.lang !== lang) {
+      const originalId = update.original_id || update.id;
+      const translated = await Update.findOne({
+        where: {
+          [Op.or]: [
+            { id: originalId, lang: lang },
+            { original_id: originalId, lang: lang }
+          ],
+          published: true
+        }
+      });
+      if (translated) update = translated;
     }
 
     // Only show if published unless 'all' is true

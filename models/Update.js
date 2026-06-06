@@ -34,6 +34,15 @@ const Update = sequelize.define('Update', {
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
+  lang: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'en'
+  },
+  original_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
   portal_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
