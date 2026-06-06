@@ -10,8 +10,136 @@ const { verifyToken } = require('./auth');
 const { 
   normalizePhone, 
   buildManualWhatsAppMessage, 
-  logWhatsAppActivity 
+  logWhatsAppActivity,
+  sendTemplateMessage
 } = require('../services/whatsapp');
+
+// Rate limiter for OTP requests (max 3 requests per 10 minutes per IP)
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many OTP requests. Please try again after 10 minutes.' }
+});
+
+/**
+ * POST /api/leads/request-otp
+ * Body: phone, name (optional)
+ */
+router.post('/request-otp', otpLimiter, async (req, res) => {
+  try {
+    const phone = cleanText(req.body?.phone, 20);
+    const name = cleanText(req.body?.name, 120);
+    const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
+
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!isValidPhone(localPhone)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Find or create unverified lead
+    let [lead] = await Lead.findOrCreate({
+      where: { phone: localPhone },
+      defaults: { 
+        name: name || 'Guest',
+        verified: false,
+        preferred_language
+      }
+    });
+
+    // Update OTP
+    await lead.update({
+      otp: await bcrypt.hash(otp, 10),
+      otp_expires_at: expiresAt,
+      name: name || lead.name
+    });
+
+    // Send OTP via WhatsApp Template
+    const whatsappResult = await sendTemplateMessage({
+      phone: localPhone,
+      templateName: process.env.WHATSAPP_OTP_TEMPLATE_NAME || 'otp_verification',
+      parameters: [otp]
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[OTP] Generated for ${localPhone}: ${otp}`);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'OTP sent successfully',
+      debug: process.env.NODE_ENV !== 'production' ? otp : undefined 
+    });
+  } catch (err) {
+    console.error('OTP Request Error:', err);
+    res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
+  }
+});
+
+/**
+ * POST /api/leads/verify-otp
+ * Body: phone, otp
+ */
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const phone = cleanText(req.body?.phone, 20);
+    const otp = cleanText(req.body?.otp, 6);
+    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
+    const sessionId = cleanText(req.body?.sessionId, 100);
+
+    if (!phone || !otp) return res.status(400).json({ error: 'Phone and OTP are required' });
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    const lead = await Lead.findOne({ where: { phone: localPhone } });
+    if (!lead || !lead.otp || !lead.otp_expires_at) {
+      return res.status(400).json({ error: 'No OTP requested for this number' });
+    }
+
+    if (new Date() > lead.otp_expires_at) {
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    }
+
+    const isValid = await bcrypt.compare(otp, lead.otp);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid OTP code' });
+    }
+
+    // Verify Success
+    const leadToken = lead.lead_token || `LT_${crypto.randomBytes(16).toString('hex')}`;
+    await lead.update({
+      verified: true,
+      otp: null,
+      otp_expires_at: null,
+      lead_token: leadToken,
+      browserFingerprint: browserFingerprint || lead.browserFingerprint,
+      visit_count: (lead.visit_count || 0) + 1
+    });
+
+    res.json({
+      success: true,
+      lead_token: leadToken,
+      name: lead.name,
+      phone: lead.phone,
+      is_pro: lead.is_pro
+    });
+  } catch (err) {
+    console.error('OTP Verification Error:', err);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
 const { logAuditEvent } = require('../services/auditLogger');
 const { maybeNotifyHighInterestLead, isHighInterestLead, maybeSendWelcomeMessage } = require('../services/leadNotifications');
 const LeadIntelligenceService = require('../services/leadIntelligence');

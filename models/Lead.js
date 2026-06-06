@@ -108,6 +108,14 @@ const Lead = sequelize.define('Lead', {
       model: 'Portals',
       key: 'id'
     }
+  },
+  otp: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  otp_expires_at: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 });
 
