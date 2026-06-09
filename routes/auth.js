@@ -22,8 +22,8 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-session-secret';
 const LOGIN_WINDOW_MS = Number.parseInt(process.env.ADMIN_LOGIN_WINDOW_MS || `${15 * 60 * 1000}`, 10);
-const LOGIN_MAX_ATTEMPTS = Number.parseInt(process.env.ADMIN_LOGIN_MAX_ATTEMPTS || '10', 10);
-const LOGIN_LOCKOUT_THRESHOLD = Number.parseInt(process.env.ADMIN_LOCKOUT_THRESHOLD || '5', 10);
+const LOGIN_MAX_ATTEMPTS = Number.parseInt(process.env.ADMIN_LOGIN_MAX_ATTEMPTS || '20', 10);
+const LOGIN_LOCKOUT_THRESHOLD = Number.parseInt(process.env.ADMIN_LOCKOUT_THRESHOLD || '10', 10);
 const LOGIN_LOCKOUT_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_MS || `${30 * 60 * 1000}`, 10);
 const failedLoginState = new Map();
 

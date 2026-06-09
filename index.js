@@ -164,7 +164,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: true, // Always secure for modern browser cross-site compatibility
+    secure: isProd, // Only secure in production to allow local HTTP testing
     sameSite: 'lax',
     path: '/',
     maxAge: 24 * 60 * 60 * 1000, // 1 day
