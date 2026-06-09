@@ -113,7 +113,7 @@ router.get('/', verifyToken, async (req, res) => {
     
     // Pagination
     const page = parsePositiveInt(req.query?.page, 1, 1000);
-    const limit = parsePositiveInt(req.query?.limit, 1, 100);
+    const limit = parsePositiveInt(req.query?.limit, 50, 100);
     const offset = (page - 1) * limit;
 
     const where = {};
@@ -147,6 +147,8 @@ router.get('/', verifyToken, async (req, res) => {
     // Manually attach VisitorSession data for each lead based on fingerprint
     const leadsWithIntelligence = await Promise.all(leads.map(async (lead) => {
       const plainLead = lead.get({ plain: true });
+      const leadPages = safeJsonParse(plainLead.visited_pages, []);
+
       if (plainLead.browserFingerprint && VisitorSession) {
         const sessions = await VisitorSession.findAll({
           where: { browserFingerprint: plainLead.browserFingerprint },
@@ -160,12 +162,12 @@ router.get('/', verifyToken, async (req, res) => {
 
         // Merge visited pages from Lead and all associated sessions
         const sessionPages = sessions.flatMap((s) => safeJsonParse(s.visitedPages, []));
-        const leadPages = safeJsonParse(plainLead.visited_pages, []);
-        plainLead.visited_pages = JSON.stringify([...new Set([...leadPages, ...sessionPages])]);
+        plainLead.visitedPages = [...new Set([...leadPages, ...sessionPages])];
       } else {
         plainLead.sessions = [];
         plainLead.total_sessions = 0;
         plainLead.totalTimeSpent = plainLead.timeSpent || 0;
+        plainLead.visitedPages = leadPages;
       }
       return plainLead;
     }));
