@@ -144,8 +144,25 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: storagePath,
-    logging: false
+    logging: false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    },
+    retry: {
+      match: [
+        /SQLITE_BUSY/
+      ],
+      name: 'query',
+      max: 5
+    }
   });
+
+  // Enable WAL mode for better concurrency
+  sequelize.query('PRAGMA journal_mode=WAL;');
+  
   databaseInfo = {
     mode: 'sqlite',
     source: isPersistent ? 'persistent-volume' : 'local-fallback',
