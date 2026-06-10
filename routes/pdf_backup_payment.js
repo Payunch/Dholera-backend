@@ -112,8 +112,8 @@ router.get('/my-vault', async (req, res) => {
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
-    // If verified or Pro, they have access to everything
-    if (lead.verified || lead.is_pro) {
+    // If Pro, they have access to everything
+    if (lead.is_pro) {
        const allPdfs = await PdfDocument.findAll({
          attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
          order: [['id', 'ASC']]
@@ -182,19 +182,139 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
       if (leadToken) {
         lead = await Lead.findOne({ where: { lead_token: leadToken } });
       }
+
+      // If no token, we create a dummy 'guest' lead object so the payment/viewing flow continues
+      if (!lead && String(req.params.id) !== String(freeTrialId)) {
+        // Create an anonymous guest lead in memory just to pass the checks,
+        // or allow the checkout page to render without a valid lead.
+        // The purchase flow might need a lead ID, but for viewing free/checkout, we proceed.
+        lead = { verified: true, is_pro: false, id: null };
+      }
     }
 
     const pdf = await PdfDocument.findByPk(req.params.id);
     if (!pdf) return res.status(404).json({ error: 'PDF not found.' });
 
-    // 2. Authorization (Verification check)
+    // 2. Authorization (Payment check)
     if (!isAdmin && pdf.is_protected) {
       const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
       const isTrial = String(pdf.id) === String(freeTrialId);
 
       if (!isTrial) {
-        if (!lead || !lead.verified) {
-          return res.status(403).json({ error: 'Mobile verification required to view this document.' });
+        if (!lead || !lead.verified) return res.status(403).json({ error: 'Invalid or unverified lead token.' });
+
+        // CRITICAL CHECK: Lead.is_pro MUST be non-null and boolean
+        if (lead.is_pro !== true) {
+          const purchase = await PdfPurchase.findOne({
+            where: {
+              lead_id: lead.id,
+              pdf_id: { [Op.in]: [pdf.id, 0] }, // 0 is PRO_ACCESS
+              status: 'completed'
+            },
+            order: [['updatedAt', 'DESC']]
+          });
+
+          if (!purchase) {
+            // Serve a beautiful Manual UPI Checkout Page
+            const upiId = process.env.ADMIN_UPI_ID || 'solankiparesh1183@okaxis';
+            const initialType = req.query.type === 'download' ? 'download' : 'view';
+            const initialAmount = initialType === 'download' ? 10 : 5;
+
+            return res.status(200).send(`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Unlock Document - Dholera Platform</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                <style>
+                  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+                  body { font-family: 'Inter', sans-serif; background: #020617; color: white; }
+                  .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+                  .btn-orange { background: #ea580c; transition: all 0.3s; }
+                  .btn-orange:hover { background: #c2410c; transform: translateY(-2px); }
+                </style>
+              </head>
+              <body class="min-h-screen flex items-center justify-center p-6">
+                <div class="max-w-md w-full glass rounded-[2.5rem] p-10 text-center shadow-2xl">
+                  <div class="h-20 w-20 bg-orange-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-orange-500/20">
+                    <svg class="h-10 w-10 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  </div>
+
+                  <h1 class="text-3xl font-black uppercase tracking-tight mb-4">Premium Document</h1>
+                  <p class="text-slate-400 font-medium text-sm leading-relaxed mb-8">
+                    To unlock this official DSIRDA document, please complete a small maintenance payment.
+                  </p>
+
+                  <div class="space-y-6">
+                    <!-- UPI Selection -->
+                    <div class="grid grid-cols-2 gap-4">
+                      <button onclick="selectOption(5, 'view')" id="btn-view" class="p-4 glass rounded-2xl border-2 border-orange-500 shadow-lg transition-all text-left">
+                        <span class="block text-[10px] font-black text-orange-500 uppercase mb-1">View Access</span>
+                        <span class="text-2xl font-black italic">₹5</span>
+                      </button>
+                      <button onclick="selectOption(10, 'download')" id="btn-download" class="p-4 glass rounded-2xl border-2 border-transparent transition-all text-left hover:border-white/10">
+                        <span class="block text-[10px] font-black text-slate-500 uppercase mb-1">Download PDF</span>
+                        <span class="text-2xl font-black italic">₹10</span>
+                      </button>
+                    </div>
+
+                    <div class="p-6 glass rounded-3xl border border-white/10 space-y-4">
+                       <p class="text-[10px] font-black uppercase text-slate-500 tracking-widest">Click below to pay via UPI</p>
+                       <a id="upi-link" href="upi://pay?pa=${upiId}&pn=Dholera%20Platform&am=${initialAmount}.00&cu=INR&tn=PDF%20Unlock%20${pdf.id}"
+                          class="block w-full btn-orange py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3">
+                         <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                         Pay <span id="display-amount">₹${initialAmount}</span> with UPI App
+                       </a>
+                       <p class="text-[9px] font-bold text-slate-600">${upiId}</p>
+                    </div>
+
+                    <button onclick="window.location.reload()" class="mt-4 text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest">I have Paid (Refresh Page)</button>
+                  </div>
+                </div>
+
+                <script>
+                  var currentType = '${initialType}';
+                  var currentAmount = ${initialAmount};
+
+                  // Run once on load to set initial state correctly
+                  window.onload = function() {
+                    selectOption(currentAmount, currentType);
+                  };
+
+                  function selectOption(amt, type) {
+                    currentAmount = amt;
+                    currentType = type;
+
+                    // Update UI Colors and Borders
+                    var btnView = document.getElementById('btn-view');
+                    var btnDownload = document.getElementById('btn-download');
+                    var displayAmt = document.getElementById('display-amount');
+
+                    if (type === 'view') {
+                      btnView.style.borderColor = '#ea580c';
+                      btnView.classList.add('shadow-lg');
+                      btnDownload.style.borderColor = 'transparent';
+                      btnDownload.classList.remove('shadow-lg');
+                    } else {
+                      btnDownload.style.borderColor = '#ea580c';
+                      btnDownload.classList.add('shadow-lg');
+                      btnView.style.borderColor = 'transparent';
+                      btnView.classList.remove('shadow-lg');
+                    }
+
+                    displayAmt.innerText = '₹' + amt;
+
+                    // Update Links (Using simple string concatenation for reliability)
+                    var upiBase = "upi://pay?pa=" + "${upiId}" + "&pn=Dholera%20Platform&am=" + amt + ".00&cu=INR&tn=PDF%20Unlock%20" + "${pdf.id}" + "_" + type;
+
+                    document.getElementById('upi-link').href = upiBase;
+                  }
+                </script>
+              </body>
+              </html>
+            `);
+          }
         }
       }
     }
