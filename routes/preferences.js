@@ -20,10 +20,21 @@ router.get('/translations/:lang', async (req, res) => {
   }
 });
 
+const extractToken = (req) => {
+  const xLeadToken = req.headers['x-lead-token'];
+  if (xLeadToken) return xLeadToken.trim();
+
+  const authHeader = req.headers['authorization'] || '';
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  return authHeader.trim();
+};
+
 // GET user preferences
 router.get('/user', async (req, res) => {
   try {
-    const token = req.headers['x-lead-token'];
+    const token = extractToken(req);
     if (!token) return res.status(400).json({ error: 'Token required' });
 
     const lead = await Lead.findOne({ where: { lead_token: token } });
@@ -42,7 +53,7 @@ router.get('/user', async (req, res) => {
 // POST update user preferences
 router.post('/user', async (req, res) => {
   try {
-    const token = req.headers['x-lead-token'];
+    const token = extractToken(req);
     const { language, theme } = req.body;
 
     if (!token) return res.status(400).json({ error: 'Token required' });
@@ -63,7 +74,7 @@ router.post('/user', async (req, res) => {
 // POST register FCM token
 router.post('/fcm-token', async (req, res) => {
   try {
-    const token = req.headers['x-lead-token'];
+    const token = extractToken(req);
     const { fcmToken } = req.body;
 
     if (!token) return res.status(400).json({ error: 'Token required' });
