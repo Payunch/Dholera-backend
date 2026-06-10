@@ -25,7 +25,7 @@ const extractToken = (req) => {
   if (xLeadToken) return xLeadToken.trim();
 
   const authHeader = req.headers['authorization'] || '';
-  if (authHeader.startsWith('Bearer ')) {
+  if (authHeader.toLowerCase().startsWith('bearer ')) {
     return authHeader.substring(7).trim();
   }
   return authHeader.trim();
@@ -35,7 +35,7 @@ const extractToken = (req) => {
 router.get('/user', async (req, res) => {
   try {
     const token = extractToken(req);
-    if (!token) return res.status(400).json({ error: 'Token required' });
+    if (!token) return res.status(400).json({ error: 'Token required (Authorization header or x-lead-token)' });
 
     const lead = await Lead.findOne({ where: { lead_token: token } });
     if (!lead) return res.status(404).json({ error: 'User not found' });
@@ -56,7 +56,7 @@ router.post('/user', async (req, res) => {
     const token = extractToken(req);
     const { language, theme } = req.body;
 
-    if (!token) return res.status(400).json({ error: 'Token required' });
+    if (!token) return res.status(400).json({ error: 'Token required (Authorization header or x-lead-token)' });
 
     const lead = await Lead.findOne({ where: { lead_token: token } });
     if (!lead) return res.status(404).json({ error: 'User not found' });
@@ -77,7 +77,7 @@ router.post('/fcm-token', async (req, res) => {
     const token = extractToken(req);
     const { fcmToken } = req.body;
 
-    if (!token) return res.status(400).json({ error: 'Token required' });
+    if (!token) return res.status(400).json({ error: 'Token required (Authorization header or x-lead-token)' });
     if (!fcmToken) return res.status(400).json({ error: 'FCM Token required' });
 
     const lead = await Lead.findOne({ where: { lead_token: token } });

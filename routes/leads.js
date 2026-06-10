@@ -19,7 +19,13 @@ const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('
 const multer = require('multer');
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
-const isValidPhone = (phone) => /^[6-9]\d{9}$/.test(phone);
+const isValidPhone = (phone) => {
+  if (!phone) return false;
+  const digits = String(phone).replace(/\D/g, '');
+  // Extract last 10 digits if it includes country code
+  const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  return /^[6-9]\d{9}$/.test(last10);
+};
 const ALLOWED_LEAD_STATUSES = new Set(['New', 'Contacted', 'Converted', 'Follow-up', 'Not Interested', 'Closed']);
 
 const extractToken = (authHeader = '') => {
