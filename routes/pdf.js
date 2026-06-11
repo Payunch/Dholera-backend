@@ -163,7 +163,7 @@ function serveOtpVerificationPage(req, res, pdf) {
     projectId: process.env.FIREBASE_PROJECT_ID || "user-management-admin-1128f",
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "user-management-admin-1128f.firebasestorage.app",
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "536387058166",
-    appId: process.env.FIREBASE_APP_ID || "1:536387058166:web:221d86e1db8169096d2fd7"
+    appId: process.env.FIREBASE_APP_ID || "1:536387058166:web:0fad3e8ce885fde06d2fd7"
   };
 
   res.status(200).send(`
