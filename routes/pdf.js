@@ -112,8 +112,9 @@ router.get('/my-vault', async (req, res) => {
     const lead = await Lead.findOne({ where: { lead_token: leadToken } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
-    // If verified or Pro, they have access to everything
-    if (lead.verified || lead.is_pro) {
+    // If session-verified or Pro, they have access to everything
+    const isSessionVerified = (req.session && req.session.pdfVerified) || lead.is_pro;
+    if (isSessionVerified) {
        const allPdfs = await PdfDocument.findAll({
          attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
          order: [['id', 'ASC']]
@@ -155,6 +156,269 @@ router.get('/my-vault', async (req, res) => {
   }
 });
 
+function serveOtpVerificationPage(req, res, pdf) {
+  const firebaseConfig = {
+    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBN6qClTk28er9L_AoQnko6M8weNp4bLZk",
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || "user-management-admin-1128f.firebaseapp.com",
+    projectId: process.env.FIREBASE_PROJECT_ID || "user-management-admin-1128f",
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "user-management-admin-1128f.firebasestorage.app",
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "536387058166",
+    appId: process.env.FIREBASE_APP_ID || "1:536387058166:web:221d86e1db8169096d2fd7"
+  };
+
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Verify Mobile - Dholera Platform</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #020617; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .btn-orange { background: #ea580c; transition: all 0.3s; }
+        .btn-orange:hover { background: #c2410c; transform: translateY(-2px); }
+        .spinner { border-top-color: #ea580c; }
+      </style>
+    </head>
+    <body class="min-h-screen flex items-center justify-center p-6">
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="flex flex-col items-center gap-4">
+          <div class="animate-spin rounded-full h-12 w-12 border-4 border-slate-700 spinner"></div>
+          <p class="text-xs font-black uppercase tracking-widest text-slate-400">Processing request...</p>
+        </div>
+      </div>
+
+      <div class="max-w-md w-full glass rounded-[2.5rem] p-10 text-center shadow-2xl relative">
+        <div class="h-20 w-20 bg-orange-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-orange-500/20">
+          <svg class="h-10 w-10 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+          </svg>
+        </div>
+
+        <h1 class="text-3xl font-black uppercase tracking-tight mb-2">Verification Required</h1>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-8">Unlock Premium Document</p>
+
+        <!-- Error Banner -->
+        <div id="error-banner" class="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center hidden">
+          <p id="error-text" class="text-[10px] font-black uppercase text-red-400 tracking-wider"></p>
+        </div>
+
+        <!-- STEP 1: ENTER NAME & PHONE -->
+        <div id="step-details" class="space-y-6">
+          <div class="space-y-4">
+            <div class="relative text-left">
+              <label class="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Full Name</label>
+              <input type="text" id="name-input" placeholder="ENTER YOUR FULL NAME"
+                     class="w-full rounded-2xl border-2 border-white/5 bg-white/5 py-4 px-5 text-[10px] font-black uppercase tracking-widest text-white placeholder-slate-600 outline-none focus:border-orange-500 transition-all mt-1">
+            </div>
+
+            <div class="relative text-left">
+              <label class="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Mobile Number</label>
+              <div class="flex items-center mt-1">
+                <span class="bg-white/5 py-4 px-4 border-2 border-r-0 border-white/5 rounded-l-2xl text-[10px] font-black text-slate-400 select-none">+91</span>
+                <input type="tel" id="phone-input" placeholder="10-DIGIT NUMBER" maxlength="10"
+                       class="w-full rounded-r-2xl border-2 border-l-0 border-white/5 bg-white/5 py-4 px-5 text-[10px] font-black uppercase tracking-widest text-white placeholder-slate-600 outline-none focus:border-orange-500 transition-all">
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 text-left pt-2">
+              <input type="checkbox" id="terms-checkbox" class="mt-1 h-4 w-4 rounded border-white/20 bg-transparent text-orange-500 focus:ring-orange-500 cursor-pointer">
+              <label for="terms-checkbox" class="text-[9px] font-bold text-slate-400 leading-relaxed cursor-pointer uppercase tracking-tight">
+                I agree to the terms and privacy policy for official DSIRDA investment reports.
+              </label>
+            </div>
+          </div>
+
+          <button onclick="sendOtp()" class="w-full btn-orange py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3">
+            Send Verification Code
+          </button>
+        </div>
+
+        <!-- STEP 2: ENTER OTP -->
+        <div id="step-otp" class="space-y-6 hidden">
+          <div class="space-y-4 text-center">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Verification Code sent to <span id="phone-display" class="font-black text-white"></span>
+            </p>
+            <input type="text" id="otp-input" placeholder="ENTER 6-DIGIT OTP" maxlength="6"
+                   class="w-full rounded-2xl border-2 border-white/5 bg-white/5 py-4 px-5 text-center text-xs font-black uppercase tracking-widest text-white placeholder-slate-600 outline-none focus:border-orange-500 transition-all mt-1">
+          </div>
+
+          <button onclick="verifyOtp()" class="w-full btn-orange py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3">
+            Verify & View Document
+          </button>
+
+          <button onclick="goBack()" class="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors">
+            Change Mobile Number
+          </button>
+        </div>
+
+        <!-- STEP 3: SUCCESS STATE -->
+        <div id="step-success" class="space-y-6 hidden">
+          <div class="h-20 w-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border border-green-500/20 text-green-500">
+            <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h2 class="text-2xl font-black uppercase">Access Granted</h2>
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading secure document stream...</p>
+        </div>
+
+        <!-- Firebase ReCAPTCHA Container -->
+        <div id="recaptcha-container" class="hidden"></div>
+      </div>
+
+      <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+          apiKey: "${firebaseConfig.apiKey}",
+          authDomain: "${firebaseConfig.authDomain}",
+          projectId: "${firebaseConfig.projectId}",
+          storageBucket: "${firebaseConfig.storageBucket}",
+          messagingSenderId: "${firebaseConfig.messagingSenderId}",
+          appId: "${firebaseConfig.appId}"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        let confirmationResult = null;
+        let recaptchaVerifier = null;
+        
+        window.sendOtp = async function() {
+          const name = document.getElementById('name-input').value.trim();
+          const phone = document.getElementById('phone-input').value.replace(/\\D/g, '').slice(-10);
+          const terms = document.getElementById('terms-checkbox').checked;
+          
+          const errDiv = document.getElementById('error-banner');
+          const errText = document.getElementById('error-text');
+          
+          if (!name || name.length < 2) {
+            errDiv.classList.remove('hidden');
+            errText.innerText = "Please enter a valid name.";
+            return;
+          }
+          if (!/^[6-9]\\d{9}$/.test(phone)) {
+            errDiv.classList.remove('hidden');
+            errText.innerText = "Please enter a valid 10-digit mobile number.";
+            return;
+          }
+          if (!terms) {
+            errDiv.classList.remove('hidden');
+            errText.innerText = "You must agree to the terms and privacy policy.";
+            return;
+          }
+          
+          errDiv.classList.add('hidden');
+          document.getElementById('loading-overlay').classList.remove('hidden');
+          
+          try {
+            if (!recaptchaVerifier) {
+              recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                size: 'invisible'
+              });
+            }
+            
+            const phoneNumber = "+91" + phone;
+            confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+            
+            document.getElementById('step-details').classList.add('hidden');
+            document.getElementById('step-otp').classList.remove('hidden');
+            document.getElementById('phone-display').innerText = "+91 " + phone;
+          } catch (err) {
+            console.error(err);
+            errDiv.classList.remove('hidden');
+            errText.innerText = err.message || "Failed to send OTP. Check your number.";
+            if (recaptchaVerifier) {
+              try { recaptchaVerifier.clear(); } catch(e){}
+              recaptchaVerifier = null;
+            }
+          } finally {
+            document.getElementById('loading-overlay').classList.add('hidden');
+          }
+        };
+
+        window.verifyOtp = async function() {
+          const code = document.getElementById('otp-input').value.replace(/\\D/g, '').slice(0, 6);
+          const errDiv = document.getElementById('error-banner');
+          const errText = document.getElementById('error-text');
+          
+          if (code.length !== 6) {
+            errDiv.classList.remove('hidden');
+            errText.innerText = "Please enter a valid 6-digit OTP.";
+            return;
+          }
+          
+          errDiv.classList.add('hidden');
+          document.getElementById('loading-overlay').classList.remove('hidden');
+          
+          try {
+            const result = await confirmationResult.confirm(code);
+            const idToken = await result.user.getIdToken();
+            
+            const name = document.getElementById('name-input').value.trim();
+            const phone = document.getElementById('phone-input').value.replace(/\\D/g, '').slice(-10);
+            
+            function getCookie(name) {
+              const value = "; " + document.cookie;
+              const parts = value.split("; " + name + "=");
+              if (parts.length === 2) return parts.pop().split(";").shift();
+              return "";
+            }
+            const fingerprint = getCookie('visitorFingerprint');
+            
+            const response = await fetch('/api/leads/verify-otp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                name,
+                phone,
+                firebaseToken: idToken,
+                browserFingerprint: fingerprint
+              })
+            });
+            
+            const data = await response.json();
+            if (response.ok && data.success) {
+              document.cookie = "lead_token=" + data.lead_token + "; path=/; SameSite=Lax";
+              document.cookie = "lead_name=" + encodeURIComponent(data.name) + "; path=/; SameSite=Lax";
+              document.cookie = "lead_phone=" + data.phone + "; path=/; SameSite=Lax";
+              
+              document.getElementById('step-otp').classList.add('hidden');
+              document.getElementById('step-success').classList.remove('hidden');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1500);
+            } else {
+              throw new Error(data.error || "Failed to finalize session.");
+            }
+          } catch (err) {
+            console.error(err);
+            errDiv.classList.remove('hidden');
+            errText.innerText = err.message || "Invalid OTP code. Please try again.";
+          } finally {
+            document.getElementById('loading-overlay').classList.add('hidden');
+          }
+        };
+
+        window.goBack = function() {
+          document.getElementById('step-otp').classList.add('hidden');
+          document.getElementById('step-details').classList.remove('hidden');
+          document.getElementById('error-banner').classList.add('hidden');
+        };
+      </script>
+    </body>
+    </html>
+  `);
+}
+
 // GET secure PDF stream
 router.get('/view/:id', appCheckVerification, async (req, res) => {
   try {
@@ -193,8 +457,14 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
       const isTrial = String(pdf.id) === String(freeTrialId);
 
       if (!isTrial) {
-        if (!lead || !lead.verified) {
-          return res.status(403).json({ error: 'Mobile verification required to view this document.' });
+        const isSessionVerified = (req.session && req.session.pdfVerified) || (lead && lead.is_pro);
+        if (!isSessionVerified) {
+          const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+          if (acceptsHtml) {
+            return serveOtpVerificationPage(req, res, pdf);
+          } else {
+            return res.status(403).json({ error: 'Mobile verification required to view this document.' });
+          }
         }
       }
     }

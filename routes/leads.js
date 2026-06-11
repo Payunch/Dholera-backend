@@ -301,6 +301,121 @@ router.post('/onboard', async (req, res) => {
   }
 });
 
+// POST verify lead OTP and grant session access
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const name = cleanText(req.body?.name, 120);
+    const phone = cleanText(req.body?.phone, 20);
+    const firebaseToken = req.body?.firebaseToken;
+    const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
+    const sessionId = cleanText(req.body?.sessionId, 100);
+    const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
+
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Name and Phone number are required' });
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!isValidPhone(localPhone)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    // Firebase Token Verification
+    const admin = require('firebase-admin');
+    if (firebaseToken && admin.apps.length > 0) {
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
+        const tokenPhone = decodedToken.phone_number;
+        if (tokenPhone) {
+          const cleanTokenPhone = tokenPhone.replace(/\D/g, '').slice(-10);
+          if (cleanTokenPhone !== localPhone) {
+            return res.status(400).json({ error: 'Phone number mismatch with verified OTP.' });
+          }
+        } else {
+          return res.status(400).json({ error: 'Verification token does not contain a phone number.' });
+        }
+      } catch (err) {
+        console.error('[VerifyOTP] Token verification failed:', err.message);
+        return res.status(401).json({ error: 'OTP verification token is invalid or expired.' });
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      // Allow bypass in production only if App Check/Firebase is specifically bypass-configured
+      if (process.env.BYPASS_APP_CHECK !== 'true') {
+        return res.status(400).json({ error: 'Firebase OTP verification token is required in production.' });
+      }
+    }
+
+    // Find or create lead
+    let lead = await Lead.findOne({ where: { phone: localPhone } });
+    
+    if (lead) {
+      await lead.update({ 
+        name: name || lead.name, 
+        browserFingerprint: browserFingerprint || lead.browserFingerprint,
+        verified: true,
+        preferred_language: preferred_language || lead.preferred_language
+      });
+    } else {
+      const leadToken = `LT_${crypto.randomBytes(16).toString('hex')}`;
+      lead = await Lead.create({
+        name,
+        phone: localPhone,
+        lead_token: leadToken,
+        browserFingerprint,
+        verified: true,
+        source: 'OTP Onboard',
+        preferred_language
+      });
+    }
+
+    // Set Session access
+    if (req.session) {
+      req.session.pdfVerified = true;
+      req.session.verifiedLeadId = lead.id;
+    }
+
+    // AI Intelligence Update
+    await LeadIntelligenceService.updateLeadIntelligence(lead);
+
+    await logAuditEvent({
+      eventType: 'lead.otp_verify.success',
+      actorType: 'lead',
+      actorId: localPhone,
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { leadId: lead.id }
+    });
+
+    const { sendAdminNotification } = require('../services/notificationService');
+    await sendAdminNotification(
+      'New Lead Verified via OTP',
+      `${lead.name} (${lead.phone}) completed OTP verification and unlocked PDFs.`,
+      { 
+        type: 'lead_otp_verify', 
+        lead_id: lead.id.toString(),
+        name: lead.name,
+        phone: lead.phone,
+        createdAt: lead.createdAt.toISOString()
+      }
+    );
+
+    res.json({
+      success: true,
+      lead_token: lead.lead_token,
+      name: lead.name,
+      phone: lead.phone
+    });
+  } catch (err) {
+    console.error('Verify OTP error:', err);
+    res.status(500).json({ error: 'Failed to verify OTP' });
+  }
+});
+
 // POST save lead directly (LEGACY -> Redirect to onboard)
 router.post('/save-direct', async (req, res) => {
   req.url = '/onboard';
