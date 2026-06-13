@@ -451,19 +451,36 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
     const pdf = await PdfDocument.findByPk(req.params.id);
     if (!pdf) return res.status(404).json({ error: 'PDF not found.' });
 
-    // 2. Authorization (Verification check)
+    // 2. Authorization (Verification and Payment check)
     if (!isAdmin && pdf.is_protected) {
       const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
       const isTrial = String(pdf.id) === String(freeTrialId);
 
       if (!isTrial) {
-        const isSessionVerified = (req.session && req.session.pdfVerified) || (lead && lead.is_pro);
-        if (!isSessionVerified) {
+        // First, check OTP mobile verification
+        const isVerified = (req.session && req.session.pdfVerified) || (lead && lead.verified);
+        if (!isVerified) {
           const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
           if (acceptsHtml) {
             return serveOtpVerificationPage(req, res, pdf);
           } else {
             return res.status(403).json({ error: 'Mobile verification required to view this document.' });
+          }
+        }
+
+        // Second, check purchase if not Pro
+        const isPro = lead && lead.is_pro;
+        if (!isPro) {
+          const purchase = await PdfPurchase.findOne({
+            where: {
+              lead_id: lead.id,
+              pdf_id: { [Op.in]: [pdf.id, 0] }, // 0 is PRO_ACCESS
+              status: 'completed'
+            }
+          });
+
+          if (!purchase) {
+            return res.status(402).json({ error: 'Payment required to view this document.' });
           }
         }
       }

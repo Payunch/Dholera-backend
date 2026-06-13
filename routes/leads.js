@@ -219,14 +219,14 @@ router.get('/check-visitor/:fingerprint', async (req, res) => {
  */
 router.post('/onboard', async (req, res) => {
   try {
-    const name = cleanText(req.body?.name, 120);
+    const name = cleanText(req.body?.name, 120) || 'Verified Visitor';
     const phone = cleanText(req.body?.phone, 20);
     const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
     const sessionId = cleanText(req.body?.sessionId, 100);
     const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
 
-    if (!name || !phone) {
-      return res.status(400).json({ error: 'Name and Phone Number are required' });
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone Number is required' });
     }
 
     const normalizedPhone = normalizePhone(phone);
@@ -304,15 +304,15 @@ router.post('/onboard', async (req, res) => {
 // POST verify lead OTP and grant session access
 router.post('/verify-otp', async (req, res) => {
   try {
-    const name = cleanText(req.body?.name, 120);
+    const name = cleanText(req.body?.name, 120) || 'Verified Visitor';
     const phone = cleanText(req.body?.phone, 20);
     const firebaseToken = req.body?.firebaseToken;
     const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
     const sessionId = cleanText(req.body?.sessionId, 100);
     const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
 
-    if (!name || !phone) {
-      return res.status(400).json({ error: 'Name and Phone number are required' });
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
     }
 
     const normalizedPhone = normalizePhone(phone);
