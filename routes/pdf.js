@@ -482,7 +482,33 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
       let streamUrl = filePath;
 
-
+      try {
+        const parsed = new URL(filePath);
+        if (parsed.hostname === 'res.cloudinary.com') {
+          const parts = parsed.pathname.split('/');
+          const uploadIndex = parts.indexOf('upload');
+          if (uploadIndex !== -1) {
+            let publicIdParts = parts.slice(uploadIndex + 1);
+            if (publicIdParts[0] && publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
+              publicIdParts = publicIdParts.slice(1);
+            }
+            const fullPublicId = publicIdParts.join('/');
+            const extMatch = fullPublicId.match(/\.([a-z0-9]+)$/i);
+            const format = extMatch ? extMatch[1] : 'pdf';
+            const publicId = extMatch ? fullPublicId.slice(0, -extMatch[0].length) : fullPublicId;
+            
+            streamUrl = cloudinary.url(publicId, {
+              sign_url: true,
+              secure: true,
+              format: format,
+              type: 'upload',
+              resource_type: 'image'
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[PDF] Cloudinary signing failed:', err.message);
+      }
 
       await pipeRemoteUrl(streamUrl, res);
       return;
