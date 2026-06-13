@@ -96,31 +96,8 @@ const fileFilter = (req, file, cb) => {
   } else {
     cb(new Error(`Invalid file type: ${file.mimetype || 'unknown'}. Only images and PDFs are allowed!`), false);
   }
-};
-
-const dynamicStorage = {
-  _handleFile(req, file, cb) {
-    const isPdf = file.mimetype === 'application/pdf' || 
-                 path.extname(file.originalname).toLowerCase() === '.pdf';
-    if (isPdf || !hasCloudinaryConfig()) {
-      diskStorage._handleFile(req, file, cb);
-    } else {
-      cloudinaryStorage._handleFile(req, file, cb);
-    }
-  },
-  _removeFile(req, file, cb) {
-    const isPdf = file.mimetype === 'application/pdf' || 
-                 path.extname(file.originalname).toLowerCase() === '.pdf';
-    if (isPdf || !hasCloudinaryConfig()) {
-      diskStorage._removeFile(req, file, cb);
-    } else {
-      cloudinaryStorage._removeFile(req, file, cb);
-    }
-  }
-};
-
 const upload = multer({ 
-  storage: dynamicStorage,
+  storage: hasCloudinaryConfig() ? cloudinaryStorage : diskStorage,
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 } // Increased to 10MB for PDFs
 });
