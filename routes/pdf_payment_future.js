@@ -468,8 +468,21 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
           }
         }
 
-        // Second, check purchase if not Pro (Payment gateway removed temporarily)
-        // Access is granted directly after mobile OTP verification.
+        // Second, check purchase if not Pro
+        const isPro = lead && lead.is_pro;
+        if (!isPro) {
+          const purchase = await PdfPurchase.findOne({
+            where: {
+              lead_id: lead.id,
+              pdf_id: { [Op.in]: [pdf.id, 0] }, // 0 is PRO_ACCESS
+              status: 'completed'
+            }
+          });
+
+          if (!purchase) {
+            return res.status(402).json({ error: 'Payment required to view this document.' });
+          }
+        }
       }
     }
 
