@@ -280,7 +280,7 @@ const startServer = async () => {
   }
 
   try {
-    await sequelize.sync({ alter: shouldAlterSchema });
+    await sequelize.sync({ alter: false });
     console.log('[DB] Tables synced successfully.');
   } catch (err) {
     console.error('[DB] ❌ Failed to sync tables:', err);
