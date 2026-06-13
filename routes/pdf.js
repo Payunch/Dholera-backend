@@ -482,43 +482,7 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
 
       let streamUrl = filePath;
 
-      // ROADMAP PHASE 6: SECURE CLOUDINARY SIGNING
-      try {
-        const parsed = new URL(filePath);
-        if (parsed.hostname === 'res.cloudinary.com') {
-          const parts = parsed.pathname.split('/');
-          const uploadIndex = parts.indexOf('upload');
-          const privateIndex = parts.indexOf('private');
-          const authenticatedIndex = parts.indexOf('authenticated');
-          const typeIndex = uploadIndex !== -1 ? uploadIndex : (privateIndex !== -1 ? privateIndex : authenticatedIndex);
 
-          if (typeIndex !== -1) {
-            let publicIdParts = parts.slice(typeIndex + 1);
-
-            // Skip signature if present
-            if (publicIdParts[0] && publicIdParts[0].startsWith('s--') && publicIdParts[0].endsWith('--')) {
-              publicIdParts = publicIdParts.slice(1);
-            }
-
-            if (publicIdParts[0] && publicIdParts[0].startsWith('v') && /^\d+$/.test(publicIdParts[0].slice(1))) {
-              publicIdParts = publicIdParts.slice(1);
-            }
-
-            const fullPublicId = publicIdParts.join('/');
-            const extMatch = fullPublicId.match(/\.([a-z0-9]+)$/i);
-            const format = extMatch ? extMatch[1] : 'pdf';
-            const publicId = extMatch ? fullPublicId.slice(0, -extMatch[0].length) : fullPublicId;
-
-            // USE STORED METADATA FOR PERFECT SIGNING
-            streamUrl = cloudinary.utils.private_download_url(publicId, format, {
-              resource_type: pdf.resource_type || 'image',
-              type: pdf.storage_type || parts[typeIndex]
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('[PDF] Cloudinary signing failed:', err.message);
-      }
 
       await pipeRemoteUrl(streamUrl, res);
       return;
