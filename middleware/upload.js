@@ -96,6 +96,8 @@ const fileFilter = (req, file, cb) => {
   } else {
     cb(new Error(`Invalid file type: ${file.mimetype || 'unknown'}. Only images and PDFs are allowed!`), false);
   }
+};
+
 const upload = multer({ 
   storage: hasCloudinaryConfig() ? cloudinaryStorage : diskStorage,
   fileFilter: fileFilter,
