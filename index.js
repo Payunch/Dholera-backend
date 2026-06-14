@@ -196,14 +196,16 @@ app.use((req, res, next) => {
   if (isAuthMutation) return next();
 
   const isAdminSessionMutation = Boolean(req.session?.isAdmin || req.cookies?.admin_access_token || req.cookies?.admin_refresh_token);
-  const isPublicLeadMutation = [
+  const isPublicMutation = [
     '/api/leads',
     '/api/leads/onboard',
     '/api/leads/save-direct',
-    '/api/leads/track-returning'
+    '/api/leads/track-returning',
+    '/api/leads/verify-otp',
+    '/api/analytics/track'
   ].includes(req.path);
 
-  if (isAdminSessionMutation && !isPublicLeadMutation) {
+  if (isAdminSessionMutation && !isPublicMutation) {
     return csrfProtection(req, res, next);
   }
   return next();
