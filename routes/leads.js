@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const { Lead, PdfView, PdfDocument, Update, Setting } = require('../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
@@ -18,6 +19,31 @@ const LeadIntelligenceService = require('../services/leadIntelligence');
 const { cleanText, cleanEmail, cleanPathFragment, parsePositiveInt } = require('../utils/sanitize');
 const multer = require('multer');
 const memoryUpload = multer({ storage: multer.memoryStorage() });
+
+// Rate Limiters
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: { error: 'Too many OTP requests from this IP, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const formLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 15, // Limit each IP to 15 requests per windowMs
+  message: { error: 'Too many form submissions from this IP, please try again after an hour' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const formLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 15, // Limit each IP to 15 requests per windowMs
+  message: { error: 'Too many form submissions from this IP, please try again after an hour' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const isValidPhone = (phone) => {
   if (!phone) return false;
@@ -309,16 +335,8 @@ router.post('/onboard', onboardRateLimiter, async (req, res) => {
   }
 });
 
-// POST verify lead OTP and grant session access
-const otpRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 OTP verifications per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many verification attempts, please try again later.' }
-});
-
-router.post('/verify-otp', otpRateLimiter, async (req, res) => {
+// POST Verify OTP (Public)
+router.post('/verify-otp', otpLimiter, async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120) || 'Verified Visitor';
     const phone = cleanText(req.body?.phone, 20);
@@ -480,7 +498,11 @@ router.post('/track-returning', async (req, res) => {
     await LeadIntelligenceService.updateLeadIntelligence(lead);
 
     const leadContext = await getLeadContext(lead);
-    await maybeNotifyLeadIfHighInterest(lead, leadContext);
+    await maybeNotifyHighInterestLead(lead, leadContext);
+
+    // Trigger behavioral follow up if applicable (fire and forget)
+    const { maybeSendBehavioralFollowUp } = require('../services/leadNotifications');
+    maybeSendBehavioralFollowUp(lead).catch(err => console.error('Failed to send behavioral follow up:', err));
 
     res.json({ success: true, lead: { name: lead.name, phone: lead.phone } });
   } catch (err) {
@@ -683,7 +705,7 @@ router.get('/export', verifyToken, async (req, res) => {
 });
 
 // POST a new lead (Public)
-router.post('/', async (req, res) => {
+router.post('/', formLimiter, async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120);
     const source = cleanText(req.body?.source, 80);

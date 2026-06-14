@@ -22,7 +22,8 @@ class LeadIntelligenceService {
     score += Math.min((lead.visit_count || 0) * 5, 50);
     score += Math.min(Math.floor((lead.timeSpent || 0) / 30), 100);
     
-    if (lead.verified) score += 20;
+    if (lead.verified) score += 25; // Permanent verified bonus
+    if (lead.utm_source && lead.utm_source !== 'organic') score += 15; // Ads bonus
     if (lead.returning_visitor) score += 15;
     if (lead.is_pro) score += 50;
 

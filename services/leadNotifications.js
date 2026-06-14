@@ -191,10 +191,57 @@ const maybeSendWelcomeMessage = async (lead) => {
   }
 };
 
+const maybeSendBehavioralFollowUp = async (lead) => {
+  if (!lead?.phone || !lead?.verified) return { sent: false, reason: 'unverified_or_no_phone' };
+  
+  // Only send if they spent > 5 mins (300 secs) and read a PDF
+  if ((lead.timeSpent || 0) < 300) return { sent: false, reason: 'time_too_low' };
+  
+  let pages = [];
+  try {
+    pages = JSON.parse(lead.visited_pages || '[]');
+  } catch(e) {}
+  
+  if (!pages.includes('/pdf') && !pages.some(p => p.startsWith('/pdf/'))) {
+    return { sent: false, reason: 'no_pdf_viewed' };
+  }
+
+  // Prevent multiple follow-ups (if welcome message logic already handles counts, we check whatsapp_sent_count)
+  if ((lead.whatsapp_sent_count || 0) > 1) {
+    return { sent: false, reason: 'already_followed_up' };
+  }
+
+  try {
+    const { sendTemplateMessage, logWhatsAppActivity } = require('./whatsapp');
+    const lang = lead.preferred_language || 'en';
+    const templateName = 'followup_en'; // Fallback to EN if others don't exist
+
+    const result = await sendTemplateMessage({
+      phone: lead.phone,
+      templateName,
+      languageCode: 'en_US',
+      parameters: [lead.name || 'Investor']
+    });
+
+    if (lead.id) {
+      await logWhatsAppActivity({
+        leadId: lead.id,
+        messageSent: result.sent,
+        messageType: 'automated_followup',
+        templateName
+      });
+    }
+    return result;
+  } catch (err) {
+    return { sent: false, error: err.message };
+  }
+};
+
 module.exports = {
   isHighInterestLead,
   maybeNotifyHighInterestLead,
   maybeSendWelcomeMessage,
+  maybeSendBehavioralFollowUp,
   sendAdminWhatsAppAlert,
   sendAdminEmailAlert,
   buildLeadSummary

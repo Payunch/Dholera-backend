@@ -242,6 +242,39 @@ router.get('/detailed', verifyToken, async (req, res) => {
   }
 });
 
+// GET campaign analytics based on UTM source (Admin)
+router.get('/campaigns', verifyToken, async (req, res) => {
+  try {
+    const leads = await Lead.findAll({
+      attributes: [
+        'utm_source',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalVisitors'],
+        [sequelize.fn('SUM', sequelize.literal("CASE WHEN verified = 1 THEN 1 ELSE 0 END")), 'verifiedLeads']
+      ],
+      group: ['utm_source'],
+      order: [[sequelize.literal('totalVisitors'), 'DESC']]
+    });
+
+    const campaigns = leads.map(lead => {
+      const total = parseInt(lead.get('totalVisitors') || 0, 10);
+      const verified = parseInt(lead.get('verifiedLeads') || 0, 10);
+      const conversionRate = total > 0 ? ((verified / total) * 100).toFixed(1) : 0;
+      
+      return {
+        campaign: lead.utm_source || 'organic',
+        visitors: total,
+        verifiedLeads: verified,
+        conversionRate: parseFloat(conversionRate)
+      };
+    });
+
+    res.json({ success: true, campaigns });
+  } catch (err) {
+    console.error('[Analytics Campaigns] Error:', err);
+    res.status(500).json({ error: 'Failed to generate campaign analytics' });
+  }
+});
+
 
 // GET separate export for Blogs/Updates
 router.get('/export/updates', verifyToken, async (req, res) => {
