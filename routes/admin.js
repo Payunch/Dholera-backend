@@ -196,4 +196,26 @@ router.get('/db/raw/:tableName', verifyToken, async (req, res) => {
   }
 });
 
+// DELETE /api/admin/leads/purge
+router.delete('/leads/purge', verifyToken, async (req, res) => {
+  try {
+    const { Lead, PdfPurchase, PdfView, WhatsAppLog, VisitorSession, AuditLog } = require('../models');
+    
+    // Clear dependencies first to avoid FK errors
+    if (PdfPurchase) await PdfPurchase.destroy({ where: {} });
+    if (PdfView) await PdfView.destroy({ where: {} });
+    if (WhatsAppLog) await WhatsAppLog.destroy({ where: {} });
+    if (VisitorSession) await VisitorSession.destroy({ where: {} });
+    if (AuditLog) await AuditLog.destroy({ where: {} });
+    
+    // Finally clear leads
+    const count = await Lead.destroy({ where: {} });
+    
+    res.json({ success: true, count, message: `Successfully wiped ${count} leads and all associated test data.` });
+  } catch (err) {
+    console.error('Failed to purge leads:', err);
+    res.status(500).json({ error: 'Failed to purge leads data: ' + err.message });
+  }
+});
+
 module.exports = router;
