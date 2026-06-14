@@ -109,6 +109,11 @@ const Lead = sequelize.define('Lead', {
       key: 'id'
     }
   },
+  utm_source: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'organic'
+  }
 });
 
 module.exports = Lead;

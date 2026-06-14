@@ -675,6 +675,7 @@ router.post('/', async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120);
     const source = cleanText(req.body?.source, 80);
+    const utm_source = cleanText(req.body?.utm_source, 80) || 'organic';
     const sessionId = cleanText(req.body?.sessionId, 100);
     const phone = cleanText(req.body?.phone, 20);
     const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
@@ -700,10 +701,17 @@ router.post('/', async (req, res) => {
       }
     }
     
+    let score = 10; // Base score
+    if (source && source.toLowerCase().includes('site visit')) score += 50;
+    else if (source && source.toLowerCase().includes('contact')) score += 20;
+    if (utm_source !== 'organic') score += 10;
+
     const lead = await Lead.create({
       name,
       phone: localPhone,
       source: source || 'Website',
+      utm_source,
+      score,
       timeSpent,
       visited_pages: visitedPages,
       preferred_language
