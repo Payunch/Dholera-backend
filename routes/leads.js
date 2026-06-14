@@ -217,7 +217,15 @@ router.get('/check-visitor/:fingerprint', async (req, res) => {
  * Required: name, phone
  * No OTP verification. Just stores the lead and returns a token.
  */
-router.post('/onboard', async (req, res) => {
+const onboardRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // Limit each IP to 20 onboards per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many onboarding attempts from this IP, please try again later.' }
+});
+
+router.post('/onboard', onboardRateLimiter, async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120) || 'Verified Visitor';
     const phone = cleanText(req.body?.phone, 20);
@@ -302,7 +310,15 @@ router.post('/onboard', async (req, res) => {
 });
 
 // POST verify lead OTP and grant session access
-router.post('/verify-otp', async (req, res) => {
+const otpRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 OTP verifications per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification attempts, please try again later.' }
+});
+
+router.post('/verify-otp', otpRateLimiter, async (req, res) => {
   try {
     const name = cleanText(req.body?.name, 120) || 'Verified Visitor';
     const phone = cleanText(req.body?.phone, 20);
