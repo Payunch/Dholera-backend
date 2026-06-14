@@ -326,6 +326,7 @@ router.post('/verify-otp', otpRateLimiter, async (req, res) => {
     const browserFingerprint = cleanText(req.body?.browserFingerprint, 120);
     const sessionId = cleanText(req.body?.sessionId, 100);
     const preferred_language = cleanText(req.body?.preferred_language, 5) || 'en';
+    const utm_source = cleanText(req.body?.utm_source, 80);
 
     if (!phone) {
       return res.status(400).json({ error: 'Phone number is required' });
@@ -373,10 +374,14 @@ router.post('/verify-otp', otpRateLimiter, async (req, res) => {
         name: name || lead.name, 
         browserFingerprint: browserFingerprint || lead.browserFingerprint,
         verified: true,
-        preferred_language: preferred_language || lead.preferred_language
+        preferred_language: preferred_language || lead.preferred_language,
+        ...(utm_source && utm_source !== 'organic' && { utm_source })
       });
     } else {
       const leadToken = `LT_${crypto.randomBytes(16).toString('hex')}`;
+      let score = 25; // Base score for verified OTP
+      if (utm_source && utm_source !== 'organic') score += 10;
+      
       lead = await Lead.create({
         name,
         phone: localPhone,
@@ -384,7 +389,9 @@ router.post('/verify-otp', otpRateLimiter, async (req, res) => {
         browserFingerprint,
         verified: true,
         source: 'OTP Onboard',
-        preferred_language
+        preferred_language,
+        utm_source: utm_source || 'organic',
+        score
       });
     }
 
