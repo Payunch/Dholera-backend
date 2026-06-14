@@ -280,11 +280,11 @@ const startServer = async () => {
   }
 
   try {
-    if (shouldAlterSchema) {
-      console.log('[DB] Running robust schema patches for SQLite...');
-      await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => {});
-      await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => {});
-    }
+    // Always attempt robust schema patches for missing columns, 
+    // gracefully ignoring errors if columns already exist.
+    console.log('[DB] Running robust schema patches for SQLite...');
+    await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => {});
+    await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => {});
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log(`[DB] Tables synced successfully (Alter: ${shouldAlterSchema}).`);
   } catch (err) {
