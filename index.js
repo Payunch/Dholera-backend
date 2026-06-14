@@ -280,8 +280,8 @@ const startServer = async () => {
   }
 
   try {
-    await sequelize.sync({ alter: false });
-    console.log('[DB] Tables synced successfully.');
+    await sequelize.sync({ alter: shouldAlterSchema });
+    console.log(`[DB] Tables synced successfully (Alter: ${shouldAlterSchema}).`);
   } catch (err) {
     console.error('[DB] ❌ Failed to sync tables:', err);
     console.error('[DB] Try setting DB_SYNC_ALTER=true in .env to auto-migrate columns.');
