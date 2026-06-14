@@ -414,7 +414,7 @@ router.post('/verify-otp', otpRateLimiter, async (req, res) => {
       details: { leadId: lead.id }
     });
 
-    const { sendAdminNotification, maybeSendWelcomeMessage } = require('../services/notificationService');
+    const { sendAdminNotification } = require('../services/notificationService');
     await sendAdminNotification(
       'New Lead Verified via OTP',
       `${lead.name} (${lead.phone}) completed OTP verification and unlocked PDFs.`,
