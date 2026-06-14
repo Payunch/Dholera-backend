@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const rateLimit = require('express-rate-limit');
 const { Lead, PdfView, PdfDocument, Update, Setting } = require('../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
