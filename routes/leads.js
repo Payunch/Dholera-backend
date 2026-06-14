@@ -37,13 +37,6 @@ const formLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const formLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 15, // Limit each IP to 15 requests per windowMs
-  message: { error: 'Too many form submissions from this IP, please try again after an hour' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 const isValidPhone = (phone) => {
   if (!phone) return false;
