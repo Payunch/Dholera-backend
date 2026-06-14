@@ -165,7 +165,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     secure: isProd, // Only secure in production to allow local HTTP testing
-    sameSite: 'lax',
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge: 24 * 60 * 60 * 1000, // 1 day
     ...(cookieDomain && { domain: cookieDomain })
