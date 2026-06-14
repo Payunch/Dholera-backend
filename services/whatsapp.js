@@ -208,12 +208,23 @@ const sendWelcomeMessageOnWhatsapp = async ({ lead }) => {
     lead.name || 'Investor'
   ];
 
-  return sendTemplateMessage({
+  const result = await sendTemplateMessage({
     phone: lead.phone,
     templateName,
     languageCode: lang === 'hi' ? 'hi' : lang === 'gu' ? 'gu' : 'en_US',
     parameters
   });
+
+  if (lead.id) {
+    await logWhatsAppActivity({
+      leadId: lead.id,
+      messageSent: result.sent,
+      messageType: 'automated',
+      templateName
+    });
+  }
+
+  return result;
 };
 
 module.exports = {

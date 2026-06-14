@@ -414,7 +414,7 @@ router.post('/verify-otp', otpRateLimiter, async (req, res) => {
       details: { leadId: lead.id }
     });
 
-    const { sendAdminNotification } = require('../services/notificationService');
+    const { sendAdminNotification, maybeSendWelcomeMessage } = require('../services/notificationService');
     await sendAdminNotification(
       'New Lead Verified via OTP',
       `${lead.name} (${lead.phone}) completed OTP verification and unlocked PDFs.`,
@@ -426,6 +426,11 @@ router.post('/verify-otp', otpRateLimiter, async (req, res) => {
         createdAt: lead.createdAt.toISOString()
       }
     );
+
+    // Trigger automated welcome message asynchronously (fire and forget)
+    maybeSendWelcomeMessage(lead).catch(err => {
+      console.error('Failed to send automated welcome message:', err);
+    });
 
     res.json({
       success: true,
