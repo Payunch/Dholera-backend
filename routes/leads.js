@@ -409,6 +409,16 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
       });
     }
 
+    // Fallback 4: Guaranteed Jasper's Market fallback if they are on the wrong Meta App
+    if (!result.sent && result.error.includes('132001')) {
+      result = await sendTemplateMessage({
+        phone: normalizedPhone,
+        templateName: 'jaspers_market_order_confirmation_v1',
+        languageCode: 'en_US',
+        parameters: ['Investor', otpCode, 'ASAP'] 
+      });
+    }
+
     if (!result.sent) {
       console.error('WhatsApp OTP failed to send:', result.error);
       return res.status(500).json({ error: `WhatsApp Error: ${result.error}` });
