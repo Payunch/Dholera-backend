@@ -348,6 +348,11 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
     // Save to DB
     const { OtpVerification } = require('../models');
+    
+    // TEMPORARY FIX: Force sync this specific table in case the global DB sync 
+    // failed in production due to unrelated Postgres alter table constraints.
+    await OtpVerification.sync(); 
+    
     await OtpVerification.create({
       phone: localPhone,
       code: otpCode,
