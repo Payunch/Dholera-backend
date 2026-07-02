@@ -3,7 +3,7 @@ const { sendTemplateMessage } = require('./services/whatsapp');
 
 // Replace this with the phone number you just verified in your Meta Dashboard
 // Format: Include country code but no plus sign or spaces. Example for India: 919876543210
-const TEST_RECIPIENT_PHONE = "919876543210"; 
+const TEST_RECIPIENT_PHONE = "15556483583"; 
 
 async function runTest() {
   console.log('Testing WhatsApp Meta API Connection...');
