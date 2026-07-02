@@ -380,13 +380,13 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 
     if (!result.sent) {
       console.error('WhatsApp OTP failed to send:', result.error);
-      return res.status(500).json({ error: 'Failed to send OTP message. Ensure your WhatsApp templates are approved.' });
+      return res.status(500).json({ error: `WhatsApp Error: ${result.error}` });
     }
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (err) {
     console.error('Send OTP error:', err);
-    res.status(500).json({ error: 'Internal server error while sending OTP' });
+    res.status(500).json({ error: `Server Error: ${err.message}` });
   }
 });
 
