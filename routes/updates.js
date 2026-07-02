@@ -3,7 +3,7 @@ const router = express.Router();
 const { Update } = require('../models');
 const { verifyToken } = require('./auth');
 const { Op } = require('sequelize');
-const { cleanText } = require('../utils/sanitize');
+const { cleanText, cleanHtml } = require('../utils/sanitize');
 const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
 const { translateBlogPost } = require('../services/translationService');
@@ -164,7 +164,7 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
 
     const update = await Update.create({
       title: cleanText(title, 255),
-      content: cleanText(content, 50000),
+      content: cleanHtml(content, 50000),
       category: cleanText(category, 100) || 'General',
       published: published === 'true' || published === true || published === '1',
       imageUrl: finalImageUrl,
@@ -227,7 +227,7 @@ router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
 
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,
-      content: content !== undefined ? cleanText(content, 50000) : update.content,
+      content: content !== undefined ? cleanHtml(content, 50000) : update.content,
       category: category !== undefined ? (cleanText(category, 100) || 'General') : update.category,
       published: published !== undefined ? (published === 'true' || published === true || published === '1') : update.published,
       imageUrl: finalImageUrl,

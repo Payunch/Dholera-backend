@@ -9,6 +9,15 @@ const cleanText = (value, maxLen = 255) => {
     .slice(0, maxLen);
 };
 
+const cleanHtml = (value, maxLen = 50000) => {
+  if (value === undefined || value === null) return '';
+  return String(value)
+    // Strip null bytes and dangerous control chars BUT preserve \n, \r, \t
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim()
+    .slice(0, maxLen);
+};
+
 const cleanEmail = (value) => {
   const email = cleanText(value, 255).toLowerCase();
   if (!email) return '';
@@ -31,5 +40,6 @@ module.exports = {
   cleanText,
   cleanEmail,
   cleanPathFragment,
-  parsePositiveInt
+  parsePositiveInt,
+  cleanHtml
 };
