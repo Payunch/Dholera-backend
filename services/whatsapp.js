@@ -211,7 +211,7 @@ const sendWelcomeMessageOnWhatsapp = async ({ lead }) => {
   const result = await sendTemplateMessage({
     phone: lead.phone,
     templateName,
-    languageCode: lang === 'hi' ? 'hi' : lang === 'gu' ? 'gu' : 'en_US',
+    languageCode: lang === 'hi' ? 'hi' : lang === 'gu' ? 'gu' : 'en',
     parameters
   });
 

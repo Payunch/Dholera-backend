@@ -18,9 +18,9 @@ async function runTest() {
 
   const result = await sendTemplateMessage({
     phone: TEST_RECIPIENT_PHONE,
-    templateName: 'hello_world', // Meta's built-in default template
+    templateName: 'followup_en', 
     languageCode: 'en_US',
-    parameters: [] // hello_world takes no parameters
+    parameters: ['John Doe']
   });
 
   if (result.sent) {
