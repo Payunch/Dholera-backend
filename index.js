@@ -282,6 +282,13 @@ const startServer = async () => {
   }
 
   try {
+    // Manually add columns to SQLite since alter:true often fails
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN author VARCHAR(255);'); } catch (e) {}
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN tags TEXT;'); } catch (e) {}
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);'); } catch (e) {}
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoDescription TEXT;'); } catch (e) {}
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'); } catch (e) {}
+    
     // Always attempt robust schema patches for missing columns, 
     // gracefully ignoring errors if columns already exist.
     console.log('[DB] Running robust schema patches for SQLite...');
