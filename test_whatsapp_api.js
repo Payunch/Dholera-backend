@@ -14,7 +14,18 @@ async function runTest() {
     process.exit(1);
   }
 
-  console.log(`Sending test template "welcome_en" to ${TEST_RECIPIENT_PHONE}...`);
+  console.log('--- Testing otp_verification ---');
+  try {
+    const otpResponse = await sendTemplateMessage({
+      phone: TEST_RECIPIENT_PHONE,
+      templateName: 'otp_verification',
+      languageCode: 'en',
+      parameters: ['123456']
+    });
+    console.log('OTP Result:', otpResponse);
+  } catch (err) {
+    console.error('OTP Test Failed:', err);
+  }
 
   const result = await sendTemplateMessage({
     phone: TEST_RECIPIENT_PHONE,
