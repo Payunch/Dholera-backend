@@ -327,110 +327,6 @@ router.post('/onboard', onboardRateLimiter, async (req, res) => {
   }
 });
 
-// POST Send WhatsApp OTP
-router.post('/send-otp', otpLimiter, async (req, res) => {
-  try {
-    const phone = cleanText(req.body?.phone, 20);
-    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
-
-    const normalizedPhone = normalizePhone(phone);
-    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
-      ? normalizedPhone.slice(2)
-      : normalizedPhone;
-
-    if (!isValidPhone(localPhone)) {
-      return res.status(400).json({ error: 'Invalid phone number format' });
-    }
-
-    // Generate 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
-
-    // Save to DB
-    const { OtpVerification } = require('../models');
-    
-    // TEMPORARY FIX: Force sync this specific table in case the global DB sync 
-    // failed in production due to unrelated Postgres alter table constraints.
-    await OtpVerification.sync(); 
-    
-    await OtpVerification.create({
-      phone: localPhone,
-      code: otpCode,
-      expires_at: expiresAt
-    });
-
-    // Send via WhatsApp Meta API
-    const { sendTemplateMessage } = require('../services/whatsapp');
-    
-    // TEMPORARY HACK: Using the approved 'welcome_en' template to send the OTP code 
-    // because the 'otp_verification' template is blocked by Meta business verification.
-    const templateName = 'welcome_en'; 
-    
-    // Magic bypass for test number
-    if (localPhone === '15556483583') {
-      return res.json({ success: true, message: 'OTP sent (Bypass)' });
-    }
-
-    // Try welcome_en with 'en'
-    let result = await sendTemplateMessage({
-      phone: normalizedPhone,
-      templateName: 'welcome_en',
-      languageCode: 'en',
-      parameters: [otpCode] 
-    });
-
-    // Fallback 1: welcome_en with 'en_US'
-    if (!result.sent && result.error.includes('132001')) {
-      result = await sendTemplateMessage({
-        phone: normalizedPhone,
-        templateName: 'welcome_en',
-        languageCode: 'en_US',
-        parameters: [otpCode] 
-      });
-    }
-
-    // Fallback 2: Maybe they created otp_verification in en!
-    if (!result.sent && result.error.includes('132001')) {
-      result = await sendTemplateMessage({
-        phone: normalizedPhone,
-        templateName: 'otp_verification',
-        languageCode: 'en',
-        parameters: [otpCode] 
-      });
-    }
-
-    // Fallback 3: Maybe they created otp_verification in en_US!
-    if (!result.sent && result.error.includes('132001')) {
-      result = await sendTemplateMessage({
-        phone: normalizedPhone,
-        templateName: 'otp_verification',
-        languageCode: 'en_US',
-        parameters: [otpCode] 
-      });
-    }
-
-    // Fallback 4: Guaranteed Jasper's Market fallback if they are on the wrong Meta App
-    if (!result.sent && result.error.includes('132001')) {
-      result = await sendTemplateMessage({
-        phone: normalizedPhone,
-        templateName: 'jaspers_market_order_confirmation_v1',
-        languageCode: 'en_US',
-        parameters: ['Investor', otpCode, 'ASAP'] 
-      });
-    }
-
-    if (!result.sent) {
-      console.error('WhatsApp OTP failed to send:', result.error);
-      return res.status(500).json({ error: `WhatsApp Error: ${result.error}` });
-    }
-
-    res.json({ success: true, message: 'OTP sent successfully' });
-  } catch (err) {
-    console.error('Send OTP error:', err);
-    res.status(500).json({ error: `Server Error: ${err.message}` });
-  }
-});
-
 // POST Verify OTP (Public)
 router.post('/verify-otp', otpLimiter, async (req, res) => {
   try {
@@ -455,38 +351,30 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Invalid phone number format' });
     }
 
-    const otpCode = cleanText(req.body?.otpCode, 6); // Add otpCode to request
-    
-    // Check if test bypass
-    if (localPhone === '15556483583' && otpCode === '123456') {
-      // Allow test bypass
-    } else {
-      if (!otpCode || otpCode.length !== 6) {
-        return res.status(400).json({ error: 'A valid 6-digit OTP code is required.' });
+    // Firebase Token Verification
+    const admin = require('firebase-admin');
+    if (firebaseToken && admin.apps.length > 0) {
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
+        const tokenPhone = decodedToken.phone_number;
+        if (tokenPhone) {
+          const cleanTokenPhone = tokenPhone.replace(/\D/g, '').slice(-10);
+          if (cleanTokenPhone !== localPhone) {
+            return res.status(400).json({ error: 'Phone number mismatch with verified OTP.' });
+          }
+        } else {
+          return res.status(400).json({ error: 'Verification token does not contain a phone number.' });
+        }
+      } catch (err) {
+        console.error('[VerifyOTP] Token verification failed:', err.message);
+        return res.status(401).json({ error: 'OTP verification token is invalid or expired.' });
       }
-
-      const { OtpVerification } = require('../models');
-      const otpRecord = await OtpVerification.findOne({
-        where: {
-          phone: localPhone,
-          code: otpCode,
-          verified: false
-        },
-        order: [['createdAt', 'DESC']]
-      });
-
-      if (!otpRecord) {
-        return res.status(400).json({ error: 'Invalid or expired OTP.' });
+    } else if (process.env.NODE_ENV === 'production') {
+      // Allow bypass in production only if App Check/Firebase is specifically bypass-configured
+      if (process.env.BYPASS_APP_CHECK !== 'true') {
+        return res.status(400).json({ error: 'Firebase OTP verification token is required in production.' });
       }
-
-      if (new Date() > otpRecord.expires_at) {
-        return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
-      }
-
-      // Mark as verified
-      await otpRecord.update({ verified: true });
     }
-
 
     // Find or create lead
     let lead = await Lead.findOne({ where: { phone: localPhone } });
@@ -1215,23 +1103,6 @@ router.delete('/:id', verifyToken, async (req, res) => {
     });
     
     res.json({ success: true, message: 'Lead deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET Debug Templates (TEMPORARY)
-router.get('/debug-templates', async (req, res) => {
-  try {
-    const fetch = require('node-fetch'); // or global fetch if Node 18+
-    const url = `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`
-      }
-    });
-    const data = await response.json();
-    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
