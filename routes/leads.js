@@ -327,6 +327,61 @@ router.post('/onboard', onboardRateLimiter, async (req, res) => {
   }
 });
 
+// POST Send WhatsApp OTP
+router.post('/send-otp', otpLimiter, async (req, res) => {
+  try {
+    const phone = cleanText(req.body?.phone, 20);
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+    if (!isValidPhone(localPhone)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    // Save to DB
+    const { OtpVerification } = require('../models');
+    await OtpVerification.create({
+      phone: localPhone,
+      code: otpCode,
+      expires_at: expiresAt
+    });
+
+    // Send via WhatsApp Meta API
+    const { sendTemplateMessage } = require('../services/whatsapp');
+    const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME || 'otp_verification';
+    
+    // Magic bypass for test number
+    if (localPhone === '15556483583') {
+      return res.json({ success: true, message: 'OTP sent (Bypass)' });
+    }
+
+    const result = await sendTemplateMessage({
+      phone: normalizedPhone,
+      templateName,
+      languageCode: 'en',
+      parameters: [otpCode]
+    });
+
+    if (!result.sent) {
+      console.error('WhatsApp OTP failed to send:', result.error);
+      return res.status(500).json({ error: 'Failed to send OTP message. Ensure your WhatsApp templates are approved.' });
+    }
+
+    res.json({ success: true, message: 'OTP sent successfully' });
+  } catch (err) {
+    console.error('Send OTP error:', err);
+    res.status(500).json({ error: 'Internal server error while sending OTP' });
+  }
+});
+
 // POST Verify OTP (Public)
 router.post('/verify-otp', otpLimiter, async (req, res) => {
   try {
@@ -351,30 +406,38 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Invalid phone number format' });
     }
 
-    // Firebase Token Verification
-    const admin = require('firebase-admin');
-    if (firebaseToken && admin.apps.length > 0) {
-      try {
-        const decodedToken = await admin.auth().verifyIdToken(firebaseToken);
-        const tokenPhone = decodedToken.phone_number;
-        if (tokenPhone) {
-          const cleanTokenPhone = tokenPhone.replace(/\D/g, '').slice(-10);
-          if (cleanTokenPhone !== localPhone) {
-            return res.status(400).json({ error: 'Phone number mismatch with verified OTP.' });
-          }
-        } else {
-          return res.status(400).json({ error: 'Verification token does not contain a phone number.' });
-        }
-      } catch (err) {
-        console.error('[VerifyOTP] Token verification failed:', err.message);
-        return res.status(401).json({ error: 'OTP verification token is invalid or expired.' });
+    const otpCode = cleanText(req.body?.otpCode, 6); // Add otpCode to request
+    
+    // Check if test bypass
+    if (localPhone === '15556483583' && otpCode === '123456') {
+      // Allow test bypass
+    } else {
+      if (!otpCode || otpCode.length !== 6) {
+        return res.status(400).json({ error: 'A valid 6-digit OTP code is required.' });
       }
-    } else if (process.env.NODE_ENV === 'production') {
-      // Allow bypass in production only if App Check/Firebase is specifically bypass-configured
-      if (process.env.BYPASS_APP_CHECK !== 'true') {
-        return res.status(400).json({ error: 'Firebase OTP verification token is required in production.' });
+
+      const { OtpVerification } = require('../models');
+      const otpRecord = await OtpVerification.findOne({
+        where: {
+          phone: localPhone,
+          code: otpCode,
+          verified: false
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!otpRecord) {
+        return res.status(400).json({ error: 'Invalid or expired OTP.' });
       }
+
+      if (new Date() > otpRecord.expires_at) {
+        return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+      }
+
+      // Mark as verified
+      await otpRecord.update({ verified: true });
     }
+
 
     // Find or create lead
     let lead = await Lead.findOne({ where: { phone: localPhone } });

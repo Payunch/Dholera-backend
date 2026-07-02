@@ -13,6 +13,7 @@ const Translation = require('./Translation');
 const Project = require('./Project');
 const TpMap = require('./TpMap');
 const Portal = require('./Portal');
+const OtpVerification = require('./OtpVerification');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -58,5 +59,6 @@ module.exports = {
   Translation,
   Project,
   TpMap,
-  Portal
+  Portal,
+  OtpVerification
 };
