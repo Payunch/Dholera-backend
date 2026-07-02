@@ -29,8 +29,8 @@ async function runTest() {
 
   const result = await sendTemplateMessage({
     phone: TEST_RECIPIENT_PHONE,
-    templateName: 'followup_en', 
-    languageCode: 'en_US',
+    templateName: 'welcome_en', 
+    languageCode: 'en',
     parameters: ['John Doe']
   });
 
