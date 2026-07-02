@@ -142,7 +142,7 @@ router.get('/:id', async (req, res) => {
 // POST create update (Admin)
 router.post('/', verifyToken, upload.single('image'), async (req, res) => {
   try {
-    const { title, content, category, published, imageUrl, imagePosition, publishedAt } = req.body;
+    const { title, content, category, published, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -169,7 +169,12 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
       published: published === 'true' || published === true || published === '1',
       imageUrl: finalImageUrl,
       imagePosition: imagePosition || 'top',
-      publishedAt: publishedAt || new Date()
+      publishedAt: publishedAt || new Date(),
+      author: author || null,
+      tags: tags || null,
+      seoTitle: seoTitle || null,
+      seoDescription: seoDescription || null,
+      seoKeywords: seoKeywords || null
     });
 
     // Send push notification if published
@@ -205,7 +210,7 @@ router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
     const update = await Update.findByPk(req.params.id);
     if (!update) return res.status(404).json({ error: 'Update not found' });
 
-    const { title, content, category, published, imageUrl, imagePosition, publishedAt } = req.body;
+    const { title, content, category, published, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
     
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
@@ -227,7 +232,12 @@ router.put('/:id', verifyToken, upload.single('image'), async (req, res) => {
       published: published !== undefined ? (published === 'true' || published === true || published === '1') : update.published,
       imageUrl: finalImageUrl,
       imagePosition: imagePosition !== undefined ? imagePosition : update.imagePosition,
-      publishedAt: publishedAt !== undefined ? publishedAt : update.publishedAt
+      publishedAt: publishedAt !== undefined ? publishedAt : update.publishedAt,
+      author: author !== undefined ? author : update.author,
+      tags: tags !== undefined ? tags : update.tags,
+      seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle,
+      seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription,
+      seoKeywords: seoKeywords !== undefined ? seoKeywords : update.seoKeywords
     });
 
     res.json(update);

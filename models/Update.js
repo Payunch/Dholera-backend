@@ -43,6 +43,26 @@ const Update = sequelize.define('Update', {
     type: DataTypes.INTEGER,
     allowNull: true
   },
+  author: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  tags: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  seoTitle: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  seoDescription: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  seoKeywords: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   portal_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
