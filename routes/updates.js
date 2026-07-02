@@ -13,6 +13,33 @@ const path = require('path');
 const isRemotePath = (value = '') => /^https?:\/\//i.test(String(value).trim());
 
 // GET all updates
+router.get('/migrate-db-now', async (req, res) => {
+  try {
+    const { sequelize } = require('../models');
+    const results = [];
+    
+    const queries = [
+      'ALTER TABLE Updates ADD COLUMN author VARCHAR(255);',
+      'ALTER TABLE Updates ADD COLUMN tags TEXT;',
+      'ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);',
+      'ALTER TABLE Updates ADD COLUMN seoDescription TEXT;',
+      'ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'
+    ];
+
+    for (let q of queries) {
+      try {
+        await sequelize.query(q);
+        results.push({ query: q, status: 'success' });
+      } catch (err) {
+        results.push({ query: q, status: 'failed', error: err.message });
+      }
+    }
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const { search, all, lang } = req.query;
