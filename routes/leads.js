@@ -1210,4 +1210,21 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
+// GET Debug Templates (TEMPORARY)
+router.get('/debug-templates', async (req, res) => {
+  try {
+    const fetch = require('node-fetch'); // or global fetch if Node 18+
+    const url = `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`
+      }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
