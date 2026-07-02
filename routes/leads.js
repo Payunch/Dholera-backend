@@ -371,12 +371,43 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
       return res.json({ success: true, message: 'OTP sent (Bypass)' });
     }
 
-    const result = await sendTemplateMessage({
+    // Try welcome_en with 'en'
+    let result = await sendTemplateMessage({
       phone: normalizedPhone,
-      templateName,
+      templateName: 'welcome_en',
       languageCode: 'en',
-      parameters: [otpCode] // The OTP code (e.g. 123456) will replace {{1}} in the welcome message
+      parameters: [otpCode] 
     });
+
+    // Fallback 1: welcome_en with 'en_US'
+    if (!result.sent && result.error.includes('132001')) {
+      result = await sendTemplateMessage({
+        phone: normalizedPhone,
+        templateName: 'welcome_en',
+        languageCode: 'en_US',
+        parameters: [otpCode] 
+      });
+    }
+
+    // Fallback 2: Maybe they created otp_verification in en!
+    if (!result.sent && result.error.includes('132001')) {
+      result = await sendTemplateMessage({
+        phone: normalizedPhone,
+        templateName: 'otp_verification',
+        languageCode: 'en',
+        parameters: [otpCode] 
+      });
+    }
+
+    // Fallback 3: Maybe they created otp_verification in en_US!
+    if (!result.sent && result.error.includes('132001')) {
+      result = await sendTemplateMessage({
+        phone: normalizedPhone,
+        templateName: 'otp_verification',
+        languageCode: 'en_US',
+        parameters: [otpCode] 
+      });
+    }
 
     if (!result.sent) {
       console.error('WhatsApp OTP failed to send:', result.error);
