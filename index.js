@@ -272,7 +272,7 @@ app.use('/api/intelligence', require('./routes/intelligence'));
 const PORT = process.env.PORT || 3000;
 
 // Database Sync and Server Start
-const shouldAlterSchema = process.env.DB_SYNC_ALTER === 'true';
+const shouldAlterSchema = process.env.DB_SYNC_ALTER !== 'false';
 
 const startServer = async () => {
   const connected = await testConnection();
