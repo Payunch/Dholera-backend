@@ -152,7 +152,12 @@ router.get('/', async (req, res) => {
                     original_id: post.id,
                     published: true,
                     publishedAt: post.publishedAt,
-                    imageUrl: post.imageUrl
+                    imageUrl: post.imageUrl,
+                    author: post.author,
+                    tags: post.tags,
+                    seoTitle: post.seoTitle,
+                    seoDescription: post.seoDescription,
+                    seoKeywords: post.seoKeywords
                   });
                   console.log(`[Auto-Translate] Stored translation for post ${post.id}`);
                 }
@@ -223,7 +228,12 @@ router.get('/:id', async (req, res) => {
                  original_id: original.id,
                  published: true,
                  publishedAt: original.publishedAt,
-                 imageUrl: original.imageUrl
+                 imageUrl: original.imageUrl,
+                 author: original.author,
+                 tags: original.tags,
+                 seoTitle: original.seoTitle,
+                 seoDescription: original.seoDescription,
+                 seoKeywords: original.seoKeywords
                });
              }
            }
