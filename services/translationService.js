@@ -6,6 +6,7 @@
  */
 
 const translate = require('translate-google');
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function translateInChunks(text, lang) {
   if (!text) return text;
@@ -35,6 +36,10 @@ async function translateInChunks(text, lang) {
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
     console.log(`    [Chunk ${i+1}/${chunks.length}] Translating ${chunk.length} chars...`);
+    
+    // Add a 2-second delay between chunks to respect rate limits
+    if (i > 0) await sleep(2000);
+    
     const translatedChunk = await translate(chunk, { to: lang });
     translatedText += translatedChunk;
   }
