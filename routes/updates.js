@@ -184,6 +184,11 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Update not found' });
     }
 
+    // NEW: Reject direct access to surrogate translated IDs to prevent URL bypassing
+    if (update.original_id !== null) {
+      return res.status(404).json({ error: 'Translations cannot be accessed directly by ID. Use ?lang= on the canonical ID.' });
+    }
+
     // If a different language is requested, try to find the linked translation
     if (targetLang !== update.lang) {
       const originalId = update.original_id || update.id;
