@@ -23,7 +23,13 @@ router.get('/migrate-db-now', async (req, res) => {
       let modified = false;
       
       // Cleanup old contact text from DB
-      if (content.includes('dholerahub.com') || content.includes('7435808031') || content.includes('Contact us today')) {
+      if (content.includes('dholerahub.com') || content.includes('7435808031') || content.includes('Contact us today') || content.includes('Want to learn more about Dholera?')) {
+        
+        // Remove old banners
+        content = content.replace(/<div class="mt-8 rounded-2xl bg-slate-50[^]*?Contact Us Now<\/a>[\s\S]*?<\/div>/g, '');
+        content = content.replace(/<div class="mt-8 rounded-2xl bg-slate-50[^]*?<\/div>/g, '');
+        
+        // Remove old text paragraphs
         content = content.replace(/<p[^>]*>[\s\S]*?(?:7435808031|dholerahub\.com|Contact us today|Call\/WhatsApp)[\s\S]*?<\/p>/gi, '');
         content = content.replace(/📞[\s\S]*?7435808031/g, '');
         content = content.replace(/🌐[\s\S]*?dholerahub\.com/g, '');
