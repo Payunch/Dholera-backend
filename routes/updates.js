@@ -51,8 +51,8 @@ router.get('/', async (req, res) => {
       where.published = true;
     }
 
-    // Filter by language
-    where.lang = targetLang;
+    // Always fetch English updates as the base list
+    where.lang = 'en';
 
     if (search) {
       where[Op.or] = [
@@ -67,41 +67,27 @@ router.get('/', async (req, res) => {
       order: [['publishedAt', 'DESC']]
     });
 
-    // AUTO-TRANSLATE TOOL (FALLBACK)
-    // If no updates found for this language, try to translate the English ones
-    if (updates.length === 0 && targetLang !== 'en') {
-       const englishUpdates = await Update.findAll({
-         where: { ...where, lang: 'en' },
-         order: [['publishedAt', 'DESC']]
-       });
-
-       if (englishUpdates.length > 0) {
-         console.log(`[Auto-Translate] Listing fallback to ${targetLang}...`);
-         const translatedList = [];
-         for (const post of englishUpdates) {
-            try {
-              let trans = await Update.findOne({ where: { original_id: post.id, lang: targetLang } });
-              if (!trans) {
-                const results = await translateBlogPost(post, [targetLang]);
-                if (results && results[0]) {
-                  trans = await Update.create({
-                    ...results[0],
-                    lang: targetLang,
-                    original_id: post.id,
-                    published: true,
-                    publishedAt: post.publishedAt,
-                    imageUrl: post.imageUrl
-                  });
-                }
-              }
-              if (trans) translatedList.push(trans);
-              else translatedList.push(post);
-            } catch (err) {
-              translatedList.push(post);
-            }
-         }
-         updates = translatedList;
-       }
+    if (targetLang !== 'en') {
+      // Fetch all existing translations for the target language
+      const existingTranslations = await Update.findAll({
+        where: { lang: targetLang }
+      });
+      
+      const translationMap = {};
+      for (const t of existingTranslations) {
+        if (t.original_id) translationMap[t.original_id] = t;
+      }
+      
+      const translatedList = [];
+      for (const post of updates) {
+        if (translationMap[post.id]) {
+          translatedList.push(translationMap[post.id]);
+        } else {
+          // If no translation exists, fallback to English post so it doesn't disappear
+          translatedList.push(post);
+        }
+      }
+      updates = translatedList;
     }
 
     res.json(updates);
