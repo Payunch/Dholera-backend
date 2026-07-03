@@ -79,14 +79,57 @@ router.get('/', async (req, res) => {
       }
       
       const translatedList = [];
+      const toTranslate = [];
       for (const post of updates) {
         if (translationMap[post.id]) {
           translatedList.push(translationMap[post.id]);
         } else {
           // If no translation exists, fallback to English post so it doesn't disappear
           translatedList.push(post);
+          toTranslate.push(post);
         }
       }
+      
+      // BACKGROUND TRANSLATION & STORE (Fire and Forget)
+      if (toTranslate.length > 0) {
+        console.log(`[Auto-Translate] Background translating ${toTranslate.length} posts to ${targetLang}...`);
+        (async () => {
+          for (const post of toTranslate) {
+            try {
+              // Double check to prevent duplicates
+              const exists = await Update.findOne({ where: { original_id: post.id, lang: targetLang } });
+              if (!exists) {
+                const results = await translateBlogPost(post, [targetLang]);
+                if (results && results[0]) {
+                  let finalContent = results[0].content;
+                  
+                  // Append Localized Contact Block
+                  if (targetLang === 'hi') {
+                    finalContent += "\n\n<p><strong>क्या आप धोलेरा स्मार्ट सिटी में निवेश करने के लिए तैयार हैं?</strong></p>\n<p>विशेषज्ञ मार्गदर्शन के लिए <a href=\"https://dholeraplatform.com/contact\">dholeraplatform.com/contact</a> पर आज ही हमसे संपर्क करें, या सीधे <a href=\"https://wa.me/917435808031\">+91 7435808031</a> पर हमें WhatsApp करें।</p>";
+                  } else if (targetLang === 'gu') {
+                    finalContent += "\n\n<p><strong>શું તમે ધોલેરા સ્માર્ટ સિટીમાં રોકાણ કરવા માટે તૈયાર છો?</strong></p>\n<p>નિષ્ણાત માર્ગદર્શન માટે <a href=\"https://dholeraplatform.com/contact\">dholeraplatform.com/contact</a> પર આજે જ અમારો સંપર્ક કરો અથવા સીધો <a href=\"https://wa.me/917435808031\">+91 7435808031</a> પર અમને WhatsApp કરો.</p>";
+                  }
+
+                  await Update.create({
+                    title: results[0].title,
+                    content: finalContent,
+                    category: post.category,
+                    lang: targetLang,
+                    original_id: post.id,
+                    published: true,
+                    publishedAt: post.publishedAt,
+                    imageUrl: post.imageUrl
+                  });
+                  console.log(`[Auto-Translate] Stored translation for post ${post.id}`);
+                }
+              }
+            } catch (err) {
+              console.error(`[Auto-Translate Error] Post ${post.id}:`, err.message);
+            }
+          }
+        })();
+      }
+      
       updates = translatedList;
     }
 
