@@ -1108,4 +1108,92 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
+// POST Google Ads Webhook
+router.post('/webhook/google-ads', async (req, res) => {
+  try {
+    const payload = req.body;
+    const webhookKey = process.env.GOOGLE_ADS_WEBHOOK_KEY || 'dholera_secret_key_2026';
+    
+    // 1. Verify Key
+    if (payload.google_key !== webhookKey) {
+      console.warn('Invalid Google Ads Webhook Key received');
+      return res.status(401).json({ error: 'Unauthorized key' });
+    }
+    
+    // 2. Extract Data
+    let name = 'Google Ads Lead';
+    let phone = '';
+    let email = '';
+    
+    if (Array.isArray(payload.user_column_data)) {
+      for (const field of payload.user_column_data) {
+        if (field.column_id === 'FULL_NAME' || field.column_name === 'Full Name' || field.column_name === 'Name') name = field.string_value;
+        if (field.column_id === 'PHONE_NUMBER' || field.column_name === 'User Phone' || field.column_name === 'Phone number') phone = field.string_value;
+        if (field.column_id === 'EMAIL' || field.column_name === 'User Email' || field.column_name === 'Email') email = field.string_value;
+      }
+    }
+    
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone is missing in payload' });
+    }
+    
+    // 3. Normalize Phone
+    const normalizedPhone = normalizePhone(phone);
+    const localPhone = normalizedPhone.startsWith('91') && normalizedPhone.length === 12
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+      
+    // 4. Save to DB
+    const [lead, created] = await Lead.findOrCreate({
+      where: { phone: localPhone },
+      defaults: {
+        name: cleanText(name, 120),
+        phone: localPhone,
+        source: payload.is_test ? 'Google Ads (Test)' : 'Google Ads',
+        utm_source: 'google_ads',
+        score: payload.is_test ? 0 : 75, // High score for ads
+        verified: true, // Lead form phone is pre-verified by Google
+        email: email ? cleanText(email, 100) : null
+      }
+    });
+    
+    if (!created && !payload.is_test) {
+      await lead.update({ 
+        source: 'Google Ads',
+        utm_source: 'google_ads',
+        score: (lead.score || 0) + 20,
+        last_contacted: new Date()
+      });
+    }
+    
+    // 5. Intelligence & Notifications
+    if (!payload.is_test) {
+      const LeadIntelligenceService = require('../services/leadIntelligence');
+      await LeadIntelligenceService.updateLeadIntelligence(lead);
+      
+      const { sendAdminNotification } = require('../services/notificationService');
+      await sendAdminNotification(
+        'New Google Ads Lead 🚀',
+        `${lead.name} (${lead.phone}) just submitted the Google Ads form!`,
+        { 
+          type: 'lead_google_ads', 
+          lead_id: lead.id.toString(),
+          name: lead.name,
+          phone: lead.phone,
+          source: lead.source,
+          createdAt: lead.createdAt.toISOString()
+        }
+      );
+      
+      const { maybeSendWelcomeMessage } = require('../services/leadNotifications');
+      maybeSendWelcomeMessage(lead).catch(err => console.error('Failed to send welcome msg:', err));
+    }
+    
+    res.status(200).json({ success: true, message: 'Lead received successfully' });
+  } catch (err) {
+    console.error('Google Ads Webhook Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
