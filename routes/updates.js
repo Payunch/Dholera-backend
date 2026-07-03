@@ -167,7 +167,16 @@ router.get('/', async (req, res) => {
       updates = translatedList;
     }
 
-    res.json(updates);
+    // Mask the IDs so the frontend always links to the canonical English ID
+    const responseData = updates.map(u => {
+      const plain = typeof u.toJSON === 'function' ? u.toJSON() : u;
+      if (plain.original_id) {
+        plain.id = plain.original_id;
+      }
+      return plain;
+    });
+
+    res.json(responseData);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
