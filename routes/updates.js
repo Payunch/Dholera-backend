@@ -220,10 +220,12 @@ router.get('/:id', async (req, res) => {
          try {
            const original = update.lang === 'en' ? update : await Update.findByPk(originalId);
            if (original) {
-             const results = await translateBlogPost(original, [targetLang]);
-             if (results && results[0]) {
+             const results = await translateBlogPost(original.toJSON(), [targetLang]);
+             if (results && results[0] && results[0].content && results[0].title) {
                translated = await Update.create({
-                 ...results[0],
+                 title: results[0].title,
+                 content: results[0].content,
+                 category: original.category,
                  lang: targetLang,
                  original_id: original.id,
                  published: true,
@@ -235,9 +237,13 @@ router.get('/:id', async (req, res) => {
                  seoDescription: original.seoDescription,
                  seoKeywords: original.seoKeywords
                });
+             } else {
+               console.error(`[Fallback] Translation failed or returned empty content for post ${original.id} to ${targetLang}`);
              }
            }
-         } catch (e) {}
+         } catch (e) {
+           console.error(`[Fallback] Error during auto-translate for post ${originalId} to ${targetLang}:`, e.message);
+         }
       }
       if (translated) update = translated;
     }

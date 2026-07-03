@@ -7,6 +7,41 @@
 
 const translate = require('translate-google');
 
+async function translateInChunks(text, lang) {
+  if (!text) return text;
+  if (text.length < 4000) {
+    return await translate(text, { to: lang });
+  }
+
+  const parts = text.split(/(<\/p>|\n)/i);
+  const chunks = [];
+  let currentChunk = '';
+
+  for (const part of parts) {
+    if (part.trim() === '') {
+       currentChunk += part;
+       continue;
+    }
+    if ((currentChunk.length + part.length) > 4000 && currentChunk.trim().length > 0) {
+      chunks.push(currentChunk);
+      currentChunk = part;
+    } else {
+      currentChunk += part;
+    }
+  }
+  if (currentChunk.trim().length > 0) chunks.push(currentChunk);
+
+  let translatedText = '';
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    console.log(`    [Chunk ${i+1}/${chunks.length}] Translating ${chunk.length} chars...`);
+    const translatedChunk = await translate(chunk, { to: lang });
+    translatedText += translatedChunk;
+  }
+
+  return translatedText;
+}
+
 /**
  * Translates a blog payload into multiple languages.
  * @param {Object} payload { title, content, category }
@@ -21,7 +56,7 @@ async function translateBlogPost(payload, targetLangs = ['hi', 'gu']) {
       console.log(`[Translation] Translating "${payload.title}" to ${lang}...`);
       
       const translatedTitle = await translate(payload.title, { to: lang });
-      const translatedContent = await translate(payload.content, { to: lang });
+      const translatedContent = await translateInChunks(payload.content, lang);
       
       translations.push({
         ...payload,
