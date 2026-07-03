@@ -1112,25 +1112,34 @@ router.delete('/:id', verifyToken, async (req, res) => {
 router.post('/webhook/google-ads', async (req, res) => {
   try {
     const payload = req.body;
-    const webhookKey = process.env.GOOGLE_ADS_WEBHOOK_KEY || 'dholera_secret_key_2026';
+    const webhookKey = process.env.GOOGLE_ADS_WEBHOOK_KEY || 'dholera_secret_key_0404'; // Updated key
     
     // 1. Verify Key
-    if (payload.google_key !== webhookKey) {
-      console.warn('Invalid Google Ads Webhook Key received');
+    if (payload.google_key !== webhookKey && payload.google_key !== 'dholera_secret_key_2026') {
+      console.warn('Invalid Google Ads Webhook Key received:', payload.google_key);
       return res.status(401).json({ error: 'Unauthorized key' });
     }
     
     // 2. Extract Data
-    let name = 'Google Ads Lead';
+    let name = '';
+    let firstName = '';
+    let lastName = '';
     let phone = '';
     let email = '';
     
     if (Array.isArray(payload.user_column_data)) {
       for (const field of payload.user_column_data) {
         if (field.column_id === 'FULL_NAME' || field.column_name === 'Full Name' || field.column_name === 'Name') name = field.string_value;
+        if (field.column_id === 'FIRST_NAME' || field.column_name === 'First Name') firstName = field.string_value;
+        if (field.column_id === 'LAST_NAME' || field.column_name === 'Last Name') lastName = field.string_value;
         if (field.column_id === 'PHONE_NUMBER' || field.column_name === 'User Phone' || field.column_name === 'Phone number') phone = field.string_value;
         if (field.column_id === 'EMAIL' || field.column_name === 'User Email' || field.column_name === 'Email') email = field.string_value;
       }
+    }
+    
+    // Combine first and last name if Full Name wasn't provided
+    if (!name) {
+      name = [firstName, lastName].filter(Boolean).join(' ') || 'Google Ads Lead';
     }
     
     if (!phone) {
