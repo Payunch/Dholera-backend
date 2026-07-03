@@ -10,7 +10,26 @@ const { translateBlogPost } = require('../services/translationService');
 const upload = require('../middleware/upload');
 const path = require('path');
 
-const isRemotePath = (value = '') => /^https?:\/\//i.test(String(value).trim());
+// RECOVERY ENDPOINT
+router.post('/recover-post', async (req, res) => {
+  try {
+    const { Update } = require('../models');
+    const { id, content, lang } = req.body;
+    
+    // Find all posts that share this original_id (the translated posts)
+    // and delete them so they can be freshly translated from the recovered content
+    if (lang === 'en') {
+      await Update.destroy({ where: { original_id: id } });
+    }
+    
+    // Update the actual post
+    await Update.update({ content }, { where: { id } });
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.get('/migrate-db-now', async (req, res) => {
   try {
