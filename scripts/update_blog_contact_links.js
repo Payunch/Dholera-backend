@@ -10,29 +10,32 @@ async function run() {
     let content = update.content;
     let modified = false;
     
-    // Check if the content has the contact string
-    if (content.includes('7435808031') || content.includes('dholerahub.com/contact') || content.includes('Contact us today')) {
-      // Remove specific paragraphs containing these keywords
+    // Check if the content has the old banner or contact text
+    if (content.includes('Want to learn more about Dholera?') || content.includes('Contact Us Now') || content.includes('7435808031') || content.includes('dholerahub.com/contact') || content.includes('Contact us today')) {
+      
+      // Remove my custom banner
+      content = content.replace(/<div class="mt-8 rounded-2xl bg-slate-50[^]*?Contact Us Now<\/a>[\s\S]*?<\/div>/g, '');
+      content = content.replace(/<div class="mt-8 rounded-2xl bg-slate-50[^]*?<\/div>/g, '');
+      
+      // Remove any leftover old text blocks
       content = content.replace(/<p[^>]*>[\s\S]*?(?:7435808031|dholerahub\.com|Contact us today|Call\/WhatsApp)[\s\S]*?<\/p>/gi, '');
       content = content.replace(/📞[\s\S]*?7435808031/g, '');
       content = content.replace(/🌐[\s\S]*?dholerahub\.com/g, '');
       content = content.replace(/Contact us today[\s\S]*?Dholera SIR\./gi, '');
       
       const newContactBlock = `
-<div class="mt-8 rounded-2xl bg-slate-50 dark:bg-slate-800 p-8 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
-  <h4 class="wp-block-heading text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white mb-4">Want to learn more about Dholera?</h4>
-  <p class="text-slate-600 dark:text-slate-300 mb-6">Contact us today to discover verified land opportunities and get expert guidance on investing in Dholera SIR.</p>
-  <a href="/contact" class="inline-flex items-center justify-center rounded-full bg-[#FF7A00] px-8 py-3 text-sm font-black uppercase tracking-widest text-white transition-transform hover:scale-105 shadow-lg shadow-orange-600/10">Contact Us Now</a>
-</div>`;
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>7435808031</strong></a></p>
+<p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
+<p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`;
       
-      if (!content.includes('href="/contact" class="inline-flex')) {
+      if (!content.includes('href="https://dholeraplatform.com/contact"')) {
         content = content + newContactBlock;
       }
       modified = true;
     }
     
     if (modified) {
-      update.content = content;
+      update.content = content.trim();
       await update.save();
       count++;
       console.log(`Updated post: ${update.title}`);
