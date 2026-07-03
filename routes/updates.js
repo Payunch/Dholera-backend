@@ -12,29 +12,38 @@ const path = require('path');
 
 const isRemotePath = (value = '') => /^https?:\/\//i.test(String(value).trim());
 
-// GET all updates
 router.get('/migrate-db-now', async (req, res) => {
   try {
-    const { sequelize } = require('../models');
-    const results = [];
+    const { Update } = require('../models');
+    const updates = await Update.findAll();
     
-    const queries = [
-      'ALTER TABLE Updates ADD COLUMN author VARCHAR(255);',
-      'ALTER TABLE Updates ADD COLUMN tags TEXT;',
-      'ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);',
-      'ALTER TABLE Updates ADD COLUMN seoDescription TEXT;',
-      'ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'
-    ];
-
-    for (let q of queries) {
-      try {
-        await sequelize.query(q);
-        results.push({ query: q, status: 'success' });
-      } catch (err) {
-        results.push({ query: q, status: 'failed', error: err.message });
+    let count = 0;
+    for (const update of updates) {
+      let content = update.content;
+      let modified = false;
+      
+      // Cleanup old contact text from DB
+      if (content.includes('dholerahub.com') || content.includes('7435808031') || content.includes('Contact us today')) {
+        content = content.replace(/<p[^>]*>[\s\S]*?(?:7435808031|dholerahub\.com|Contact us today|Call\/WhatsApp)[\s\S]*?<\/p>/gi, '');
+        content = content.replace(/📞[\s\S]*?7435808031/g, '');
+        content = content.replace(/🌐[\s\S]*?dholerahub\.com/g, '');
+        content = content.replace(/Contact us today[\s\S]*?Dholera SIR\./gi, '');
+        
+        const newContactBlock = `\n<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>\n<p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>\n<p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`;
+        
+        if (!content.includes('href="https://dholeraplatform.com/contact"')) {
+          content = content + newContactBlock;
+        }
+        modified = true;
+      }
+      
+      if (modified) {
+        update.content = content.trim();
+        await update.save();
+        count++;
       }
     }
-    res.json({ results });
+    res.json({ message: `Updated contact block on ${count} posts!` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
