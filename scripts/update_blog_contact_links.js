@@ -10,13 +10,13 @@ async function run() {
     let content = update.content;
     let modified = false;
     
-    if (content.includes('dholerahub.com/contact') || content.includes('7435808031')) {
-      // Use regex to strip the contact lines
-      content = content.replace(/<p class="wp-block-paragraph"><strong><a href="https:\/\/dholerahub\.com\/contact\/".+?<\/a><\/strong><\/p>/g, '');
-      content = content.replace(/<p class="wp-block-paragraph"><strong>a href="https:\/\/dholerahub\.com\/contact\/".+?<\/a><\/strong><\/p>/g, '');
-      content = content.replace(/<p class="wp-block-paragraph"><strong>.+?7435808031.+?<\/strong><\/p>/g, '');
-      content = content.replace(/<p class="wp-block-paragraph"><strong>Contact us today.+?<\/p>/g, '');
-      content = content.replace(/<p class="wp-block-paragraph"><strong>(?:Y|📞|🌐).+?<\/strong><\/p>/g, '');
+    // Check if the content has the contact string
+    if (content.includes('7435808031') || content.includes('dholerahub.com/contact') || content.includes('Contact us today')) {
+      // Remove specific paragraphs containing these keywords
+      content = content.replace(/<p[^>]*>[\s\S]*?(?:7435808031|dholerahub\.com|Contact us today|Call\/WhatsApp)[\s\S]*?<\/p>/gi, '');
+      content = content.replace(/📞[\s\S]*?7435808031/g, '');
+      content = content.replace(/🌐[\s\S]*?dholerahub\.com/g, '');
+      content = content.replace(/Contact us today[\s\S]*?Dholera SIR\./gi, '');
       
       const newContactBlock = `
 <div class="mt-8 rounded-2xl bg-slate-50 dark:bg-slate-800 p-8 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
@@ -25,7 +25,7 @@ async function run() {
   <a href="/contact" class="inline-flex items-center justify-center rounded-full bg-[#FF7A00] px-8 py-3 text-sm font-black uppercase tracking-widest text-white transition-transform hover:scale-105 shadow-lg shadow-orange-600/10">Contact Us Now</a>
 </div>`;
       
-      if (!content.includes('href="/contact"')) {
+      if (!content.includes('href="/contact" class="inline-flex')) {
         content = content + newContactBlock;
       }
       modified = true;
