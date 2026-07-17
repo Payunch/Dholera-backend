@@ -69,7 +69,7 @@ async function publishTranslations() {
       published: true,
       publishedAt: new Date(),
       lang: "hi",
-      original_id: 44, // Using the English post ID from the previous step
+      original_id: 49, // Using the English post ID from the previous step
       author: "Dholera Admin",
       tags: "धोलेरा स्मार्ट सिटी, धोलेरा SIR, निवेश",
       seoTitle: "धोलेरा स्मार्ट सिटी में निवेश क्यों करें 2026",
@@ -88,7 +88,7 @@ async function publishTranslations() {
       published: true,
       publishedAt: new Date(),
       lang: "gu",
-      original_id: 44,
+      original_id: 49,
       author: "Dholera Admin",
       tags: "ધોલેરા સ્માર્ટ સિટી, ધોલેરા SIR, રોકાણ",
       seoTitle: "ધોલેરા સ્માર્ટ સિટીમાં શા માટે રોકાણ કરવું ૨૦૨૬",
