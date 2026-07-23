@@ -827,28 +827,7 @@ router.put('/:id/notes', verifyToken, async (req, res) => {
   }
 });
 
-// DELETE a lead (Admin)
-router.delete('/:id', verifyToken, async (req, res) => {
-  try {
-    const lead = await Lead.findByPk(req.params.id);
-    if (!lead) return res.status(404).json({ error: 'Lead not found' });
-    await lead.destroy();
 
-    await logAuditEvent({
-      eventType: 'lead.deleted',
-      actorType: 'admin',
-      actorId: req.user?.role || 'admin',
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { leadId: req.params.id }
-    });
-
-    res.json({ message: 'Lead deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // GET WhatsApp URL for a lead (Admin)
 router.get('/:id/whatsapp-url', verifyToken, async (req, res) => {
@@ -1084,29 +1063,7 @@ router.post('/system/restore', verifyToken, memoryUpload.single('file'), async (
   }
 });
 
-// DELETE lead (Admin Only)
-router.delete('/:id', verifyToken, async (req, res) => {
-  try {
-    const lead = await Lead.findByPk(req.params.id);
-    if (!lead) return res.status(404).json({ error: 'Lead not found' });
-    
-    await lead.destroy();
-    
-    await logAuditEvent({
-      eventType: 'lead.deleted',
-      actorType: 'admin',
-      actorId: req.user?.username || 'admin',
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { leadId: req.params.id, name: lead.name }
-    });
-    
-    res.json({ success: true, message: 'Lead deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 // POST Google Ads Webhook
 router.post('/webhook/google-ads', async (req, res) => {
@@ -1210,6 +1167,13 @@ router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const lead = await Lead.findByPk(req.params.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    
+    const { PdfView, WhatsAppLog, PdfPurchase } = require('../models');
+    
+    // Manually delete associated rows to prevent SQLITE_CONSTRAINT error
+    if (PdfView) await PdfView.destroy({ where: { lead_id: lead.id } });
+    if (WhatsAppLog) await WhatsAppLog.destroy({ where: { lead_id: lead.id } });
+    if (PdfPurchase) await PdfPurchase.destroy({ where: { lead_id: lead.id } });
     
     await lead.destroy();
     
