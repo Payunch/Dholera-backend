@@ -196,7 +196,7 @@ app.use((req, res, next) => {
   if (isAuthMutation) return next();
 
   const isAdminSessionMutation = Boolean(req.session?.isAdmin || req.cookies?.admin_access_token || req.cookies?.admin_refresh_token);
-  const isPublicMutation = [
+  const isPublicPath = [
     '/api/leads',
     '/api/leads/onboard',
     '/api/leads/save-direct',
@@ -204,6 +204,12 @@ app.use((req, res, next) => {
     '/api/leads/verify-otp',
     '/api/analytics/track'
   ].includes(req.path);
+  
+  // DELETE endpoints are protected by CORS preflight and verifyToken (JWT).
+  // Bypassing csurf here to avoid session-cookie domain issues across admin panels.
+  const isSafeDelete = req.method === 'DELETE' && (req.path.startsWith('/api/leads/') || req.path.startsWith('/api/updates/'));
+
+  const isPublicMutation = isPublicPath || isSafeDelete;
 
   if (isAdminSessionMutation && !isPublicMutation) {
     return csrfProtection(req, res, next);
