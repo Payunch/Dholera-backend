@@ -1205,4 +1205,29 @@ router.post('/webhook/google-ads', async (req, res) => {
   }
 });
 
+// DELETE a lead (Admin)
+router.delete('/:id', verifyToken, async (req, res) => {
+  try {
+    const lead = await Lead.findByPk(req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    
+    await lead.destroy();
+    
+    await logAuditEvent({
+      eventType: 'lead.deleted',
+      actorType: 'admin',
+      actorId: req.user?.role || 'admin',
+      success: true,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: { leadId: req.params.id, name: lead.name, phone: lead.phone }
+    });
+
+    res.json({ success: true, message: 'Lead deleted successfully' });
+  } catch (err) {
+    console.error('Failed to delete lead:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
