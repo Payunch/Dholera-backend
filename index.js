@@ -274,6 +274,12 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/preferences', require('./routes/preferences'));
 app.use('/api/content', require('./routes/content'));
 app.use('/api/intelligence', require('./routes/intelligence'));
+app.use('/api/tblmng', require('./routes/tblmng'));
+app.use('/api/user', require('./routes/user'));
+app.use('/api/generalsetting', require('./routes/generalsettings'));
+app.use('/api/invoicesetting', require('./routes/generalsettings'));
+app.use('/api/defaultentrysetting', require('./routes/generalsettings'));
+app.use('/api/import', require('./routes/import'));
 
 const PORT = process.env.PORT || 3000;
 
