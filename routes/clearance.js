@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { ClearanceModel, Lead } = require('../models');
 const { sendAdminNotification } = require('../services/notificationService');
+const { verifyToken } = require('./auth');
 
 const extractToken = (authHeader = '') => {
   if (!authHeader) return '';
@@ -90,8 +91,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PATCH /api/clearance/:id - Update a specific model
-router.patch('/:id', async (req, res) => {
+// PATCH /api/clearance/:id - Update a specific model (Admin only)
+router.patch('/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, configurationData, projectName } = req.body;

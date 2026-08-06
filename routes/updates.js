@@ -4,16 +4,16 @@ const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
 const updatesController = require('../controllers/updatesController');
 
-// RECOVERY ENDPOINT
-router.post('/recover-post', updatesController.recoverPost);
+// RECOVERY ENDPOINT — Admin only
+router.post('/recover-post', verifyToken, updatesController.recoverPost);
 
-// MIGRATE DB ENDPOINT
-router.get('/migrate-db-now', updatesController.migrateDbNow);
+// MIGRATE DB ENDPOINT — Admin only (was publicly accessible — CRITICAL FIX)
+router.get('/migrate-db-now', verifyToken, updatesController.migrateDbNow);
 
-// GET all updates
+// GET all updates (public — intentional)
 router.get('/', updatesController.getUpdates);
 
-// GET single update by ID
+// GET single update by ID (public — intentional)
 router.get('/:id', updatesController.getUpdateById);
 
 // POST create update (Admin)
@@ -25,7 +25,7 @@ router.put('/:id', verifyToken, upload.single('image'), updatesController.update
 // DELETE update (Admin)
 router.delete('/:id', verifyToken, updatesController.deleteUpdate);
 
-// POST one-time seed for production without shell access
-router.post('/seed/discover-dholera', updatesController.seedDiscoverDholera);
+// POST one-time seed — Admin only
+router.post('/seed/discover-dholera', verifyToken, updatesController.seedDiscoverDholera);
 
 module.exports = router;

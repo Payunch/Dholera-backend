@@ -5,8 +5,9 @@
 const express = require('express');
 const router = express.Router();
 const tblMngService = require('../services/tblMngService');
+const { verifyToken } = require('./auth');
 
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const data = req.body || {};
     const { Op, bint_acid, bint_acyear } = data;
