@@ -1,6 +1,22 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// ==========================================
+// PRIORITY 3: GLOBAL CRASH PREVENTION
+// ==========================================
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception:', err);
+  console.error('Stack Trace:', err.stack);
+  // Keep server alive, do not exit process
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
+  // Keep server alive, do not exit process
+});
+// ==========================================
+
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -308,6 +324,7 @@ const startServer = async () => {
     console.log('[DB] Running robust schema patches for SQLite...');
     await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => {});
     await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => {});
+    await sequelize.query("ALTER TABLE Updates ADD COLUMN isApproved BOOLEAN DEFAULT 0").catch(() => {});
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log(`[DB] Tables synced successfully (Alter: ${shouldAlterSchema}).`);
   } catch (err) {

@@ -29,6 +29,12 @@ const Update = sequelize.define('Update', {
     allowNull: false,
     defaultValue: true
   },
+  isApproved: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Safety Flag: Requires Admin Approval (Safe Harbor)'
+  },
   publishedAt: {
     type: DataTypes.DATE,
     allowNull: false,
