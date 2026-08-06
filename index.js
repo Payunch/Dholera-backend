@@ -15,6 +15,8 @@ const { buildOriginMatcher } = require('./utils/originMatcher');
 const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
 const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
 const BackupService = require('./services/backupService');
+const autoBlogService = require('./services/autoBlogService');
+const cron = require('node-cron');
 
 const http = require('http');
 const { Server } = require('socket.io');
@@ -323,6 +325,11 @@ const startServer = async () => {
 
     // Initialize Backup Service
     BackupService.init();
+
+    // Initialize Auto-Blog Service (runs daily at 8:00 AM)
+    cron.schedule('0 8 * * *', () => {
+      autoBlogService.runDaily();
+    });
   });
 };
 
