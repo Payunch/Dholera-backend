@@ -196,7 +196,7 @@ router.get('/', verifyToken, async (req, res) => {
       return plainLead;
     }));
 
-    res.json(leadsWithIntelligence);
+    res.json({ data: leadsWithIntelligence, total: count, page, pageSize: limit });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
