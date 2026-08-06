@@ -1,12 +1,12 @@
 /**
- * TblMngService.js - Node.js Table Management Service
+ * tblMngService.js - Node.js Table Management Service
  * Converted from PHP class/tblmng.php (Rite Mng Backend Concept)
  */
 
 const { sequelize } = require('../models');
 const { QueryTypes } = require('sequelize');
 
-class TblMngService {
+class tblMngService {
   constructor() {
     this.response = [];
   }
@@ -328,7 +328,7 @@ class TblMngService {
       `);
 
     } catch (err) {
-      console.error('[TblMngService] createTable_acid_yyyy Error:', err);
+      console.error('[tblMngService] createTable_acid_yyyy Error:', err);
       response.msgType = 'error';
       response.message = `Table creation error: ${err.message}`;
       response.errors.push(err.message);
@@ -338,4 +338,4 @@ class TblMngService {
   }
 }
 
-module.exports = new TblMngService();
+module.exports = new tblMngService();

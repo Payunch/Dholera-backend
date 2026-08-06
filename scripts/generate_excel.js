@@ -84,7 +84,7 @@ async function createExcel() {
         { module: 'PDF/Media', route: 'pdf.js', controller: '', model: 'PdfDocument.js, PdfView.js', service: 'cloudinary.js' },
         { module: 'WhatsApp', route: 'whatsapp.js', controller: '', model: 'WhatsAppLog.js', service: 'whatsapp.js' },
         { module: 'Analytics', route: 'analytics.js', controller: '', model: 'Analytics.js', service: '' },
-        { module: 'System/Settings', route: 'settings.js', controller: '', model: 'Setting.js', service: 'SettingsService.js' }
+        { module: 'System/Settings', route: 'settings.js', controller: '', model: 'Setting.js', service: 'settingsService.js' }
     ]);
     
     // Sheet 3: Module Detail (based on RiTe Account FR 1.xlsx format)

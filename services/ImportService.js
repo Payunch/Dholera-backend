@@ -1,9 +1,9 @@
 /**
- * ImportService.js - Data Import Service
+ * importService.js - Data Import Service
  * Converted from class/import.php and importdetail.php
  */
 
-class ImportService {
+class importService {
   async importSalesData(bint_acyear, bint_acid, bint_ci, username, salesData) {
     return {
       msgType: 'success',
@@ -19,4 +19,4 @@ class ImportService {
   }
 }
 
-module.exports = new ImportService();
+module.exports = new importService();

@@ -4,7 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
-const TblMngService = require('../services/TblMngService');
+const tblMngService = require('../services/tblMngService');
 
 router.post('/', async (req, res) => {
   try {
@@ -19,7 +19,7 @@ router.post('/', async (req, res) => {
         });
       }
 
-      const result = await TblMngService.createTable_acid_yyyy(bint_acid, bint_acyear);
+      const result = await tblMngService.createTable_acid_yyyy(bint_acid, bint_acyear);
       return res.json(result);
     }
 

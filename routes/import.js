@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const ImportService = require('../services/ImportService');
+const importService = require('../services/importService');
 
 router.post('/', async (req, res) => {
   try {
@@ -13,7 +13,7 @@ router.post('/', async (req, res) => {
     const { Op } = data;
 
     if (Op === 'ImportSalesData') {
-      const result = await ImportService.importSalesData(
+      const result = await importService.importSalesData(
         data.bint_acyear,
         data.bint_acid,
         data.bint_ci,
@@ -22,7 +22,7 @@ router.post('/', async (req, res) => {
       );
       return res.json(result);
     } else if (Op === 'ImportBankData') {
-      const result = await ImportService.importBankData(
+      const result = await importService.importBankData(
         data.bint_acyear,
         data.bint_acid,
         data.bank_data

@@ -4,7 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
-const UserService = require('../services/UserService');
+const userService = require('../services/userService');
 
 router.post('/', async (req, res) => {
   try {
@@ -12,13 +12,13 @@ router.post('/', async (req, res) => {
     const { Op } = data;
 
     if (Op === 'UserList') {
-      const result = await UserService.userList(data.bint_ci || 1, data.admin_cat);
+      const result = await userService.userList(data.bint_ci || 1, data.admin_cat);
       return res.json(result);
     } else if (Op === 'SaveUser') {
-      const result = await UserService.saveUser(data);
+      const result = await userService.saveUser(data);
       return res.json(result);
     } else if (Op === 'DeleteUser') {
-      const result = await UserService.deleteUser(data.edit_userid);
+      const result = await userService.deleteUser(data.edit_userid);
       return res.json(result);
     }
 

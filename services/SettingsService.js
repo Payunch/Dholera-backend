@@ -1,9 +1,9 @@
 /**
- * SettingsService.js - Settings Service (General, Invoice, Default Settings)
+ * settingsService.js - Settings Service (General, Invoice, Default Settings)
  * Converted from generalsettings.php, invoicesetting.php, defaultentrysetting.php
  */
 
-class SettingsService {
+class settingsService {
   async getGeneralSettings(bint_acid) {
     return {
       msgType: 'success',
@@ -56,4 +56,4 @@ class SettingsService {
   }
 }
 
-module.exports = new SettingsService();
+module.exports = new settingsService();

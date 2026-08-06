@@ -1,12 +1,12 @@
 /**
- * UserService.js - Node.js User Management Service
+ * userService.js - Node.js User Management Service
  * Converted from PHP class/user.php
  */
 
 const { sequelize } = require('../models');
 const { QueryTypes } = require('sequelize');
 
-class UserService {
+class userService {
   async userList(bint_ci, admin_cat = '') {
     try {
       const isSqlite = sequelize.getDialect() === 'sqlite';
@@ -55,4 +55,4 @@ class UserService {
   }
 }
 
-module.exports = new UserService();
+module.exports = new userService();

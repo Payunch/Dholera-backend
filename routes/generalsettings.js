@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const SettingsService = require('../services/SettingsService');
+const settingsService = require('../services/settingsService');
 
 router.post('/', async (req, res) => {
   try {
@@ -13,19 +13,19 @@ router.post('/', async (req, res) => {
     const { Op, bint_acid } = data;
 
     if (Op === 'GetGeneralSettings') {
-      const result = await SettingsService.getGeneralSettings(bint_acid || 1);
+      const result = await settingsService.getGeneralSettings(bint_acid || 1);
       return res.json(result);
     } else if (Op === 'SaveGeneralSettings') {
-      const result = await SettingsService.saveGeneralSettings(bint_acid || 1, data.setting);
+      const result = await settingsService.saveGeneralSettings(bint_acid || 1, data.setting);
       return res.json(result);
     } else if (Op === 'GetInvoiceSettings' || Op === 'GetBillSetting') {
-      const result = await SettingsService.getInvoiceSettings(bint_acid || 1);
+      const result = await settingsService.getInvoiceSettings(bint_acid || 1);
       return res.json(result);
     } else if (Op === 'SaveInvoiceSettings' || Op === 'SaveBillSetting') {
-      const result = await SettingsService.saveInvoiceSettings(bint_acid || 1, data.setting);
+      const result = await settingsService.saveInvoiceSettings(bint_acid || 1, data.setting);
       return res.json(result);
     } else if (Op === 'GetDefaultEntrySetting') {
-      const result = await SettingsService.getDefaultEntrySettings(bint_acid || 1);
+      const result = await settingsService.getDefaultEntrySettings(bint_acid || 1);
       return res.json(result);
     }
 
