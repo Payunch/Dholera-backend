@@ -17,3 +17,7 @@ frontend/.env
 backend/.venv/
 __pycache__/
 uploads/pdfs/*-mutool.pdf
+
+# ADK cleanup
+backups/*.sqlite
+myAgent.js
