@@ -4,6 +4,7 @@ const { cleanText, cleanHtml } = require('../utils/sanitize');
 const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
 const { translateBlogPost } = require('../services/translationService');
+const { verifyNewsWithGemini } = require('../services/autoBlogService');
 const path = require('path');
 
 const isRemotePath = (p) => p.startsWith('http://') || p.startsWith('https://');
@@ -208,6 +209,16 @@ exports.createUpdate = async (req, res) => {
 
     let finalImageUrl = cleanText(imageUrl, 500) || null;
 
+    // --- GEMINI AI CONTENT MODERATION (SAFE HARBOR) ---
+    // If the author is explicitly set (e.g. a user or agent upload) OR we just want to protect all inputs:
+    const verification = await verifyNewsWithGemini(title, content);
+    const isApproved = verification.verified;
+    const finalPublished = isApproved ? (published === 'true' || published === true || published === '1') : false;
+    
+    if (!isApproved) {
+      console.warn(`[Content Moderation] Blocked/Flagged Upload. Reason: ${verification.reason}`);
+    }
+
     if (req.file) {
       const filePath = req.file.secure_url || req.file.path;
       if (isRemotePath(filePath)) {
@@ -222,7 +233,8 @@ exports.createUpdate = async (req, res) => {
       title: cleanText(title, 255),
       content: cleanHtml(content, 50000),
       category: cleanText(category, 100) || 'General',
-      published: published === 'true' || published === true || published === '1',
+      published: finalPublished,
+      isApproved: isApproved,
       imageUrl: finalImageUrl,
       imagePosition: imagePosition || 'top',
       publishedAt: publishedAt || new Date(),
@@ -252,7 +264,7 @@ exports.updateUpdate = async (req, res) => {
     const update = await Update.findByPk(req.params.id);
     if (!update) return res.status(404).json({ error: 'Update not found' });
 
-    const { title, content, category, published, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
+    const { title, content, category, published, isApproved, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
     
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
@@ -267,11 +279,17 @@ exports.updateUpdate = async (req, res) => {
       }
     }
 
+    // Determine final values considering isApproved
+    const parsedIsApproved = isApproved !== undefined ? (isApproved === 'true' || isApproved === true || isApproved === '1') : update.isApproved;
+    const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
+    const finalPublished = parsedIsApproved ? parsedPublished : false; // Force unpublished if not approved
+
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,
       content: content !== undefined ? cleanHtml(content, 50000) : update.content,
       category: category !== undefined ? (cleanText(category, 100) || 'General') : update.category,
-      published: published !== undefined ? (published === 'true' || published === true || published === '1') : update.published,
+      published: finalPublished,
+      isApproved: parsedIsApproved,
       imageUrl: finalImageUrl,
       imagePosition: imagePosition !== undefined ? imagePosition : update.imagePosition,
       publishedAt: publishedAt !== undefined ? publishedAt : update.publishedAt,
