@@ -100,47 +100,54 @@ exports.login = async (req, res) => {
     clearLoginFailure(lockKey);
 
     req.session.regenerate(async (err) => {
-      if (err) {
-        console.error('Session regenerate error:', err);
-        return res.status(500).json({ error: 'Failed to create session' });
-      }
-
-      req.session.isAdmin = true;
-      req.session.username = username;
-      req.session.mfaEnabled = isMfaEnabled();
-
-      const tokens = issueAdminTokens({ username });
-      setAuthCookies(res, tokens);
-
       try {
-        await UserSession.create({
-          username,
-          ip: req.ip,
-          userAgent: req.headers['user-agent']
-        });
-      } catch (sessErr) {
-        console.error('Failed to create UserSession:', sessErr);
-      }
-
-      await logAuditEvent({
-        eventType: 'admin.login.success',
-        actorType: 'admin',
-        actorId: username,
-        success: true,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        details: {
-          mfaEnabled: isMfaEnabled(),
-          authMethod: 'session+jwt'
+        if (err) {
+          console.error('Session regenerate error:', err);
+          return res.status(500).json({ error: 'Failed to create session' });
         }
-      });
 
-      res.json({ 
-        ok: true, 
-        username, 
-        mfaEnabled: isMfaEnabled(),
-        token: tokens.accessToken 
-      });
+        req.session.isAdmin = true;
+        req.session.username = username;
+        req.session.mfaEnabled = isMfaEnabled();
+
+        const tokens = issueAdminTokens({ username });
+        setAuthCookies(res, tokens);
+
+        try {
+          await UserSession.create({
+            username,
+            ip: req.ip,
+            userAgent: req.headers['user-agent']
+          });
+        } catch (sessErr) {
+          console.error('Failed to create UserSession:', sessErr);
+        }
+
+        await logAuditEvent({
+          eventType: 'admin.login.success',
+          actorType: 'admin',
+          actorId: username,
+          success: true,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          details: {
+            mfaEnabled: isMfaEnabled(),
+            authMethod: 'session+jwt'
+          }
+        });
+
+        res.json({ 
+          ok: true, 
+          username, 
+          mfaEnabled: isMfaEnabled(),
+          token: tokens.accessToken 
+        });
+      } catch (innerErr) {
+        console.error('Unhandled error in session regenerate callback:', innerErr);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Internal server error during login setup' });
+        }
+      }
     });
   } else {
     const failure = registerLoginFailure(lockKey);
@@ -214,18 +221,25 @@ exports.logout = async (req, res) => {
     if (refreshToken) revokeRefreshToken(refreshToken);
     
     req.session.destroy(async (err) => {
-      clearAuthCookies(res);
-      if (username) {
-        await logAuditEvent({
-          eventType: 'admin.logout',
-          actorType: 'admin',
-          actorId: username,
-          success: true,
-          ip: req.ip,
-          userAgent: req.headers['user-agent']
-        });
+      try {
+        clearAuthCookies(res);
+        if (username) {
+          await logAuditEvent({
+            eventType: 'admin.logout',
+            actorType: 'admin',
+            actorId: username,
+            success: true,
+            ip: req.ip,
+            userAgent: req.headers['user-agent']
+          });
+        }
+        res.json({ ok: true });
+      } catch (innerErr) {
+        console.error('Unhandled error in session destroy callback:', innerErr);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Internal server error during logout' });
+        }
       }
-      res.json({ ok: true });
     });
   } catch (err) {
     res.status(500).json({ error: 'Logout failed' });
