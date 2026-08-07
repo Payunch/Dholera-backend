@@ -223,11 +223,12 @@ app.use((req, res, next) => {
     '/api/analytics/track'
   ].includes(req.path);
   
-  // DELETE endpoints are protected by CORS preflight and verifyToken (JWT).
+  // DELETE/PUT/POST endpoints for updates are protected by CORS preflight and verifyToken (JWT).
   // Bypassing csurf here to avoid session-cookie domain issues across admin panels.
   const isSafeDelete = req.method === 'DELETE' && (req.path.startsWith('/api/leads/') || req.path.startsWith('/api/updates/'));
+  const isSafeUpdateMutation = (req.method === 'PUT' || req.method === 'POST') && req.path.startsWith('/api/updates');
 
-  const isPublicMutation = isPublicPath || isSafeDelete;
+  const isPublicMutation = isPublicPath || isSafeDelete || isSafeUpdateMutation;
 
   if (isAdminSessionMutation && !isPublicMutation) {
     return csrfProtection(req, res, next);
