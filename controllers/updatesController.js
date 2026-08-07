@@ -317,6 +317,21 @@ exports.deleteUpdate = async (req, res) => {
   }
 };
 
+exports.fixLiveServer = async (req, res) => {
+  try {
+    // 1. Fix old blogs
+    await Update.update({ isApproved: true }, { where: { published: true } });
+    
+    // 2. Run auto blog right now (in background)
+    const autoBlogService = require('../services/autoBlogService');
+    autoBlogService.runDaily().catch(e => console.error(e));
+
+    res.json({ message: 'Live Server Fixed! Old blogs approved, and today\'s auto-blog is generating in the background.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.seedDiscoverDholera = async (req, res) => {
   try {
     const expectedKey = process.env.BLOG_SEED_KEY;

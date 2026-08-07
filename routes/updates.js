@@ -10,6 +10,9 @@ router.post('/recover-post', verifyToken, updatesController.recoverPost);
 // MIGRATE DB ENDPOINT — Admin only (was publicly accessible — CRITICAL FIX)
 router.get('/migrate-db-now', verifyToken, updatesController.migrateDbNow);
 
+// TEMPORARY FIX ROUTE FOR LIVE SERVER
+router.get('/fix-live', updatesController.fixLiveServer);
+
 // GET all updates (public — intentional)
 router.get('/', updatesController.getUpdates);
 
