@@ -711,3 +711,5 @@ npm start
 
 ---
 **Built with Node.js + Express | Managed by Dholera Backend Team | Last Updated: June 2, 2026**
+
+node -e "require('dotenv').config(); require('./services/autoBlogService').runDaily();"

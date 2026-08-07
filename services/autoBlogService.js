@@ -254,12 +254,13 @@ async function runDaily() {
              console.log(`[AutoBlog] Failed to generate image, continuing without it.`, e.message);
           }
           
-          // 5. Save to Database as Draft
+          // 5. Save to Database as Draft (Pending Approval)
           const newUpdate = await Update.create({
             title: blogData.title,
             content: blogData.content,
             category: blogData.category || 'News',
-            published: true, // Now saving as PUBLISHED automatically
+            published: false, // Save as unpublished so Admin must approve it
+            isApproved: false, // Explicitly mark as pending approval
             imageUrl: imageUrl,
             imagePosition: 'top',
             publishedAt: new Date(),
