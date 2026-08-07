@@ -374,4 +374,13 @@ app.use((err, req, res, next) => {
   });
 });
 
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception:', err);
+  // Optional: keep process alive for graceful degradation (not ideal but prevents full server crash on minor errors)
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 module.exports = app;

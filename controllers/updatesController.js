@@ -76,9 +76,10 @@ exports.getUpdates = async (req, res) => {
     const targetLang = lang || 'en';
     const where = {};
     
-    // Only show published updates unless 'all' is true (for admin)
+    // Only show published and approved updates unless 'all' is true (for admin)
     if (all !== 'true') {
       where.published = true;
+      where.isApproved = true;
     }
 
     // Always fetch English updates as the base list
