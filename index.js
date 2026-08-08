@@ -208,7 +208,7 @@ app.use((req, res, next) => {
   if (isSafeMethod) return next();
 
   const isAuthMutation = req.path === '/api/auth/login' || req.path === '/api/auth/logout';
-  
+
   // FIXED: Explicitly exclude login from CSRF during the credential check phase
   // CSRF is still enforced for all other admin mutations via the logic below.
   if (isAuthMutation) return next();
@@ -222,7 +222,7 @@ app.use((req, res, next) => {
     '/api/leads/verify-otp',
     '/api/analytics/track'
   ].includes(req.path);
-  
+
   // DELETE/PUT/POST endpoints for updates are protected by CORS preflight and verifyToken (JWT).
   // Bypassing csurf here to avoid session-cookie domain issues across admin panels.
   const isSafeDelete = req.method === 'DELETE' && (req.path.startsWith('/api/leads/') || req.path.startsWith('/api/updates/'));
@@ -301,6 +301,48 @@ app.use('/api/defaultentrysetting', require('./routes/generalsettings'));
 app.use('/api/import', require('./routes/import'));
 
 const PORT = process.env.PORT || 3000;
+const AUTO_BLOG_TIMEZONE = 'Asia/Kolkata';
+const AUTO_BLOG_TEST_DATE = '2026-08-08';
+
+// This cron expression includes today's IST date and the task stops after its
+// first invocation, preventing these test uploads from repeating tomorrow.
+function scheduleOneTimeAutoBlogTest(hour, minute, label) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: AUTO_BLOG_TIMEZONE,
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(new Date());
+  const day = parts.find(part => part.type === 'day').value;
+  const month = parts.find(part => part.type === 'month').value;
+  const year = parts.find(part => part.type === 'year').value;
+  const istDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  if (istDate !== AUTO_BLOG_TEST_DATE) return;
+  const currentMinutes = Number(parts.find(part => part.type === 'hour').value) * 60
+    + Number(parts.find(part => part.type === 'minute').value);
+  const scheduledMinutes = hour * 60 + minute;
+
+  // The 8:56 test may be deployed a few minutes late. Run it immediately only
+  // in the short gap before the 8:59 test; never catch it up on another day.
+  if (currentMinutes > scheduledMinutes) {
+    if (hour === 8 && minute === 56 && currentMinutes < 8 * 60 + 59) {
+      console.log('[AutoBlog] 8:56 AM test was deployed late; running it immediately.');
+      void autoBlogService.runDaily();
+    }
+    return;
+  }
+
+  const task = cron.schedule(`${minute} ${hour} ${day} ${month} *`, async () => {
+    task.stop();
+    console.log(`[AutoBlog] Running one-time ${label} test.`);
+    await autoBlogService.runDaily();
+  }, { timezone: AUTO_BLOG_TIMEZONE });
+
+  console.log(`[AutoBlog] One-time ${label} test scheduled for today at ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} IST.`);
+}
 
 // Database Sync and Server Start
 const shouldAlterSchema = process.env.DB_SYNC_ALTER !== 'false';
@@ -314,18 +356,18 @@ const startServer = async () => {
 
   try {
     // Manually add columns to SQLite since alter:true often fails
-    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN author VARCHAR(255);'); } catch (e) {}
-    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN tags TEXT;'); } catch (e) {}
-    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);'); } catch (e) {}
-    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoDescription TEXT;'); } catch (e) {}
-    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'); } catch (e) {}
-    
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN author VARCHAR(255);'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN tags TEXT;'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoDescription TEXT;'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'); } catch (e) { }
+
     // Always attempt robust schema patches for missing columns, 
     // gracefully ignoring errors if columns already exist.
     console.log('[DB] Running robust schema patches for SQLite...');
-    await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => {});
-    await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => {});
-    await sequelize.query("ALTER TABLE Updates ADD COLUMN isApproved BOOLEAN DEFAULT 0").catch(() => {});
+    await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => { });
+    await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => { });
+    await sequelize.query("ALTER TABLE Updates ADD COLUMN isApproved BOOLEAN DEFAULT 0").catch(() => { });
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log(`[DB] Tables synced successfully (Alter: ${shouldAlterSchema}).`);
   } catch (err) {
@@ -344,9 +386,15 @@ const startServer = async () => {
     // Initialize Backup Service
     BackupService.init();
 
-    // Initialize Auto-Blog Service (runs daily at 8:00 AM)
+    // One-time test uploads for today only. The normal schedule remains below.
+    scheduleOneTimeAutoBlogTest(9, 16, '9:16 AM');
+    scheduleOneTimeAutoBlogTest(9, 20, '9:20 AM');
+
+    // Initialize Auto-Blog Service (runs daily at 8:00 AM IST)
     cron.schedule('0 8 * * *', () => {
       autoBlogService.runDaily();
+    }, {
+      timezone: AUTO_BLOG_TIMEZONE
     });
   });
 };

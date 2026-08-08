@@ -7,6 +7,9 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const parser = new Parser();
+const AUTO_BLOG_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash-lite';
+const AUTO_BLOG_MAX_CANDIDATES = Math.max(1, Math.min(Number(process.env.AUTO_BLOG_MAX_CANDIDATES) || 1, 3));
+const AUTO_BLOG_USE_VISION_SELECTION = process.env.AUTO_BLOG_USE_VISION_SELECTION === 'true';
 
 // Configure the Gemini Client
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -25,23 +28,21 @@ Review the following news article title and content.
 News Title: ${title}
 News Content: ${content}
 
-Respond strictly in JSON format without markdown wrapping, like this:
-{
-  "verified": true/false,
-  "reason": "Brief explanation of your decision."
-}
+Respond with exactly one word and no punctuation: YES if all three checks pass; otherwise NO.
 `;
 
   try {
-    // Using gemini-3.5-flash for maximum reasoning and output quality, as requested
-    const model = ai.getGenerativeModel({ model: "gemini-3.5-flash" });
-    const response = await model.generateContent(prompt);
+    const model = ai.getGenerativeModel({ model: AUTO_BLOG_MODEL });
+    const response = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 32 }
+    });
     
-    let text = response.response.text();
-    if (text.startsWith('```json')) text = text.replace(/```json\n/, '').replace(/\n```$/, '');
-
-    const result = JSON.parse(text);
-    return result;
+    const answer = response.response.text().trim().toUpperCase();
+    return {
+      verified: answer === 'YES',
+      reason: answer === 'YES' ? 'Passed automated relevance and policy check.' : 'Rejected by automated relevance or policy check.'
+    };
   } catch (error) {
     console.error('[AutoBlog] Error verifying news:', error);
     return { verified: false, reason: 'Error communicating with Gemini API' };
@@ -64,7 +65,7 @@ Requirements for Editorial Quality:
 - **Risk Disclaimer:** Include a standard, brief risk disclaimer at the very end of the post (e.g., "Disclaimer: Real estate investments are subject to market risks...").
 
 Requirements for WordPress SEO Ranking:
-- **Length:** Write a comprehensive post between 800 and 1,200 words.
+- **Length:** Write a focused post between 650 and 800 words.
 - **Table of Contents:** Include a dynamic Table of Contents at the top using a <ul> list with anchor links (e.g., <a href="#section1">) to the corresponding H2 tags which must have matching id attributes (e.g., <h2 id="section1">).
 - **Introduction:** State the core answer/summary within the first 100 words, including the primary keyword.
 - **Structure:** Break text into 200-300 word sections. Use proper HTML tags (<h2>, <h3>, <p>, <ul>, <li>). 
@@ -90,9 +91,11 @@ Respond strictly in JSON format without markdown wrapping, like this:
 `;
 
   try {
-    // Using gemini-3.5-flash for maximum reasoning and output quality, as requested
-    const model = ai.getGenerativeModel({ model: "gemini-3.5-flash" });
-    const response = await model.generateContent(prompt);
+    const model = ai.getGenerativeModel({ model: AUTO_BLOG_MODEL });
+    const response = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 3072 }
+    });
     
     let text = response.response.text();
     if (text.startsWith('```json')) text = text.replace(/```json\n/, '').replace(/\n```$/, '');
@@ -137,7 +140,9 @@ async function generateImageForBlog(blogTitle) {
 
     let chosenImage = candidates[0]; // default to first
 
-    if (candidates.length > 1) {
+    // Image inputs are expensive. Use the local first-match unless this is
+    // explicitly enabled in the environment.
+    if (AUTO_BLOG_USE_VISION_SELECTION && candidates.length > 1) {
       // 5. Ask Gemini to analyze and pick the best one
       const promptParts = [
         { text: `You are an expert real estate editor. Which of the following images is the absolute best fit for a blog post titled: "${blogTitle}"? Respond STRICTLY with ONLY the exact filename of the best image. Do not explain.` }
@@ -157,7 +162,7 @@ async function generateImageForBlog(blogTitle) {
       }
 
       try {
-        const imageModel = ai.getGenerativeModel({ model: "gemini-3.5-flash" });
+        const imageModel = ai.getGenerativeModel({ model: AUTO_BLOG_MODEL });
         const response = await imageModel.generateContent(promptParts);
         const answer = response.response.text().trim();
         
@@ -212,8 +217,8 @@ async function runDaily() {
       return;
     }
 
-    // Process the top 3 items to find a verified one
-    for (let i = 0; i < Math.min(3, feed.items.length); i++) {
+    // The low-cost default uses one candidate. It can be raised to 3 by env var.
+    for (let i = 0; i < Math.min(AUTO_BLOG_MAX_CANDIDATES, feed.items.length); i++) {
       const item = feed.items[i];
       console.log(`[AutoBlog] Evaluating News: ${item.title}`);
 

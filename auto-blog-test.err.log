@@ -1,0 +1,13 @@
+[Notification] Firebase Service Account missing. Push notifications disabled.
+[Seed] Cloudinary seed URLs are not ready yet.
+[AutoBlog] Error verifying news: SyntaxError: Unterminated string in JSON at position 38 (line 1 column 39)
+    at JSON.parse (<anonymous>)
+    at verifyNewsWithGemini (C:\Desktop\JR\Dholera\Dholera-backend\services\autoBlogService.js:48:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.runDaily (C:\Desktop\JR\Dholera\Dholera-backend\services\autoBlogService.js:239:28)
+[AutoBlog] Error verifying news: SyntaxError: Unterminated string in JSON at position 25 (line 3 column 4)
+    at JSON.parse (<anonymous>)
+    at verifyNewsWithGemini (C:\Desktop\JR\Dholera\Dholera-backend\services\autoBlogService.js:48:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.runDaily (C:\Desktop\JR\Dholera\Dholera-backend\services\autoBlogService.js:239:28)
+    at async cron.schedule.timezone [as _execution] (C:\Desktop\JR\Dholera\Dholera-backend\index.js:334:5)
