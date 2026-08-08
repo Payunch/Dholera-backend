@@ -1,2 +1,9 @@
 [Notification] Firebase Service Account missing. Push notifications disabled.
 [Seed] Cloudinary seed URLs are not ready yet.
+[AutoBlog] Error generating blog post: SyntaxError: Expected ',' or '}' after property value in JSON at position 8640 (line 9 column 1)
+    at JSON.parse (<anonymous>)
+    at generateBlogPost (C:\Desktop\JR\Dholera\Dholera-backend\services\autoBlogService.js:108:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.runDaily (C:\Desktop\JR\Dholera\Dholera-backend\services\autoBlogService.js:266:26)
+    at async runOneTimeLiveBlogTest (C:\Desktop\JR\Dholera\Dholera-backend\index.js:349:22)
+    at async cron.schedule.timezone [as _execution] (C:\Desktop\JR\Dholera\Dholera-backend\index.js:342:5)

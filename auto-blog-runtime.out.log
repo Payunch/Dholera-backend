@@ -1,4 +1,4 @@
-◇ injected env (48) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (48) from .env // tip: ⌘ enable debugging { debug: true }
 [DB] Using persistent volume storage at /data/database.sqlite
 [DB] SQLite → /data/database.sqlite
 [Session] Using SQLite persistent store at \data\sessions.sqlite
@@ -9,6 +9,7 @@
 [Server] ✅ Running on port 3001 (development)
 [Socket] ⚡ Engine active
 📡 Backup Service Active: [0 0 * * *]
+[AutoBlog] One-time 9:45 AM live blog test scheduled for today at 09:45 IST.
 [Translation] Translating "Dholera: The Rise of India's Most Ambitious Smart City" to hi...
 [Translation] Translating "Dholera: The Rise of India's Most Ambitious Smart City" to gu...
 [Translation] Translating "The Silicon Valley of Industrial India: Dholera’s Semiconductor Ecosystem" to hi...
@@ -22,3 +23,13 @@
 [Translation] Translating "Why Smart Investors Are Turning Toward Emerging Real Estate Markets" to hi...
 [Translation] Translating "Why Smart Investors Are Turning Toward Emerging Real Estate Markets" to gu...
 [Seed] English blog posts are fully seeded.
+[AutoBlog] Running one-time 9:45 AM live blog test.
+[AutoBlog] Starting daily Dholera news auto-blog pipeline...
+[AutoBlog] Evaluating News: Tata’s Dholera fab eyes Entegris boost for chemical supply - The Economic Times
+[AutoBlog] News Rejected. Reason: Rejected by automated relevance or policy check.
+[AutoBlog] Evaluating News: Gujarat targets 7.5 GW under new AI data centre policy - Ahmedabad Mirror
+[AutoBlog] News Verified! Reason: Passed automated relevance and policy check.
+[AutoBlog] Evaluating News: Civil Lines by DNA Ventures Expands Its Footprint in the Dholera Growth Corridor with Strategic Acquisition of Over 500,000 Sq. Ft. - Business Standard
+[AutoBlog] News Rejected. Reason: Rejected by automated relevance or policy check.
+[AutoBlog] Daily run complete.
+[LiveBlog] No verified local draft was created, so nothing was sent to production.

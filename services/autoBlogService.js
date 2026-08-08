@@ -7,9 +7,11 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const parser = new Parser();
-const AUTO_BLOG_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash-lite';
-const AUTO_BLOG_MAX_CANDIDATES = Math.max(1, Math.min(Number(process.env.AUTO_BLOG_MAX_CANDIDATES) || 1, 3));
-const AUTO_BLOG_USE_VISION_SELECTION = process.env.AUTO_BLOG_USE_VISION_SELECTION === 'true';
+// Quality-first editorial pipeline. These defaults retain the original
+// three-source review and AI image-fit selection.
+const AUTO_BLOG_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash';
+const AUTO_BLOG_MAX_CANDIDATES = Math.max(1, Math.min(Number(process.env.AUTO_BLOG_MAX_CANDIDATES) || 3, 3));
+const AUTO_BLOG_USE_VISION_SELECTION = process.env.AUTO_BLOG_USE_VISION_SELECTION !== 'false';
 
 // Configure the Gemini Client
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -65,7 +67,7 @@ Requirements for Editorial Quality:
 - **Risk Disclaimer:** Include a standard, brief risk disclaimer at the very end of the post (e.g., "Disclaimer: Real estate investments are subject to market risks...").
 
 Requirements for WordPress SEO Ranking:
-- **Length:** Write a focused post between 650 and 800 words.
+- **Length:** Write a comprehensive post between 800 and 1,200 words.
 - **Table of Contents:** Include a dynamic Table of Contents at the top using a <ul> list with anchor links (e.g., <a href="#section1">) to the corresponding H2 tags which must have matching id attributes (e.g., <h2 id="section1">).
 - **Introduction:** State the core answer/summary within the first 100 words, including the primary keyword.
 - **Structure:** Break text into 200-300 word sections. Use proper HTML tags (<h2>, <h3>, <p>, <ul>, <li>). 
@@ -94,7 +96,10 @@ Respond strictly in JSON format without markdown wrapping, like this:
     const model = ai.getGenerativeModel({ model: AUTO_BLOG_MODEL });
     const response = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 3072 }
+      generationConfig: {
+        maxOutputTokens: 6000,
+        responseMimeType: 'application/json'
+      }
     });
     
     let text = response.response.text();
@@ -106,6 +111,25 @@ Respond strictly in JSON format without markdown wrapping, like this:
     console.error('[AutoBlog] Error generating blog post:', error);
     return null;
   }
+}
+
+/**
+ * Final local safety gate for generated copy. This catches high-risk claims
+ * before a draft reaches the admin panel, without adding another paid API call.
+ * It is a safeguard, not a guarantee of Google Ads approval.
+ */
+function hasUnsafeAdvertisingClaims(content) {
+  const prohibitedClaims = [
+    /\bguaranteed\s+(?:return|profit|income|approval|investment)/i,
+    /\b(?:100|one hundred)\s*%\s*(?:guaranteed|return|profit)/i,
+    /\brisk[-\s]?free\b/i,
+    /\bassured\s+(?:return|profit|income)/i,
+    /\bget\s+rich\s+quick/i,
+    /\bdouble\s+your\s+money\b/i,
+    /\bno\s+risk\b/i
+  ];
+
+  return prohibitedClaims.some(pattern => pattern.test(content || ''));
 }
 
 /**
@@ -217,7 +241,8 @@ async function runDaily() {
       return;
     }
 
-    // The low-cost default uses one candidate. It can be raised to 3 by env var.
+    // Review up to three news sources so a rejected or irrelevant first item
+    // does not prevent a quality blog from being produced.
     for (let i = 0; i < Math.min(AUTO_BLOG_MAX_CANDIDATES, feed.items.length); i++) {
       const item = feed.items[i];
       console.log(`[AutoBlog] Evaluating News: ${item.title}`);
@@ -242,6 +267,11 @@ async function runDaily() {
         
         if (blogData) {
           console.log(`[AutoBlog] Blog post generated. Title: ${blogData.title}`);
+
+          if (hasUnsafeAdvertisingClaims(blogData.content)) {
+            console.warn('[AutoBlog] Generated copy failed the advertising-claims safety gate. Draft not saved.');
+            continue;
+          }
           
           // Inject the requested Contact CTA at the very end
           const ctaHtml = `\n\n<div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
@@ -280,7 +310,7 @@ async function runDaily() {
           console.log(`[AutoBlog] Successfully created draft blog post with ID: ${newUpdate.id}`);
           
           // Only create one blog post per day
-          break; 
+          return newUpdate;
         }
       } else {
         console.log(`[AutoBlog] News Rejected. Reason: ${verification.reason}`);
@@ -288,8 +318,10 @@ async function runDaily() {
     }
     
     console.log('[AutoBlog] Daily run complete.');
+    return null;
   } catch (error) {
     console.error('[AutoBlog] Critical error during daily run:', error);
+    return null;
   }
 }
 
@@ -297,5 +329,6 @@ module.exports = {
   runDaily,
   verifyNewsWithGemini,
   generateBlogPost,
-  generateImageForBlog
+  generateImageForBlog,
+  hasUnsafeAdvertisingClaims
 };

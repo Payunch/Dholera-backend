@@ -32,6 +32,7 @@ const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
 const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
 const BackupService = require('./services/backupService');
 const autoBlogService = require('./services/autoBlogService');
+const { publishDraftToLive } = require('./services/liveBlogPublisher');
 const cron = require('node-cron');
 
 const http = require('http');
@@ -306,7 +307,7 @@ const AUTO_BLOG_TEST_DATE = '2026-08-08';
 
 // This cron expression includes today's IST date and the task stops after its
 // first invocation, preventing these test uploads from repeating tomorrow.
-function scheduleOneTimeAutoBlogTest(hour, minute, label) {
+function scheduleOneTimeAutoBlogTest(hour, minute, label, job = () => autoBlogService.runDaily()) {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: AUTO_BLOG_TIMEZONE,
     day: 'numeric',
@@ -325,12 +326,12 @@ function scheduleOneTimeAutoBlogTest(hour, minute, label) {
     + Number(parts.find(part => part.type === 'minute').value);
   const scheduledMinutes = hour * 60 + minute;
 
-  // The 8:56 test may be deployed a few minutes late. Run it immediately only
-  // in the short gap before the 8:59 test; never catch it up on another day.
+  // If deployment finishes a little after a one-time test minute, preserve the
+  // test by running it once immediately. Never carry it to another day.
   if (currentMinutes > scheduledMinutes) {
-    if (hour === 8 && minute === 56 && currentMinutes < 8 * 60 + 59) {
-      console.log('[AutoBlog] 8:56 AM test was deployed late; running it immediately.');
-      void autoBlogService.runDaily();
+    if (currentMinutes <= scheduledMinutes + 2) {
+      console.log(`[AutoBlog] ${label} test was deployed late; running it immediately.`);
+      void job();
     }
     return;
   }
@@ -338,10 +339,25 @@ function scheduleOneTimeAutoBlogTest(hour, minute, label) {
   const task = cron.schedule(`${minute} ${hour} ${day} ${month} *`, async () => {
     task.stop();
     console.log(`[AutoBlog] Running one-time ${label} test.`);
-    await autoBlogService.runDaily();
+    await job();
   }, { timezone: AUTO_BLOG_TIMEZONE });
 
   console.log(`[AutoBlog] One-time ${label} test scheduled for today at ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} IST.`);
+}
+
+async function runOneTimeLiveBlogTest() {
+  const localDraft = await autoBlogService.runDaily();
+  if (!localDraft) {
+    console.log('[LiveBlog] No verified local draft was created, so nothing was sent to production.');
+    return;
+  }
+
+  try {
+    const liveBlog = await publishDraftToLive(localDraft);
+    console.log(`[LiveBlog] Production draft ${liveBlog.alreadyExists ? 'already exists' : 'created'} with ID: ${liveBlog.id}`);
+  } catch (error) {
+    console.error('[LiveBlog] Failed to sync draft to production:', error.response?.data?.error || error.message);
+  }
 }
 
 // Database Sync and Server Start
@@ -387,8 +403,7 @@ const startServer = async () => {
     BackupService.init();
 
     // One-time test uploads for today only. The normal schedule remains below.
-    scheduleOneTimeAutoBlogTest(9, 16, '9:16 AM');
-    scheduleOneTimeAutoBlogTest(9, 20, '9:20 AM');
+    scheduleOneTimeAutoBlogTest(9, 55, '9:55 AM live blog', runOneTimeLiveBlogTest);
 
     // Initialize Auto-Blog Service (runs daily at 8:00 AM IST)
     cron.schedule('0 8 * * *', () => {
