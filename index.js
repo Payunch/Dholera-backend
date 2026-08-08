@@ -403,7 +403,7 @@ const startServer = async () => {
     BackupService.init();
 
     // One-time test uploads for today only. The normal schedule remains below.
-    scheduleOneTimeAutoBlogTest(9, 55, '9:55 AM live blog', runOneTimeLiveBlogTest);
+    scheduleOneTimeAutoBlogTest(9, 59, '9:59 AM live blog', runOneTimeLiveBlogTest);
 
     // Initialize Auto-Blog Service (runs daily at 8:00 AM IST)
     cron.schedule('0 8 * * *', () => {
