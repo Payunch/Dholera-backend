@@ -22,6 +22,28 @@ const readRequestMeta = (req) => ({
   userAgent: String(req.headers['user-agent'] || '').slice(0, 1000),
 });
 const isFourDigitPin = (value) => /^\d{4}$/.test(String(value || ''));
+let appUserColumnsPromise = null;
+
+async function getAppUserColumns() {
+  if (!appUserColumnsPromise) {
+    appUserColumnsPromise = (async () => {
+      const tableName = AppUser.getTableName();
+      const resolvedTableName = typeof tableName === 'object' && tableName !== null ? tableName.tableName : tableName;
+      const columns = await AppUser.sequelize.getQueryInterface().describeTable(resolvedTableName);
+      return new Set(Object.keys(columns));
+    })();
+  }
+  return appUserColumnsPromise;
+}
+
+async function safeUpdateUser(user, values) {
+  const columns = await getAppUserColumns();
+  const filtered = Object.fromEntries(
+    Object.entries(values).filter(([key]) => columns.has(key)),
+  );
+  if (Object.keys(filtered).length === 0) return user;
+  return user.update(filtered);
+}
 
 function configured(res) {
   if (JWT_SECRET && JWT_SECRET !== 'replace-me-too') return true;
@@ -62,7 +84,7 @@ exports.signup = async (req, res) => {
 
     // Best-effort metadata write; never block account creation if the live
     // schema has not yet been migrated for these optional fields.
-    await user.update({
+    await safeUpdateUser(user, {
       last_login_at: now,
       last_login_ip: meta.ip,
       last_login_user_agent: meta.userAgent,
@@ -70,8 +92,6 @@ exports.signup = async (req, res) => {
       signup_user_agent: meta.userAgent,
       accepted_terms_at: now,
       accepted_privacy_at: now,
-    }).catch((err) => {
-      console.error('[userAuth.signup] optional metadata update skipped:', err.message);
     });
 
     return res.status(201).json({ success: true, token: signToken(user), user: userPayload(user) });
@@ -115,10 +135,10 @@ exports.login = async (req, res) => {
       const lockMs = Math.min(LOGIN_BASE_LOCK_MS * Math.pow(2, lockExponent), LOGIN_MAX_LOCK_MS);
       updates.locked_until = new Date(now.getTime() + lockMs);
     }
-    await user.update(updates);
+    await safeUpdateUser(user, updates);
     return res.status(401).json({ error: 'Invalid email/mobile number or password.' });
   }
-  await user.update({
+  await safeUpdateUser(user, {
     last_login_at: now,
     last_login_ip: meta.ip,
     last_login_user_agent: meta.userAgent,
@@ -169,7 +189,7 @@ exports.resetPassword = async (req, res) => {
     return res.status(400).json({ error: 'Invalid or expired verification code.' });
   }
   if (!isFourDigitPin(password)) return res.status(400).json({ error: 'Password must be exactly 4 digits.' });
-  await user.update({ password_hash: await bcrypt.hash(password, 12), last_login_at: new Date() });
+  await safeUpdateUser(user, { password_hash: await bcrypt.hash(password, 12), last_login_at: new Date() });
   await otp.destroy();
   return res.json({ success: true, token: signToken(user), user: userPayload(user) });
 };
