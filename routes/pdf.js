@@ -628,15 +628,15 @@ async function watermarkPdfResponse(req, res, pdf, tokenParam) {
     pdfBuffer = fs.readFileSync(diskPath);
   }
 
-  const watermarkText =
-    appUser?.email?.trim() ||
-    lead?.email?.trim() ||
-    lead?.phone?.trim() ||
+  const watermarkName =
     appUser?.name?.trim() ||
     lead?.name?.trim() ||
+    appUser?.email?.trim() ||
+    lead?.email?.trim() ||
     'AUTHORIZED USER';
+  const watermarkPhone = appUser?.phone?.trim() || lead?.phone?.trim() || '';
 
-  const stampedBuffer = await applyWatermarkToPdf(pdfBuffer, watermarkText);
+  const stampedBuffer = await applyWatermarkToPdf(pdfBuffer, watermarkName, watermarkPhone);
   const filename = `${String(pdf.title || 'document').replace(/[^a-z0-9_-]+/gi, '_')}.pdf`;
 
   res.status(200);

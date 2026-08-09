@@ -110,10 +110,22 @@ Respond strictly in JSON format without markdown wrapping, like this:
       }
     });
     
-    let text = response.response.text();
-    if (text.startsWith('```json')) text = text.replace(/```json\n/, '').replace(/\n```$/, '');
-
-    const result = JSON.parse(text);
+    let text = response.response.text().trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    }
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (parseError) {
+      // Models occasionally add a short preamble or trailing explanation even
+      // with responseMimeType=json. Recover only when there is one complete
+      // JSON object; otherwise reject the candidate safely.
+      const firstBrace = text.indexOf('{');
+      const lastBrace = text.lastIndexOf('}');
+      if (firstBrace < 0 || lastBrace <= firstBrace) throw parseError;
+      result = JSON.parse(text.slice(firstBrace, lastBrace + 1));
+    }
     return result;
   } catch (error) {
     console.error('[AutoBlog] Error generating blog post:', error);

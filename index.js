@@ -422,9 +422,12 @@ const startServer = async () => {
     // One-time test uploads for today only. The normal schedule remains below.
     scheduleOneTimeAutoBlogTest(10, 25, '10:25 AM live blog', runOneTimeLiveBlogTest);
 
-    // Initialize Auto-Blog Service (runs every 2 days at 8:00 AM IST - 1 day gap)
-    cron.schedule('0 8 */2 * *', () => {
-      autoBlogService.runDaily();
+    // Run on alternate calendar dates (1, 3, 5, 7, ...), at 8:00 AM IST.
+    // runDaily() also enforces the 36-hour minimum gap at month boundaries.
+    cron.schedule('0 8 1-31/2 * *', () => {
+      autoBlogService.runDaily().catch((error) => {
+        console.error('[AutoBlog] Scheduled run failed:', error);
+      });
     }, {
       timezone: AUTO_BLOG_TIMEZONE
     });
