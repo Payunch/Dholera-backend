@@ -17,7 +17,9 @@ const AppUser = sequelize.define('AppUser', {
   accepted_terms_at: { type: DataTypes.DATE, allowNull: true },
   accepted_privacy_at: { type: DataTypes.DATE, allowNull: true }
 }, {
-  timestamps: false,
+  // The existing production AppUsers table has required createdAt/updatedAt
+  // columns, so Sequelize must populate them on insert/update.
+  timestamps: true,
 });
 
 module.exports = AppUser;
