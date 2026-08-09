@@ -21,7 +21,8 @@ const cleanHtml = (value, maxLen = 50000) => {
 const cleanEmail = (value) => {
   const email = cleanText(value, 255).toLowerCase();
   if (!email) return '';
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+  const emailPattern = /^(?![.])(?!.*[.]{2})[a-z0-9._%+-]{1,64}(?<![.])@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
+  return emailPattern.test(email) ? email : '';
 };
 
 const cleanPathFragment = (value, maxLen = 120) => {
