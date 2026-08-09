@@ -20,7 +20,7 @@ router.get('/', verifyToken, async (req, res) => {
     
     res.json(config);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -54,8 +54,9 @@ router.post('/', verifyToken, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+

@@ -144,7 +144,7 @@ router.get('/db/tables', verifyToken, async (req, res) => {
     const filtered = tables.filter(t => !['sqlite_sequence', 'SequelizeMeta'].includes(t));
     res.json(filtered);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -192,7 +192,7 @@ router.get('/db/raw/:tableName', verifyToken, async (req, res) => {
     
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -219,3 +219,4 @@ router.delete('/leads/purge', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+

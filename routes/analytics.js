@@ -120,7 +120,7 @@ router.get('/platform-insights', verifyToken, async (req, res) => {
 
   } catch (err) {
     console.error('[Platform Insights Error]:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -302,7 +302,7 @@ router.get('/export/updates', verifyToken, async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -332,8 +332,9 @@ router.get('/export/pdfs', verifyToken, async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+

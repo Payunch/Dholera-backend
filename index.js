@@ -422,17 +422,16 @@ app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
 
   if (err && err.code === 'EBADCSRFTOKEN') {
-    return res.status(403).json({ error: 'Invalid CSRF token. Please refresh the page.' });
+    return res.status(403).json({ error: 'Your request could not be completed. Please refresh and try again.' });
   }
 
   // Handle Multer errors
   if (err instanceof require('multer').MulterError) {
-    return res.status(400).json({ error: `Upload error: ${err.message}` });
+    return res.status(400).json({ error: 'Upload failed. Please check the file and try again.' });
   }
 
   res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+    error: 'Something went wrong. Please try again later.'
   });
 });
 

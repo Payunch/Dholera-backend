@@ -11,7 +11,7 @@ router.get('/projects', async (req, res) => {
     const projects = await Project.findAll({ order: [['createdAt', 'DESC']] });
     res.json(projects);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -22,7 +22,7 @@ router.get('/projects/:slug', async (req, res) => {
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json(project);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -32,7 +32,7 @@ router.post('/projects', verifyToken, async (req, res) => {
     const project = await Project.create(req.body);
     res.status(201).json({ success: true, project });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -44,7 +44,7 @@ router.put('/projects/:id', verifyToken, async (req, res) => {
     await project.update(req.body);
     res.json({ success: true, project });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -56,7 +56,7 @@ router.delete('/projects/:id', verifyToken, async (req, res) => {
     await project.destroy();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -68,7 +68,7 @@ router.get('/tp-maps', async (req, res) => {
     const maps = await TpMap.findAll({ order: [['tp_id', 'ASC']] });
     res.json(maps);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -78,7 +78,7 @@ router.post('/tp-maps', verifyToken, async (req, res) => {
     const map = await TpMap.create(req.body);
     res.status(201).json({ success: true, map });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -90,7 +90,7 @@ router.put('/tp-maps/:id', verifyToken, async (req, res) => {
     await map.update(req.body);
     res.json({ success: true, map });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -102,7 +102,7 @@ router.delete('/tp-maps/:id', verifyToken, async (req, res) => {
     await map.destroy();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -114,8 +114,9 @@ router.get('/portals', async (req, res) => {
     const portals = await Portal.findAll({ order: [['id', 'ASC']] });
     res.json(portals);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+

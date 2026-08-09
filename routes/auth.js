@@ -9,6 +9,7 @@ const LOGIN_MAX_ATTEMPTS = Number.parseInt(process.env.ADMIN_LOGIN_MAX_ATTEMPTS 
 const loginLimiter = rateLimit({
   windowMs: LOGIN_WINDOW_MS,
   max: LOGIN_MAX_ATTEMPTS,
+  keyGenerator: (req) => `${req.ip}:${String(req.body?.username || '').toLowerCase()}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please try again later.' }

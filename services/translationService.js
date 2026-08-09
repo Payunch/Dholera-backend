@@ -2,16 +2,31 @@
  * translationService.js
  *
  * Provides automated translation capabilities for blog posts.
- * Uses 'translate-google' which is a free, key-less wrapper for Google Translate.
+ * In production, translations are disabled unless ENABLE_AUTO_TRANSLATION=true.
  */
 
-const translate = require('translate-google');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const autoTranslationEnabled = process.env.ENABLE_AUTO_TRANSLATION === 'true';
+let translate = null;
+
+function getTranslateClient() {
+  if (!autoTranslationEnabled) return null;
+  if (translate) return translate;
+  try {
+    translate = require('translate-google');
+    return translate;
+  } catch (err) {
+    console.warn('[Translation] translate-google is unavailable, returning source text.');
+    return null;
+  }
+}
 
 async function translateInChunks(text, lang) {
   if (!text) return text;
+  const translateClient = getTranslateClient();
+  if (!translateClient) return text;
   if (text.length < 4000) {
-    return await translate(text, { to: lang });
+    return await translateClient(text, { to: lang });
   }
 
   const parts = text.split(/(<\/p>|\n)/i);
@@ -40,7 +55,7 @@ async function translateInChunks(text, lang) {
     // Add a 2-second delay between chunks to respect rate limits
     if (i > 0) await sleep(2000);
     
-    const translatedChunk = await translate(chunk, { to: lang });
+    const translatedChunk = await translateClient(chunk, { to: lang });
     translatedText += translatedChunk;
   }
 
@@ -54,13 +69,21 @@ async function translateInChunks(text, lang) {
  * @returns {Promise<Array>} List of translated payloads
  */
 async function translateBlogPost(payload, targetLangs = ['hi', 'gu']) {
+  if (!autoTranslationEnabled) {
+    return targetLangs.map(() => payload);
+  }
   const translations = [];
 
   for (const lang of targetLangs) {
     try {
       console.log(`[Translation] Translating "${payload.title}" to ${lang}...`);
       
-      const translatedTitle = await translate(payload.title, { to: lang });
+      const translateClient = getTranslateClient();
+      if (!translateClient) {
+        translations.push(payload);
+        continue;
+      }
+      const translatedTitle = await translateClient(payload.title, { to: lang });
       const translatedContent = await translateInChunks(payload.content, lang);
       
       translations.push({

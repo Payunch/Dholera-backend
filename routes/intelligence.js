@@ -21,7 +21,7 @@ router.get('/leaderboard', verifyToken, async (req, res) => {
 
     res.json(leads);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -46,8 +46,9 @@ router.get('/stats', verifyToken, async (req, res) => {
       hotPercentage: totalLeads > 0 ? Math.round((hotLeads / totalLeads) * 100) : 0
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+

@@ -16,7 +16,7 @@ router.get('/translations/:lang', async (req, res) => {
     
     res.json(dict);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -63,7 +63,7 @@ router.get('/user', async (req, res) => {
       name: lead.name
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -87,7 +87,7 @@ router.post('/user', async (req, res) => {
     await lead.save();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -111,7 +111,7 @@ router.post('/fcm-token', async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -126,8 +126,9 @@ router.post('/translations/seed', async (req, res) => {
     
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+

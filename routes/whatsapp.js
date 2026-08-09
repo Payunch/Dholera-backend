@@ -30,7 +30,7 @@ router.post('/send', verifyToken, async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -63,7 +63,7 @@ router.get('/stats', verifyToken, async (req, res) => {
       responseRate: 'Manual tracking required' // As per requirement
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -77,8 +77,9 @@ router.get('/logs', verifyToken, async (req, res) => {
     });
     res.json(logs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+

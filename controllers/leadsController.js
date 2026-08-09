@@ -180,7 +180,7 @@ exports.getLeads = async (req, res) => {
 
     res.json({ data: leadsWithIntelligence, total: count, page, pageSize: limit });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -208,7 +208,7 @@ exports.checkVisitor = async (req, res) => {
     
     res.json({ verified: false });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -474,7 +474,7 @@ exports.trackReturning = async (req, res) => {
 
     res.json({ success: true, lead: { name: lead.name, phone: lead.phone } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -504,7 +504,7 @@ exports.verifyLeadToken = async (req, res) => {
       } 
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -546,7 +546,7 @@ exports.updateProfile = async (req, res) => {
       }
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -668,7 +668,7 @@ exports.exportLeads = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -743,7 +743,8 @@ exports.createLead = async (req, res) => {
     
     res.status(201).json(lead);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('[leadsController.createLead]', err);
+    res.status(400).json({ error: 'Unable to create the lead right now.' });
   }
 };
 
@@ -774,7 +775,8 @@ exports.updateStatus = async (req, res) => {
 
     res.json(lead);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('[leadsController.updateStatus]', err);
+    res.status(400).json({ error: 'Unable to update the lead right now.' });
   }
 };
 
@@ -799,7 +801,8 @@ exports.updateNotes = async (req, res) => {
 
     res.json(lead);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('[leadsController.updateNotes]', err);
+    res.status(400).json({ error: 'Unable to update the lead right now.' });
   }
 };
 
@@ -814,7 +817,7 @@ exports.getWhatsappUrl = async (req, res) => {
     const url = await buildManualWhatsAppMessage(lead);
     res.json({ url });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -842,7 +845,7 @@ exports.logWhatsapp = async (req, res) => {
 
     res.json({ success: true, log });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -912,7 +915,7 @@ exports.importLeads = async (req, res) => {
     res.json({ success: true, summary });
   } catch (err) {
     console.error('Import error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -925,7 +928,7 @@ exports.markRead = async (req, res) => {
     await lead.update({ isRead: true });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -946,7 +949,7 @@ exports.systemBackup = async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename=' + 'dholera_full_backup.json');
     res.send(JSON.stringify(data, null, 2));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -1035,7 +1038,7 @@ exports.systemRestore = async (req, res) => {
     res.json({ success: true, results });
   } catch (err) {
     console.error('Restore error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -1134,7 +1137,7 @@ exports.googleAdsWebhook = async (req, res) => {
     res.status(200).json({ success: true, message: 'Lead received successfully' });
   } catch (err) {
     console.error('Google Ads Webhook Error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -1166,8 +1169,9 @@ exports.deleteLead = async (req, res) => {
     res.json({ success: true, message: 'Lead deleted successfully' });
   } catch (err) {
     console.error('Failed to delete lead:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
+
 
 

@@ -24,7 +24,8 @@ exports.recoverPost = async (req, res) => {
     
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.recoverPost]', err);
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -66,7 +67,8 @@ exports.migrateDbNow = async (req, res) => {
     }
     res.json({ message: `Updated contact block on ${count} posts!` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.migrateDbNow]', err);
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -125,7 +127,8 @@ exports.getUpdates = async (req, res) => {
 
     res.json(updates);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.getUpdates]', err);
+    res.status(500).json({ error: 'Unable to load updates right now.' });
   }
 };
 
@@ -196,7 +199,8 @@ exports.getUpdateById = async (req, res) => {
 
     res.json(update);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.getUpdateById]', err);
+    res.status(500).json({ error: 'Unable to load this update right now.' });
   }
 };
 
@@ -257,7 +261,8 @@ exports.createUpdate = async (req, res) => {
 
     res.status(201).json(update);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.createUpdate]', err);
+    res.status(500).json({ error: 'Unable to create the update right now.' });
   }
 };
 
@@ -306,7 +311,8 @@ exports.updateUpdate = async (req, res) => {
 
     res.json(update);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.updateUpdate]', err);
+    res.status(500).json({ error: 'Unable to update the post right now.' });
   }
 };
 
@@ -317,7 +323,8 @@ exports.deleteUpdate = async (req, res) => {
     await update.destroy();
     res.json({ message: 'Update deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.deleteUpdate]', err);
+    res.status(500).json({ error: 'Unable to delete the post right now.' });
   }
 };
 
@@ -332,7 +339,8 @@ exports.fixLiveServer = async (req, res) => {
 
     res.json({ message: 'Live Server Fixed! Old blogs approved, and today\'s auto-blog is generating in the background.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[updatesController.fixLiveServer]', err);
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
 
@@ -369,6 +377,7 @@ exports.seedDiscoverDholera = async (req, res) => {
       updated: updatedCount 
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('[updatesController.seedDiscoverDholera]', err);
+    return res.status(500).json({ error: 'Unable to seed posts right now.' });
   }
 };

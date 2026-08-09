@@ -9,10 +9,19 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_TTL = '30d';
 const OTP_TTL_MS = 5 * 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
+const MAX_LOGIN_ATTEMPTS = 3;
+const LOGIN_BASE_LOCK_MS = Number.parseInt(process.env.USER_LOGIN_BASE_LOCK_MS || `${5 * 60 * 1000}`, 10);
+const LOGIN_MAX_LOCK_MS = Number.parseInt(process.env.USER_LOGIN_MAX_LOCK_MS || `${60 * 60 * 1000}`, 10);
 const normalizePhone = (value) => String(value || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
 const userPayload = (user) => ({ id: user.id, name: user.name, phone: user.phone, email: user.email });
 const signToken = (user) => jwt.sign({ sub: user.id, role: 'user' }, JWT_SECRET, { expiresIn: TOKEN_TTL });
 const hashOtp = (code) => crypto.createHash('sha256').update(code).digest('hex');
+const normalizeIp = (value) => String(value || '').replace(/^::ffff:/, '').slice(0, 64);
+const readRequestMeta = (req) => ({
+  ip: normalizeIp(req.headers['x-forwarded-for']?.toString().split(',')[0] || req.ip || req.socket?.remoteAddress || ''),
+  userAgent: String(req.headers['user-agent'] || '').slice(0, 1000),
+});
+const isFourDigitPin = (value) => /^\d{4}$/.test(String(value || ''));
 
 function configured(res) {
   if (JWT_SECRET && JWT_SECRET !== 'replace-me-too') return true;
@@ -26,13 +35,32 @@ exports.signup = async (req, res) => {
   const email = cleanEmail(req.body?.email);
   const phone = normalizePhone(req.body?.phone);
   const password = String(req.body?.password || '');
-  if (!name || !email || !/^[6-9]\d{9}$/.test(phone) || password.length < 8) {
-    return res.status(400).json({ error: 'Name, valid mobile, email, and an 8-character password are required.' });
+  const acceptedTerms = req.body?.accepted_terms === true || req.body?.acceptedTerms === true;
+  const acceptedPrivacy = req.body?.accepted_privacy === true || req.body?.acceptedPrivacy === true;
+  if (!name || !email || !/^[6-9]\d{9}$/.test(phone) || !isFourDigitPin(password)) {
+    return res.status(400).json({ error: 'Name, valid mobile, email, and a 4-digit numeric password are required.' });
+  }
+  if (!acceptedTerms || !acceptedPrivacy) {
+    return res.status(400).json({ error: 'You must accept the Privacy Policy and Terms & Conditions before creating an account.' });
   }
   const existing = await AppUser.findOne({ where: { email } });
   if (existing) return res.status(409).json({ error: 'An account already exists for this email. Please sign in.' });
   if (await AppUser.findOne({ where: { phone } })) return res.status(409).json({ error: 'An account already exists for this mobile number.' });
-  const user = await AppUser.create({ name, email, phone, password_hash: await bcrypt.hash(password, 12), last_login_at: new Date() });
+  const meta = readRequestMeta(req);
+  const now = new Date();
+  const user = await AppUser.create({
+    name,
+    email,
+    phone,
+    password_hash: await bcrypt.hash(password, 12),
+    last_login_at: now,
+    last_login_ip: meta.ip,
+    last_login_user_agent: meta.userAgent,
+    signup_ip: meta.ip,
+    signup_user_agent: meta.userAgent,
+    accepted_terms_at: now,
+    accepted_privacy_at: now,
+  });
   return res.status(201).json({ success: true, token: signToken(user), user: userPayload(user) });
 };
 
@@ -40,10 +68,43 @@ exports.login = async (req, res) => {
   if (!configured(res)) return;
   const identifier = cleanText(req.body?.identifier, 255).toLowerCase();
   const user = await AppUser.findOne({ where: identifier.includes('@') ? { email: identifier } : { phone: normalizePhone(identifier) } });
-  if (!user || !(await bcrypt.compare(String(req.body?.password || ''), user.password_hash))) {
+  const meta = readRequestMeta(req);
+  const now = new Date();
+  if (!user) {
     return res.status(401).json({ error: 'Invalid email/mobile number or password.' });
   }
-  await user.update({ last_login_at: new Date() });
+  if (user.locked_until && new Date(user.locked_until) > now) {
+    const remainingMs = new Date(user.locked_until).getTime() - now.getTime();
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    return res.status(429).json({
+      error: `Account is locked for ${remainingMinutes} minute(s) after too many failed attempts.`,
+    });
+  }
+  const password = String(req.body?.password || '');
+  if (!isFourDigitPin(password) || !(await bcrypt.compare(password, user.password_hash))) {
+    const failedLoginAttempts = (user.failed_login_attempts || 0) + 1;
+    const updates = {
+      failed_login_attempts: failedLoginAttempts,
+      last_failed_login_at: now,
+      last_login_ip: meta.ip,
+      last_login_user_agent: meta.userAgent,
+    };
+    if (failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      const lockExponent = failedLoginAttempts - MAX_LOGIN_ATTEMPTS;
+      const lockMs = Math.min(LOGIN_BASE_LOCK_MS * Math.pow(2, lockExponent), LOGIN_MAX_LOCK_MS);
+      updates.locked_until = new Date(now.getTime() + lockMs);
+    }
+    await user.update(updates);
+    return res.status(401).json({ error: 'Invalid email/mobile number or password.' });
+  }
+  await user.update({
+    last_login_at: now,
+    last_login_ip: meta.ip,
+    last_login_user_agent: meta.userAgent,
+    failed_login_attempts: 0,
+    locked_until: null,
+    last_failed_login_at: null,
+  });
   return res.json({ success: true, token: signToken(user), user: userPayload(user) });
 };
 
@@ -59,7 +120,8 @@ exports.deleteAccount = async (req, res) => {
 
     return res.json({ success: true, message: 'Account deleted successfully.' });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Failed to delete account.' });
+    console.error('[userAuth.deleteAccount]', err);
+    return res.status(500).json({ error: 'Failed to delete account. Please try again later.' });
   }
 };
 
@@ -85,7 +147,7 @@ exports.resetPassword = async (req, res) => {
     if (otp) await otp.increment('attempts');
     return res.status(400).json({ error: 'Invalid or expired verification code.' });
   }
-  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  if (!isFourDigitPin(password)) return res.status(400).json({ error: 'Password must be exactly 4 digits.' });
   await user.update({ password_hash: await bcrypt.hash(password, 12), last_login_at: new Date() });
   await otp.destroy();
   return res.json({ success: true, token: signToken(user), user: userPayload(user) });
@@ -100,5 +162,10 @@ exports.requireUser = async (req, res, next) => {
     if (!user) throw new Error('Unauthorized');
     req.appUser = user;
     next();
-  } catch (_) { res.status(401).json({ error: 'Your session has expired. Please sign in again.' }); }
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[userAuth.requireUser]', err);
+    }
+    res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+  }
 };

@@ -321,7 +321,7 @@ router.get('/admin/pending', verifyToken, async (req, res) => {
     res.json(Object.values(grouped));
   } catch (err) {
     console.error('Fetch pending approvals error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -338,7 +338,7 @@ router.get('/admin/count-pending', verifyToken, async (req, res) => {
     });
     res.json({ count });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -377,3 +377,4 @@ router.post('/admin/approve/:txnId', verifyToken, async (req, res) => {
 });
 
 module.exports = router;
+

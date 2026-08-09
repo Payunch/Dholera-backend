@@ -18,7 +18,8 @@ const {
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-session-secret';
-const LOGIN_LOCKOUT_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_MS || `${30 * 60 * 1000}`, 10);
+const LOGIN_LOCKOUT_BASE_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_BASE_MS || `${5 * 60 * 1000}`, 10);
+const LOGIN_LOCKOUT_MAX_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_MAX_MS || `${60 * 60 * 1000}`, 10);
 const LOGIN_LOCKOUT_THRESHOLD = Number.parseInt(process.env.ADMIN_LOCKOUT_THRESHOLD || '10', 10);
 const failedLoginState = new Map();
 
@@ -35,7 +36,12 @@ const registerLoginFailure = (key) => {
   const now = Date.now();
   const current = failedLoginState.get(key) || { count: 0, lockUntil: 0 };
   const count = current.count + 1;
-  const lockUntil = count >= LOGIN_LOCKOUT_THRESHOLD ? now + LOGIN_LOCKOUT_MS : 0;
+  const lockUntil = count >= LOGIN_LOCKOUT_THRESHOLD
+    ? now + Math.min(
+        LOGIN_LOCKOUT_BASE_MS * Math.pow(2, count - LOGIN_LOCKOUT_THRESHOLD),
+        LOGIN_LOCKOUT_MAX_MS
+      )
+    : 0;
   failedLoginState.set(key, { count, lockUntil });
   return { count, lockUntil };
 };
@@ -251,7 +257,8 @@ exports.getSessions = async (req, res) => {
     const sessions = await UserSession.findAll({ order: [['loginAt', 'DESC']], limit: 100 });
     res.json(sessions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[authController.getSessions]', err);
+    res.status(500).json({ error: 'Unable to load sessions at the moment.' });
   }
 };
 

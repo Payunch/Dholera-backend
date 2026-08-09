@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
@@ -208,7 +208,7 @@ router.get('/list', async (req, res) => {
     });
     res.json(pdfs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -287,7 +287,7 @@ router.get('/my-vault', async (req, res) => {
 
     res.json(pdfs.map(p => ({ ...p.toJSON(), unlocked: true })));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
@@ -697,8 +697,9 @@ router.post('/sync-disk', async (req, res) => {
 
     return res.json({ success: true, added });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 });
 
 module.exports = router;
+
