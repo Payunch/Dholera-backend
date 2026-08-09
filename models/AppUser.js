@@ -16,6 +16,8 @@ const AppUser = sequelize.define('AppUser', {
   signup_user_agent: { type: DataTypes.TEXT, allowNull: true },
   accepted_terms_at: { type: DataTypes.DATE, allowNull: true },
   accepted_privacy_at: { type: DataTypes.DATE, allowNull: true }
+}, {
+  timestamps: false,
 });
 
 module.exports = AppUser;
