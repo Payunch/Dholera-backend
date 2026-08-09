@@ -13,7 +13,15 @@ const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
 const { appCheckVerification } = require('../middleware/appCheckMiddleware');
 const jwt = require('jsonwebtoken');
-const { PDFDocument, rgb, degrees, StandardFonts } = require('pdf-lib');
+let PDFDocument;
+let rgb;
+let degrees;
+let StandardFonts;
+try {
+  ({ PDFDocument, rgb, degrees, StandardFonts } = require('pdf-lib'));
+} catch (err) {
+  console.warn('[PDF] pdf-lib is not installed; watermarking will be disabled until the dependency is installed.');
+}
 
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -134,6 +142,10 @@ function fetchRemotePdfBuffer(remoteUrl, redirectDepth = 0) {
 
 async function applyWatermarkToPdf(inputBuffer, userName = 'AUTHORIZED USER', userPhone = '') {
   try {
+    if (!PDFDocument || !rgb || !degrees || !StandardFonts) {
+      return inputBuffer;
+    }
+
     const pdfDoc = await PDFDocument.load(inputBuffer, { ignoreEncryption: true });
     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const pages = pdfDoc.getPages();
