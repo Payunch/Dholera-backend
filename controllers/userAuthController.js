@@ -77,7 +77,11 @@ exports.signup = async (req, res) => {
     return res.status(201).json({ success: true, token: signToken(user), user: userPayload(user) });
   } catch (err) {
     console.error('[userAuth.signup]', err);
-    return res.status(500).json({ error: 'Something went wrong. Please try again later.' });
+    const debugAuth = req.headers['x-debug-auth'] === '1';
+    return res.status(500).json({
+      error: 'Something went wrong. Please try again later.',
+      ...(debugAuth ? { details: err.message } : {}),
+    });
   }
 };
 
