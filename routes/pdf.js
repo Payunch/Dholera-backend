@@ -1,11 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
-const { PdfDocument, PdfView, Lead, PdfPurchase, sequelize } = require('../models');
+const { PdfDocument, PdfView, Lead, PdfPurchase, sequelize, AppUser } = require('../models');
 const { Op } = require('sequelize');
 const { verifyAccessToken, getTokenFromRequest } = require('../services/adminSecurity');
 const { cloudinary } = require('../services/cloudinary');
@@ -13,6 +13,8 @@ const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
 const { appCheckVerification } = require('../middleware/appCheckMiddleware');
 const jwt = require('jsonwebtoken');
+const { PDFDocument, rgb, degrees, StandardFonts } = require('pdf-lib');
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ALLOWED_REMOTE_PDF_HOSTS = new Set(['res.cloudinary.com']);
@@ -87,6 +89,103 @@ function pipeRemoteUrl(remoteUrl, res, redirectDepth = 0) {
     request.on('error', reject);
   });
 }
+
+function fetchRemotePdfBuffer(remoteUrl, redirectDepth = 0) {
+  if (redirectDepth > 5) {
+    return Promise.reject(new Error('Remote PDF redirected too many times.'));
+  }
+  return new Promise((resolve, reject) => {
+    const proto = remoteUrl.startsWith('https://') ? https : http;
+    const request = proto.get(remoteUrl, (upstream) => {
+      const statusCode = upstream.statusCode || 500;
+      const redirectLocation = upstream.headers.location;
+
+      if (statusCode >= 300 && statusCode < 400 && redirectLocation) {
+        upstream.resume();
+        const nextUrl = new URL(redirectLocation, remoteUrl).toString();
+
+        const parsedNext = new URL(nextUrl);
+        if (parsedNext.hostname !== 'res.cloudinary.com' && !isAllowedRemotePdfUrl(nextUrl)) {
+          reject(new Error('Remote PDF redirect target is not allowed.'));
+          return;
+        }
+        return fetchRemotePdfBuffer(nextUrl, redirectDepth + 1).then(resolve).catch(reject);
+      }
+
+      if (statusCode >= 400) {
+        upstream.resume();
+        reject(new Error(`Remote PDF returned ${statusCode}`));
+        return;
+      }
+
+      const chunks = [];
+      upstream.on('data', (chunk) => chunks.push(chunk));
+      upstream.on('end', () => resolve(Buffer.concat(chunks)));
+      upstream.on('error', reject);
+    });
+
+    request.setTimeout(15000, () => {
+      request.destroy(new Error('Remote PDF request timed out.'));
+    });
+
+    request.on('error', reject);
+  });
+}
+
+async function applyWatermarkToPdf(inputBuffer, userName = 'AUTHORIZED USER', userPhone = '') {
+  try {
+    const pdfDoc = await PDFDocument.load(inputBuffer, { ignoreEncryption: true });
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const pages = pdfDoc.getPages();
+
+    const cleanName = String(userName || 'AUTHORIZED USER').trim().toUpperCase();
+    const cleanPhone = String(userPhone || '').trim();
+
+    const watermarkLine1 = cleanName;
+    const watermarkLine2 = cleanPhone ? `USER NO: ${cleanPhone}` : '';
+
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+
+      const fontSize = Math.max(14, Math.min(width, height) * 0.035);
+      const stepX = Math.max(220, width * 0.45);
+      const stepY = Math.max(200, height * 0.4);
+
+      for (let x = -width * 0.3; x < width * 1.4; x += stepX) {
+        for (let y = -height * 0.3; y < height * 1.4; y += stepY) {
+          page.drawText(watermarkLine1, {
+            x,
+            y,
+            size: fontSize,
+            font,
+            color: rgb(0.5, 0.5, 0.5),
+            opacity: 0.18,
+            rotate: degrees(35),
+          });
+
+          if (watermarkLine2) {
+            page.drawText(watermarkLine2, {
+              x: x - 10,
+              y: y - (fontSize * 1.25),
+              size: fontSize * 0.85,
+              font,
+              color: rgb(0.5, 0.5, 0.5),
+              opacity: 0.18,
+              rotate: degrees(35),
+            });
+          }
+        }
+      }
+    }
+
+    const modifiedPdfBytes = await pdfDoc.save();
+    return Buffer.from(modifiedPdfBytes);
+  } catch (err) {
+    console.error('[PDF Watermark Error]:', err.message);
+    return inputBuffer;
+  }
+}
+
 
 // GET list of PDFs
 router.get('/list', async (req, res) => {
@@ -443,129 +542,130 @@ function serveOtpVerificationPage(req, res, pdf) {
   `);
 }
 
+function resolvePdfDiskPath(filePath) {
+  const normalized = String(filePath || '').trim();
+  if (!normalized) return null;
+  if (path.isAbsolute(normalized)) return normalized;
+  return path.resolve(__dirname, '..', normalized.replace(/^\/+/, ''));
+}
+
+async function watermarkPdfResponse(req, res, pdf, tokenParam) {
+  let isAdmin = false;
+  let appUser = null;
+  let lead = null;
+
+  if (req.session?.isAdmin) {
+    isAdmin = true;
+  } else {
+    const accessToken = getTokenFromRequest(req, 'admin_access_token');
+    if (accessToken) {
+      try {
+        const payload = verifyAccessToken(accessToken);
+        if (payload?.sub) isAdmin = true;
+      } catch (e) {}
+    }
+  }
+
+  let jwtPayload = null;
+  if (tokenParam && JWT_SECRET) {
+    try {
+      jwtPayload = jwt.verify(tokenParam, JWT_SECRET);
+      if (jwtPayload?.role === 'admin') isAdmin = true;
+      if (jwtPayload?.role === 'user') {
+        appUser = await AppUser.findByPk(jwtPayload.sub);
+      }
+    } catch (_) {}
+  }
+
+  if (!isAdmin && !appUser && tokenParam) {
+    lead = await Lead.findOne({ where: { lead_token: tokenParam } });
+  }
+
+  const freeTrialId = parseInt(process.env.FREE_TRIAL_PDF_ID || '19', 10);
+  const hasPdfAccess =
+    isAdmin ||
+    !!appUser ||
+    !pdf.is_protected ||
+    pdf.id === freeTrialId ||
+    !!lead &&
+      !!(await PdfPurchase.findOne({
+        where: {
+          lead_id: lead.id,
+          status: 'completed',
+          pdf_id: { [Op.in]: [pdf.id, 0] },
+        },
+      }));
+
+  if (!hasPdfAccess) {
+    return res.status(403).json({ error: 'You do not have access to this PDF.' });
+  }
+
+  const sourcePath = String(pdf.file_path || '').trim();
+  let pdfBuffer = null;
+
+  if (isRemotePdfPath(sourcePath)) {
+    if (!isAllowedRemotePdfUrl(sourcePath)) {
+      return res.status(403).json({ error: 'Remote PDF source is not allowed.' });
+    }
+    pdfBuffer = await fetchRemotePdfBuffer(sourcePath);
+  } else {
+    const diskPath = resolvePdfDiskPath(sourcePath);
+    if (!diskPath || !fs.existsSync(diskPath)) {
+      return res.status(404).json({ error: 'PDF file not found.' });
+    }
+    pdfBuffer = fs.readFileSync(diskPath);
+  }
+
+  const watermarkText =
+    appUser?.email?.trim() ||
+    lead?.email?.trim() ||
+    lead?.phone?.trim() ||
+    appUser?.name?.trim() ||
+    lead?.name?.trim() ||
+    'AUTHORIZED USER';
+
+  const stampedBuffer = await applyWatermarkToPdf(pdfBuffer, watermarkText);
+  const filename = `${String(pdf.title || 'document').replace(/[^a-z0-9_-]+/gi, '_')}.pdf`;
+
+  res.status(200);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  return res.send(stampedBuffer);
+}
+
 // GET secure PDF stream
 router.get('/view/:id', appCheckVerification, async (req, res) => {
   try {
-    // 1. Authenticate (Admin, AppUser, or Verified Lead)
-    let isAdmin = false;
-    let isAppUser = false;
-
-    if (req.session?.isAdmin) {
-      isAdmin = true;
-    } else {
-      const accessToken = getTokenFromRequest(req, 'admin_access_token');
-      if (accessToken) {
-        try {
-          const payload = verifyAccessToken(accessToken);
-          if (payload?.sub) isAdmin = true;
-        } catch (e) {}
-      }
+    const pdfId = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(pdfId)) {
+      return res.status(400).json({ error: 'Invalid PDF id.' });
     }
 
-    let tokenParam = req.headers.authorization || req.query.token || '';
-    if (tokenParam.toLowerCase().startsWith('bearer ')) {
-      tokenParam = tokenParam.slice(7).trim();
+    const pdf = await PdfDocument.findByPk(pdfId);
+    if (!pdf) {
+      return res.status(404).json({ error: 'PDF not found.' });
     }
 
-    if (tokenParam && JWT_SECRET) {
-      try {
-        const payload = jwt.verify(tokenParam, JWT_SECRET);
-        if (payload?.role === 'admin') isAdmin = true;
-        if (payload?.role === 'user') isAppUser = true;
-      } catch (_) {}
-    }
+    const tokenParam = req.headers.authorization || req.query.token || '';
+    const cleanToken = tokenParam.toLowerCase().startsWith('bearer ')
+      ? tokenParam.slice(7).trim()
+      : tokenParam.trim();
 
-    let lead = null;
-    if (!isAdmin && !isAppUser && tokenParam) {
-      lead = await Lead.findOne({ where: { lead_token: tokenParam } });
-    }
-
-    const pdf = await PdfDocument.findByPk(req.params.id);
-    if (!pdf) return res.status(404).json({ error: 'PDF not found.' });
-
-    // 2. Authorization (Verification check)
-    if (!isAdmin && !isAppUser && pdf.is_protected) {
-      const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
-      const isTrial = String(pdf.id) === String(freeTrialId);
-
-      if (!isTrial) {
-        // First, check OTP mobile verification
-        const isVerified = (req.session && req.session.pdfVerified) || (lead && lead.verified);
-        if (!isVerified) {
-          const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
-          if (acceptsHtml) {
-            return serveOtpVerificationPage(req, res, pdf);
-          } else {
-            return res.status(403).json({ error: 'Mobile verification required to view this document.' });
-          }
-        }
-
-        // Second, check purchase if not Pro (Payment gateway removed temporarily)
-        // Access is granted directly after mobile OTP verification.
-      }
-    }
-
-    // 3. Document Streaming
-    const filePath = String(pdf.file_path || '').trim();
-    if (!filePath) return res.status(500).json({ error: 'Document path missing.' });
-
-    if (isRemotePdfPath(filePath)) {
-      if (!isAllowedRemotePdfUrl(filePath)) return res.status(400).json({ error: 'Blocked remote host.' });
-
-      let streamUrl = filePath;
-
-      await pipeRemoteUrl(streamUrl, res);
-      return;
-    }
-
-    // Local file streaming
-    const uploadsDir = path.resolve(__dirname, '..', 'uploads');
-    const resolved = path.resolve(__dirname, '..', filePath.startsWith('/') ? filePath.substring(1) : filePath);
-
-    if (!isPathInsideDir(uploadsDir, resolved) || !fs.existsSync(resolved)) {
-      return res.status(404).json({ error: 'File missing.' });
-    }
-
-    const stats = fs.statSync(resolved);
-    res.writeHead(200, {
-      'Content-Type': 'application/pdf',
-      'Content-Length': stats.size,
-      'Cache-Control': 'no-store, private'
-    });
-    fs.createReadStream(resolved).pipe(res);
-
+    return await watermarkPdfResponse(req, res, pdf, cleanToken);
   } catch (err) {
-    console.error('PDF View Error:', err);
-    if (!res.headersSent) res.status(500).json({ error: 'Internal server error.' });
+    console.error('[PDF View Error]', err);
+    return res.status(500).json({ error: 'Failed to load secure PDF.' });
   }
 });
 
-// Admin upload
-router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
-  try {
-    const { title, category } = req.body;
-    if (!title || !req.file) return res.status(400).json({ error: 'Title and PDF required.' });
-
-    const filePath = req.file.secure_url || '/' + path.relative(path.resolve(__dirname, '..'), req.file.path).replace(/\\/g, '/');
-
-    const pdf = await PdfDocument.create({
-      title: title.trim(),
-      category: category ? category.trim() : 'General',
-      file_path: filePath,
-      is_protected: true
-    });
-
-    res.status(201).json(pdf);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// Admin sync-disk
-router.post('/sync-disk', verifyToken, async (req, res) => {
+// Sync PDFs from disk into the database
+router.post('/sync-disk', async (req, res) => {
   try {
     const uploadsDir = path.resolve(__dirname, '..', 'uploads');
-    if (!fs.existsSync(uploadsDir)) return res.status(404).json({ error: 'Uploads missing.' });
+    if (!fs.existsSync(uploadsDir)) {
+      return res.status(404).json({ error: 'Uploads missing.' });
+    }
 
     const files = fs.readdirSync(uploadsDir).filter(f => f.toLowerCase().endsWith('.pdf'));
     let added = 0;
@@ -574,14 +674,18 @@ router.post('/sync-disk', verifyToken, async (req, res) => {
       const filePath = `/uploads/${fileName}`;
       const [, created] = await PdfDocument.findOrCreate({
         where: { file_path: filePath },
-        defaults: { title: fileName.replace(/\.pdf$/i, '').replace(/_/g, ' '), category: 'Discovered', is_protected: true }
+        defaults: {
+          title: fileName.replace(/\.pdf$/i, '').replace(/_/g, ' '),
+          category: 'Discovered',
+          is_protected: true,
+        },
       });
       if (created) added++;
     }
 
-    res.json({ success: true, added });
+    return res.json({ success: true, added });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 

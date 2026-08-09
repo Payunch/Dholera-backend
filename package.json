@@ -43,6 +43,7 @@
     "mysql2": "^3.22.3",
     "node-cron": "^3.0.2",
     "nodemailer": "^6.10.1",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.21.0",
     "pg-hstore": "^2.3.4",
     "razorpay": "^2.9.6",
