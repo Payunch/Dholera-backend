@@ -49,6 +49,20 @@ exports.login = async (req, res) => {
 
 exports.me = async (req, res) => res.json({ success: true, user: userPayload(req.appUser) });
 
+exports.deleteAccount = async (req, res) => {
+  try {
+    const user = req.appUser;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    await PasswordResetOtp.destroy({ where: { user_id: user.id } });
+    await user.destroy();
+
+    return res.json({ success: true, message: 'Account deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to delete account.' });
+  }
+};
+
 exports.requestPasswordReset = async (req, res) => {
   const email = cleanEmail(req.body?.email);
   const user = email ? await AppUser.findOne({ where: { email } }) : null;

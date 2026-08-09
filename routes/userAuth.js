@@ -9,4 +9,5 @@ router.post('/login', authLimiter, controller.login);
 router.post('/forgot-password', resetLimiter, controller.requestPasswordReset);
 router.post('/reset-password', resetLimiter, controller.resetPassword);
 router.get('/me', controller.requireUser, controller.me);
+router.delete('/delete-account', controller.requireUser, controller.deleteAccount);
 module.exports = router;
