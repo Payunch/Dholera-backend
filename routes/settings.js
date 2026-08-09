@@ -5,6 +5,48 @@ const { verifyToken } = require('./auth');
 const { logAuditEvent } = require('../services/auditLogger');
 const { cleanText } = require('../utils/sanitize');
 
+const parseInteger = (value, fallback) => {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+// Public app release info for APK distribution and forced-update checks.
+router.get('/app-info', async (req, res) => {
+  try {
+    const settings = await Setting.findAll({
+      where: { category: 'app_release' }
+    });
+
+    const config = {
+      apkUrl: process.env.APP_APK_URL || '',
+      requiredBuildNumber: parseInteger(process.env.APP_REQUIRED_BUILD_NUMBER, 2),
+      latestBuildNumber: parseInteger(process.env.APP_LATEST_BUILD_NUMBER, 2),
+      releaseNotes: process.env.APP_RELEASE_NOTES || '',
+      updateTitle: process.env.APP_UPDATE_TITLE || 'Update Required',
+      updateMessage: process.env.APP_UPDATE_MESSAGE || 'A newer APK is available. Please update to continue.',
+      forceUpdate: String(process.env.APP_FORCE_UPDATE || 'true') === 'true'
+    };
+
+    for (const setting of settings) {
+      if (setting.key === 'apkUrl') config.apkUrl = setting.value || config.apkUrl;
+      if (setting.key === 'requiredBuildNumber') config.requiredBuildNumber = parseInteger(setting.value, config.requiredBuildNumber);
+      if (setting.key === 'latestBuildNumber') config.latestBuildNumber = parseInteger(setting.value, config.latestBuildNumber);
+      if (setting.key === 'releaseNotes') config.releaseNotes = setting.value || config.releaseNotes;
+      if (setting.key === 'updateTitle') config.updateTitle = setting.value || config.updateTitle;
+      if (setting.key === 'updateMessage') config.updateMessage = setting.value || config.updateMessage;
+      if (setting.key === 'forceUpdate') config.forceUpdate = String(setting.value).toLowerCase() === 'true';
+    }
+
+    return res.json({
+      success: true,
+      ...config
+    });
+  } catch (err) {
+    console.error('[settings.getAppInfo]', err);
+    return res.status(500).json({ error: 'Unable to load app info right now.' });
+  }
+});
+
 // GET all business settings
 router.get('/', verifyToken, async (req, res) => {
   try {
