@@ -35,6 +35,12 @@ const Update = sequelize.define('Update', {
     defaultValue: false,
     comment: 'Safety Flag: Requires Admin Approval (Safe Harbor)'
   },
+  isExclusive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Flag for Exclusive Content available only in Mobile App'
+  },
   publishedAt: {
     type: DataTypes.DATE,
     allowNull: false,

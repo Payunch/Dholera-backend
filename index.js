@@ -378,13 +378,11 @@ const startServer = async () => {
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);'); } catch (e) { }
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoDescription TEXT;'); } catch (e) { }
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'); } catch (e) { }
-
-    // Always attempt robust schema patches for missing columns, 
-    // gracefully ignoring errors if columns already exist.
     console.log('[DB] Running robust schema patches for SQLite...');
     await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => { });
     await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => { });
     await sequelize.query("ALTER TABLE Updates ADD COLUMN isApproved BOOLEAN DEFAULT 0").catch(() => { });
+    await sequelize.query("ALTER TABLE Updates ADD COLUMN isExclusive BOOLEAN DEFAULT 0").catch(() => { });
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log(`[DB] Tables synced successfully (Alter: ${shouldAlterSchema}).`);
   } catch (err) {
@@ -406,8 +404,8 @@ const startServer = async () => {
     // One-time test uploads for today only. The normal schedule remains below.
     scheduleOneTimeAutoBlogTest(10, 25, '10:25 AM live blog', runOneTimeLiveBlogTest);
 
-    // Initialize Auto-Blog Service (runs daily at 8:00 AM IST)
-    cron.schedule('0 8 * * *', () => {
+    // Initialize Auto-Blog Service (runs every 2 days at 8:00 AM IST - 1 day gap)
+    cron.schedule('0 8 */2 * *', () => {
       autoBlogService.runDaily();
     }, {
       timezone: AUTO_BLOG_TIMEZONE
@@ -440,7 +438,6 @@ app.use((err, req, res, next) => {
 
 process.on('uncaughtException', (err) => {
   console.error('[CRITICAL] Uncaught Exception:', err);
-  // Optional: keep process alive for graceful degradation (not ideal but prevents full server crash on minor errors)
 });
 
 process.on('unhandledRejection', (reason, promise) => {

@@ -55,15 +55,23 @@ Respond with exactly one word and no punctuation: YES if all three checks pass; 
  * Generates an SEO optimized blog post based on the news snippet and editorial guidelines.
  */
 async function generateBlogPost(title, content, sourceUrl) {
+  const currentDateStr = new Date().toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
   const prompt = `
 You are an expert SEO content writer and real estate blogger for "Dholera Smart City".
+Today's Date: ${currentDateStr}
 Write a comprehensive, engaging, and highly SEO-optimized blog post based on the following news.
 Target Audience: Real estate investors, businesses, and people looking to buy land in Dholera SIR.
 
 Requirements for Editorial Quality:
 - **News Sourcing:** You MUST attribute the source of the news within the first paragraph (e.g., "According to a recent report by [Source Name]..."). Link to the source if applicable.
 - **Objective Tone:** AVOID over-promotional and absolute claims like 'guaranteed' or 'goldmine'. Use softer, compliant language such as 'expected to', 'projected', 'may contribute to', and 'potential'.
-- **Context Details:** Ensure key facts like location, date, and specific project names from the news are accurately included.
+- **Context Details:** Ensure key facts like location, current date (${currentDateStr}), and specific project names from the news are accurately included.
 - **Risk Disclaimer:** Include a standard, brief risk disclaimer at the very end of the post (e.g., "Disclaimer: Real estate investments are subject to market risks...").
 
 Requirements for WordPress SEO Ranking:
@@ -223,12 +231,32 @@ async function generateImageForBlog(blogTitle) {
   }
 }
 
-async function runDaily() {
-  console.log('[AutoBlog] Starting daily Dholera news auto-blog pipeline...');
+async function runDaily(options = {}) {
+  const { ignoreGap = false } = options;
+  console.log('[AutoBlog] Starting Dholera news auto-blog pipeline...');
   
   if (!process.env.GEMINI_API_KEY) {
     console.error('[AutoBlog] Aborted. GEMINI_API_KEY is missing from environment variables.');
     return;
+  }
+
+  // Enforce 1-day gap rule (at least 36 hours since last auto-blog post)
+  if (!ignoreGap) {
+    try {
+      const lastAutoBlog = await Update.findOne({
+        where: { author: 'Auto-Blogger AI' },
+        order: [['createdAt', 'DESC']]
+      });
+      if (lastAutoBlog && lastAutoBlog.createdAt) {
+        const hoursSinceLast = (new Date() - new Date(lastAutoBlog.createdAt)) / (1000 * 60 * 60);
+        if (hoursSinceLast < 36) {
+          console.log(`[AutoBlog] Skipping run. Last auto-blog post was created ${hoursSinceLast.toFixed(1)} hours ago (enforcing 1-day gap).`);
+          return null;
+        }
+      }
+    } catch (err) {
+      console.warn('[AutoBlog] Could not check last auto-blog date, proceeding:', err.message);
+    }
   }
 
   try {

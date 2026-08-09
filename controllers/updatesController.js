@@ -202,7 +202,7 @@ exports.getUpdateById = async (req, res) => {
 
 exports.createUpdate = async (req, res) => {
   try {
-    const { title, content, category, published, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
+    const { title, content, category, published, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -236,6 +236,7 @@ exports.createUpdate = async (req, res) => {
       category: cleanText(category, 100) || 'General',
       published: finalPublished,
       isApproved: isApproved,
+      isExclusive: isExclusive === 'true' || isExclusive === true || isExclusive === '1',
       imageUrl: finalImageUrl,
       imagePosition: imagePosition || 'top',
       publishedAt: publishedAt || new Date(),
@@ -265,7 +266,7 @@ exports.updateUpdate = async (req, res) => {
     const update = await Update.findByPk(req.params.id);
     if (!update) return res.status(404).json({ error: 'Update not found' });
 
-    const { title, content, category, published, isApproved, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
+    const { title, content, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
     
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
@@ -283,6 +284,7 @@ exports.updateUpdate = async (req, res) => {
     // Determine final values considering isApproved
     const parsedIsApproved = isApproved !== undefined ? (isApproved === 'true' || isApproved === true || isApproved === '1') : update.isApproved;
     const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
+    const parsedIsExclusive = isExclusive !== undefined ? (isExclusive === 'true' || isExclusive === true || isExclusive === '1') : update.isExclusive;
     const finalPublished = parsedIsApproved ? parsedPublished : false; // Force unpublished if not approved
 
     await update.update({
@@ -291,6 +293,7 @@ exports.updateUpdate = async (req, res) => {
       category: category !== undefined ? (cleanText(category, 100) || 'General') : update.category,
       published: finalPublished,
       isApproved: parsedIsApproved,
+      isExclusive: parsedIsExclusive,
       imageUrl: finalImageUrl,
       imagePosition: imagePosition !== undefined ? imagePosition : update.imagePosition,
       publishedAt: publishedAt !== undefined ? publishedAt : update.publishedAt,
