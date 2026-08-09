@@ -12,7 +12,9 @@ const { cloudinary } = require('../services/cloudinary');
 const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
 const { appCheckVerification } = require('../middleware/appCheckMiddleware');
+const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = process.env.JWT_SECRET;
 const ALLOWED_REMOTE_PDF_HOSTS = new Set(['res.cloudinary.com']);
 
 const isRemotePdfPath = (value = '') => /^https?:\/\//i.test(String(value).trim());
@@ -107,10 +109,32 @@ router.get('/my-vault', async (req, res) => {
       leadToken = leadToken.slice(7).trim();
     }
 
-    if (!leadToken) return res.status(401).json({ error: 'Token required' });
+    let isJwtVerified = false;
+    if (leadToken && JWT_SECRET) {
+      try {
+        const payload = jwt.verify(leadToken, JWT_SECRET);
+        if (payload?.role === 'user' || payload?.role === 'admin') {
+          isJwtVerified = true;
+        }
+      } catch (_) {}
+    }
 
-    const lead = await Lead.findOne({ where: { lead_token: leadToken } });
-    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    if (isJwtVerified || req.session?.isAdmin) {
+      const allPdfs = await PdfDocument.findAll({
+        attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
+        order: [['id', 'ASC']]
+      });
+      return res.json(allPdfs.map(p => ({ ...p.toJSON(), unlocked: true })));
+    }
+
+    const lead = leadToken ? await Lead.findOne({ where: { lead_token: leadToken } }) : null;
+    if (!lead) {
+      const publicPdfs = await PdfDocument.findAll({
+        attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
+        order: [['id', 'ASC']]
+      });
+      return res.json(publicPdfs.map(p => ({ ...p.toJSON(), unlocked: true })));
+    }
 
     // If session-verified or Pro, they have access to everything
     const isSessionVerified = (req.session && req.session.pdfVerified) || lead.is_pro;
@@ -422,8 +446,10 @@ function serveOtpVerificationPage(req, res, pdf) {
 // GET secure PDF stream
 router.get('/view/:id', appCheckVerification, async (req, res) => {
   try {
-    // 1. Authenticate (Admin or Verified Lead)
+    // 1. Authenticate (Admin, AppUser, or Verified Lead)
     let isAdmin = false;
+    let isAppUser = false;
+
     if (req.session?.isAdmin) {
       isAdmin = true;
     } else {
@@ -436,23 +462,29 @@ router.get('/view/:id', appCheckVerification, async (req, res) => {
       }
     }
 
-    let lead = null;
-    if (!isAdmin) {
-      let leadToken = req.headers.authorization || req.query.token || '';
-      if (leadToken.toLowerCase().startsWith('bearer ')) {
-        leadToken = leadToken.slice(7).trim();
-      }
+    let tokenParam = req.headers.authorization || req.query.token || '';
+    if (tokenParam.toLowerCase().startsWith('bearer ')) {
+      tokenParam = tokenParam.slice(7).trim();
+    }
 
-      if (leadToken) {
-        lead = await Lead.findOne({ where: { lead_token: leadToken } });
-      }
+    if (tokenParam && JWT_SECRET) {
+      try {
+        const payload = jwt.verify(tokenParam, JWT_SECRET);
+        if (payload?.role === 'admin') isAdmin = true;
+        if (payload?.role === 'user') isAppUser = true;
+      } catch (_) {}
+    }
+
+    let lead = null;
+    if (!isAdmin && !isAppUser && tokenParam) {
+      lead = await Lead.findOne({ where: { lead_token: tokenParam } });
     }
 
     const pdf = await PdfDocument.findByPk(req.params.id);
     if (!pdf) return res.status(404).json({ error: 'PDF not found.' });
 
-    // 2. Authorization (Verification and Payment check)
-    if (!isAdmin && pdf.is_protected) {
+    // 2. Authorization (Verification check)
+    if (!isAdmin && !isAppUser && pdf.is_protected) {
       const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
       const isTrial = String(pdf.id) === String(freeTrialId);
 
