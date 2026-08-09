@@ -31,37 +31,54 @@ function configured(res) {
 
 exports.signup = async (req, res) => {
   if (!configured(res)) return;
-  const name = cleanText(req.body?.name, 120);
-  const email = cleanEmail(req.body?.email);
-  const phone = normalizePhone(req.body?.phone);
-  const password = String(req.body?.password || '');
-  const acceptedTerms = req.body?.accepted_terms === true || req.body?.acceptedTerms === true;
-  const acceptedPrivacy = req.body?.accepted_privacy === true || req.body?.acceptedPrivacy === true;
-  if (!name || !email || !/^[6-9]\d{9}$/.test(phone) || !isFourDigitPin(password)) {
-    return res.status(400).json({ error: 'Name, valid mobile, email, and a 4-digit numeric password are required.' });
+  try {
+    const name = cleanText(req.body?.name, 120);
+    const email = cleanEmail(req.body?.email);
+    const phone = normalizePhone(req.body?.phone);
+    const password = String(req.body?.password || '');
+    const acceptedTerms = req.body?.accepted_terms === true || req.body?.acceptedTerms === true;
+    const acceptedPrivacy = req.body?.accepted_privacy === true || req.body?.acceptedPrivacy === true;
+    if (!name || !email || !/^[6-9]\d{9}$/.test(phone) || !isFourDigitPin(password)) {
+      return res.status(400).json({ error: 'Name, valid mobile, email, and a 4-digit numeric password are required.' });
+    }
+    if (!acceptedTerms || !acceptedPrivacy) {
+      return res.status(400).json({ error: 'You must accept the Privacy Policy and Terms & Conditions before creating an account.' });
+    }
+    const existing = await AppUser.findOne({ where: { email } });
+    if (existing) return res.status(409).json({ error: 'An account already exists for this email. Please sign in.' });
+    if (await AppUser.findOne({ where: { phone } })) return res.status(409).json({ error: 'An account already exists for this mobile number.' });
+    const meta = readRequestMeta(req);
+    const now = new Date();
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // Keep the core insert minimal so the signup path still works even if a
+    // production database is missing newer optional columns.
+    const user = await AppUser.create({
+      name,
+      email,
+      phone,
+      password_hash: passwordHash,
+    });
+
+    // Best-effort metadata write; never block account creation if the live
+    // schema has not yet been migrated for these optional fields.
+    await user.update({
+      last_login_at: now,
+      last_login_ip: meta.ip,
+      last_login_user_agent: meta.userAgent,
+      signup_ip: meta.ip,
+      signup_user_agent: meta.userAgent,
+      accepted_terms_at: now,
+      accepted_privacy_at: now,
+    }).catch((err) => {
+      console.error('[userAuth.signup] optional metadata update skipped:', err.message);
+    });
+
+    return res.status(201).json({ success: true, token: signToken(user), user: userPayload(user) });
+  } catch (err) {
+    console.error('[userAuth.signup]', err);
+    return res.status(500).json({ error: 'Something went wrong. Please try again later.' });
   }
-  if (!acceptedTerms || !acceptedPrivacy) {
-    return res.status(400).json({ error: 'You must accept the Privacy Policy and Terms & Conditions before creating an account.' });
-  }
-  const existing = await AppUser.findOne({ where: { email } });
-  if (existing) return res.status(409).json({ error: 'An account already exists for this email. Please sign in.' });
-  if (await AppUser.findOne({ where: { phone } })) return res.status(409).json({ error: 'An account already exists for this mobile number.' });
-  const meta = readRequestMeta(req);
-  const now = new Date();
-  const user = await AppUser.create({
-    name,
-    email,
-    phone,
-    password_hash: await bcrypt.hash(password, 12),
-    last_login_at: now,
-    last_login_ip: meta.ip,
-    last_login_user_agent: meta.userAgent,
-    signup_ip: meta.ip,
-    signup_user_agent: meta.userAgent,
-    accepted_terms_at: now,
-    accepted_privacy_at: now,
-  });
-  return res.status(201).json({ success: true, token: signToken(user), user: userPayload(user) });
 };
 
 exports.login = async (req, res) => {
