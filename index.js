@@ -284,6 +284,7 @@ app.use('/api/updates', require('./routes/updates'));
 app.use('/api/content/updates', require('./routes/updates'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/user-auth', require('./routes/userAuth'));
 app.use('/api/pdf', require('./routes/pdf'));
 app.use('/api/payment', require('./routes/payment'));
 app.use('/api/bi', require('./routes/bi'));

@@ -13,6 +13,8 @@ const Translation = require('./Translation');
 const Project = require('./Project');
 const TpMap = require('./TpMap');
 const Portal = require('./Portal');
+const AppUser = require('./AppUser');
+const PasswordResetOtp = require('./PasswordResetOtp');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -43,6 +45,9 @@ Update.belongsTo(Portal, { foreignKey: 'portal_id' });
 Portal.hasMany(Project, { foreignKey: 'portal_id' });
 Project.belongsTo(Portal, { foreignKey: 'portal_id' });
 
+AppUser.hasOne(PasswordResetOtp, { foreignKey: 'user_id', onDelete: 'CASCADE' });
+PasswordResetOtp.belongsTo(AppUser, { foreignKey: 'user_id' });
+
 module.exports = {
   sequelize,
   Lead,
@@ -59,4 +64,6 @@ module.exports = {
   Project,
   TpMap,
   Portal
+  ,AppUser
+  ,PasswordResetOtp
 };

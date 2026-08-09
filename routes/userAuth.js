@@ -1,0 +1,12 @@
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const controller = require('../controllers/userAuthController');
+const router = express.Router();
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many attempts. Please try again later.' } });
+const resetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many reset requests. Please try again later.' } });
+router.post('/signup', authLimiter, controller.signup);
+router.post('/login', authLimiter, controller.login);
+router.post('/forgot-password', resetLimiter, controller.requestPasswordReset);
+router.post('/reset-password', resetLimiter, controller.resetPassword);
+router.get('/me', controller.requireUser, controller.me);
+module.exports = router;
