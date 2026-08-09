@@ -383,6 +383,24 @@ const startServer = async () => {
     await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => { });
     await sequelize.query("ALTER TABLE Updates ADD COLUMN isApproved BOOLEAN DEFAULT 0").catch(() => { });
     await sequelize.query("ALTER TABLE Updates ADD COLUMN isExclusive BOOLEAN DEFAULT 0").catch(() => { });
+    // Older production SQLite databases may predate the user security/audit
+    // fields. Add each optional column before Sequelize inspects the model;
+    // SQLite safely ignores the ALTER when the column already exists.
+    const appUserColumns = [
+      ['last_login_at', 'DATETIME'],
+      ['last_login_ip', 'VARCHAR(64)'],
+      ['last_login_user_agent', 'TEXT'],
+      ['last_failed_login_at', 'DATETIME'],
+      ['failed_login_attempts', 'INTEGER DEFAULT 0'],
+      ['locked_until', 'DATETIME'],
+      ['signup_ip', 'VARCHAR(64)'],
+      ['signup_user_agent', 'TEXT'],
+      ['accepted_terms_at', 'DATETIME'],
+      ['accepted_privacy_at', 'DATETIME'],
+    ];
+    for (const [column, definition] of appUserColumns) {
+      await sequelize.query(`ALTER TABLE AppUsers ADD COLUMN ${column} ${definition}`).catch(() => { });
+    }
     await sequelize.sync({ alter: shouldAlterSchema });
     console.log(`[DB] Tables synced successfully (Alter: ${shouldAlterSchema}).`);
   } catch (err) {
