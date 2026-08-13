@@ -252,7 +252,7 @@ exports.createUpdate = async (req, res) => {
     });
 
     if (update.published) {
-      sendInvestorNotification(
+      await sendInvestorNotification(
         'New Market Insight',
         update.title,
         { type: 'insight', id: update.id.toString() }
@@ -270,6 +270,7 @@ exports.updateUpdate = async (req, res) => {
   try {
     const update = await Update.findByPk(req.params.id);
     if (!update) return res.status(404).json({ error: 'Update not found' });
+    const wasPublished = Boolean(update.published && update.isApproved);
 
     const { title, content, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
     
@@ -308,6 +309,15 @@ exports.updateUpdate = async (req, res) => {
       seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription,
       seoKeywords: seoKeywords !== undefined ? seoKeywords : update.seoKeywords
     });
+
+    const isNowPublished = Boolean(update.published && update.isApproved);
+    if (!wasPublished && isNowPublished) {
+      await sendInvestorNotification(
+        'New Market Insight',
+        update.title,
+        { type: 'insight', id: update.id.toString() }
+      );
+    }
 
     res.json(update);
   } catch (err) {

@@ -16,6 +16,82 @@ const AUTO_BLOG_USE_VISION_SELECTION = process.env.AUTO_BLOG_USE_VISION_SELECTIO
 // Configure the Gemini Client
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+function stripCodeFences(text) {
+  return (text || '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+function extractBalancedJsonObject(text) {
+  const source = text || '';
+  const start = source.indexOf('{');
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = start; i < source.length; i++) {
+    const char = source[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+function parseGeminiJson(text) {
+  const cleaned = stripCodeFences(text);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (firstError) {
+    const extracted = extractBalancedJsonObject(cleaned);
+    if (!extracted) {
+      throw firstError;
+    }
+
+    return JSON.parse(extracted);
+  }
+}
+
+function parseYesNo(text) {
+  const cleaned = (text || '').trim().toUpperCase();
+  if (!cleaned) return null;
+
+  const firstToken = cleaned.split(/\s+/)[0].replace(/[^A-Z]/g, '');
+  if (firstToken === 'YES' || firstToken === 'NO') {
+    return firstToken;
+  }
+
+  const match = cleaned.match(/\b(YES|NO)\b/);
+  return match ? match[1] : null;
+}
+
 /**
  * Validates a news snippet against Google Ads policy and verifies it.
  */
@@ -39,8 +115,7 @@ Respond with exactly one word and no punctuation: YES if all three checks pass; 
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 32 }
     });
-    
-    const answer = response.response.text().trim().toUpperCase();
+    const answer = parseYesNo(response.response.text());
     return {
       verified: answer === 'YES',
       reason: answer === 'YES' ? 'Passed automated relevance and policy check.' : 'Rejected by automated relevance or policy check.'
@@ -102,31 +177,26 @@ Respond strictly in JSON format without markdown wrapping, like this:
 
   try {
     const model = ai.getGenerativeModel({ model: AUTO_BLOG_MODEL });
-    const response = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 6000,
-        responseMimeType: 'application/json'
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: attempt === 1 ? prompt : `${prompt}\n\nYour previous response was invalid. Return only one valid JSON object with double-quoted keys and values. No markdown, no explanation.` }] }],
+          generationConfig: {
+            maxOutputTokens: 6000,
+            responseMimeType: 'application/json'
+          }
+        });
+
+        const text = response.response.text();
+        return parseGeminiJson(text);
+      } catch (parseOrGenerateError) {
+        lastError = parseOrGenerateError;
       }
-    });
-    
-    let text = response.response.text().trim();
-    if (text.startsWith('```')) {
-      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     }
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch (parseError) {
-      // Models occasionally add a short preamble or trailing explanation even
-      // with responseMimeType=json. Recover only when there is one complete
-      // JSON object; otherwise reject the candidate safely.
-      const firstBrace = text.indexOf('{');
-      const lastBrace = text.lastIndexOf('}');
-      if (firstBrace < 0 || lastBrace <= firstBrace) throw parseError;
-      result = JSON.parse(text.slice(firstBrace, lastBrace + 1));
-    }
-    return result;
+
+    throw lastError;
   } catch (error) {
     console.error('[AutoBlog] Error generating blog post:', error);
     return null;
