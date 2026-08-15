@@ -78,6 +78,7 @@ exports.getUpdates = async (req, res) => {
     const targetLang = lang || 'en';
     const where = {};
     const includeAll = req.path === '/admin/all';
+    const exclusiveOnly = (req.query.exclusive || '').toString().toLowerCase() === 'true';
     
     // The public route must never reveal drafts. The admin-only route above is
     // protected by verifyToken and is the sole way to include all posts.
@@ -89,6 +90,10 @@ exports.getUpdates = async (req, res) => {
       if (targetAudience === 'web') {
         where.isExclusive = false;
       }
+    }
+
+    if (exclusiveOnly) {
+      where.isExclusive = true;
     }
 
     // Always fetch English updates as the base list
@@ -205,7 +210,11 @@ exports.getUpdateById = async (req, res) => {
     }
 
     const targetAudience = (audience || 'web').toString().toLowerCase();
+    const exclusiveOnly = (req.query.exclusive || '').toString().toLowerCase() === 'true';
     if (all !== 'true' && targetAudience === 'web' && update.isExclusive) {
+      return res.status(404).json({ error: 'Update not found' });
+    }
+    if (exclusiveOnly && !update.isExclusive) {
       return res.status(404).json({ error: 'Update not found' });
     }
 
