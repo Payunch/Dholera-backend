@@ -74,7 +74,7 @@ exports.migrateDbNow = async (req, res) => {
 
 exports.getUpdates = async (req, res) => {
   try {
-    const { search, lang } = req.query;
+    const { search, lang, audience } = req.query;
     const targetLang = lang || 'en';
     const where = {};
     const includeAll = req.path === '/admin/all';
@@ -84,6 +84,11 @@ exports.getUpdates = async (req, res) => {
     if (!includeAll) {
       where.published = true;
       where.isApproved = true;
+
+      const targetAudience = (audience || 'web').toString().toLowerCase();
+      if (targetAudience === 'web') {
+        where.isExclusive = false;
+      }
     }
 
     // Always fetch English updates as the base list
@@ -136,7 +141,7 @@ exports.getUpdates = async (req, res) => {
 
 exports.getUpdateById = async (req, res) => {
   try {
-    const { all, lang } = req.query;
+    const { all, lang, audience } = req.query;
     const targetLang = lang || 'en';
     let update = await Update.findByPk(req.params.id);
     
@@ -196,6 +201,11 @@ exports.getUpdateById = async (req, res) => {
 
     // Only show if published unless 'all' is true
     if (all !== 'true' && !update.published) {
+      return res.status(404).json({ error: 'Update not found' });
+    }
+
+    const targetAudience = (audience || 'web').toString().toLowerCase();
+    if (all !== 'true' && targetAudience === 'web' && update.isExclusive) {
       return res.status(404).json({ error: 'Update not found' });
     }
 
