@@ -27,8 +27,11 @@ router.get('/migrate-db-now', verifyToken, updatesController.migrateDbNow);
 // TEMPORARY FIX ROUTE FOR LIVE SERVER
 router.get('/fix-live', verifyToken, updatesController.fixLiveServer);
 
-// GET all updates (public — intentional)
+// Public feed: only published and approved updates.
 router.get('/', updatesController.getUpdates);
+
+// Admin feed: includes drafts and unapproved posts. Keep this before /:id.
+router.get('/admin/all', verifyToken, updatesController.getUpdates);
 
 // GET single update by ID (public — intentional)
 router.get('/:id', updatesController.getUpdateById);

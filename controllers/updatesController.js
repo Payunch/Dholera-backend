@@ -74,12 +74,14 @@ exports.migrateDbNow = async (req, res) => {
 
 exports.getUpdates = async (req, res) => {
   try {
-    const { search, all, lang } = req.query;
+    const { search, lang } = req.query;
     const targetLang = lang || 'en';
     const where = {};
+    const includeAll = req.path === '/admin/all';
     
-    // Only show published and approved updates unless 'all' is true (for admin)
-    if (all !== 'true') {
+    // The public route must never reveal drafts. The admin-only route above is
+    // protected by verifyToken and is the sole way to include all posts.
+    if (!includeAll) {
       where.published = true;
       where.isApproved = true;
     }
