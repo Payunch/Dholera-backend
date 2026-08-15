@@ -107,7 +107,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-CSRF-Token', 'X-Firebase-AppCheck']
 }));
 app.use(globalLimiter);
-app.use(express.json({ limit: '5mb' })); // Increased limit for larger articles
+app.use(express.json({ limit: '20mb' })); // Allow large rich-text posts and editor payloads
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(morgan('dev'));
 app.use(cookieParser());
 
@@ -448,6 +449,11 @@ app.use((err, req, res, next) => {
 
   // Handle Multer errors
   if (err instanceof require('multer').MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_FIELD_VALUE' || err.code === 'LIMIT_PART_COUNT' || err.code === 'LIMIT_FIELD_COUNT') {
+      return res.status(413).json({
+        error: 'Upload too large. Please reduce the image or post size and try again.'
+      });
+    }
     return res.status(400).json({ error: 'Upload failed. Please check the file and try again.' });
   }
 

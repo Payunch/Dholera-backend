@@ -5,6 +5,7 @@ const { Readable } = require('stream');
 const { cloudinary, hasCloudinaryConfig } = require('../services/cloudinary');
 
 const MAX_FILE_SIZE = Number.parseInt(process.env.UPLOAD_MAX_BYTES || `${10 * 1024 * 1024}`, 10);
+const MAX_FIELD_SIZE = Number.parseInt(process.env.UPLOAD_FIELD_MAX_BYTES || `${20 * 1024 * 1024}`, 10);
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf']);
 
@@ -179,6 +180,9 @@ const upload = multer({
   },
   limits: {
     fileSize: MAX_FILE_SIZE,
+    fieldSize: MAX_FIELD_SIZE,
+    fields: 50,
+    parts: 60,
   },
 });
 
