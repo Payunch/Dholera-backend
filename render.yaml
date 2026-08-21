@@ -23,6 +23,16 @@ services:
         value: 3000
       - key: DB_DIALECT
         value: sqlite
+      # Required for automatic draft generation.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Every other day at 8:00 AM in Asia/Kolkata. Override only when necessary.
+      - key: AUTO_BLOG_CRON
+        value: "0 8 1-31/2 * *"
+      - key: AUTO_BLOG_MIN_GAP_HOURS
+        value: "36"
+      - key: AUTO_BLOG_RUN_ON_STARTUP
+        value: "true"
       - key: SESSION_SECRET
         generateValue: true
       - key: JWT_SECRET

@@ -25,7 +25,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const { sequelize, PdfDocument } = require('./models');
+const { sequelize, PdfDocument, AutoBlogRun } = require('./models');
 const { testConnection, getDatabaseInfo } = require('./config/database');
 const { buildOriginMatcher } = require('./utils/originMatcher');
 const { seedPdfsIfEmpty } = require('./scripts/seed_cloudinary_pdfs');
@@ -262,8 +262,13 @@ app.post('/api/track', (req, res) => {
   res.status(204).end();
 });
 
-app.get('/healthz/runtime', (req, res) => {
+app.get('/healthz/runtime', async (req, res) => {
   const configuredPort = Number.parseInt(process.env.PORT || '3000', 10);
+  const lastAutoBlogRun = await AutoBlogRun.findOne({
+    attributes: ['startedAt', 'completedAt', 'status', 'updateId'],
+    order: [['startedAt', 'DESC']],
+    raw: true
+  }).catch(() => null);
   res.json({
     ok: true,
     service: 'dholera-backend',
@@ -275,7 +280,12 @@ app.get('/healthz/runtime', (req, res) => {
     allowedOrigins,
     exactAllowedOrigins: originMatcher.exactOrigins,
     wildcardAllowedOrigins: originMatcher.wildcardOrigins,
-    uptimeSec: Math.round(process.uptime())
+    uptimeSec: Math.round(process.uptime()),
+    autoBlog: {
+      schedule: AUTO_BLOG_CRON,
+      timezone: AUTO_BLOG_TIMEZONE,
+      lastRun: lastAutoBlogRun
+    }
   });
 });
 
@@ -306,6 +316,9 @@ app.use('/api/import', require('./routes/import'));
 const PORT = process.env.PORT || 3000;
 const AUTO_BLOG_TIMEZONE = 'Asia/Kolkata';
 const AUTO_BLOG_TEST_DATE = '2026-08-08';
+// Run every other calendar day (1st, 3rd, 5th …) at 8:00 AM IST.
+const AUTO_BLOG_CRON = process.env.AUTO_BLOG_CRON || '0 8 1-31/2 * *';
+let autoBlogRunInProgress = false;
 
 // This cron expression includes today's IST date and the task stops after its
 // first invocation, preventing these test uploads from repeating tomorrow.
@@ -360,6 +373,32 @@ async function runOneTimeLiveBlogTest() {
   } catch (error) {
     console.error('[LiveBlog] Failed to sync draft to production:', error.response?.data?.error || error.message);
   }
+}
+
+async function runScheduledAutoBlog(trigger) {
+  if (autoBlogRunInProgress) {
+    console.warn(`[AutoBlog] ${trigger} run skipped because another run is still in progress.`);
+    return null;
+  }
+
+  autoBlogRunInProgress = true;
+  try {
+    console.log(`[AutoBlog] Starting ${trigger} run.`);
+    return await autoBlogService.runDaily();
+  } catch (error) {
+    console.error(`[AutoBlog] ${trigger} run failed:`, error);
+    return null;
+  } finally {
+    autoBlogRunInProgress = false;
+  }
+}
+
+function isAutoBlogScheduledDate() {
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: AUTO_BLOG_TIMEZONE,
+    day: 'numeric'
+  }).format(new Date());
+  return Number(day) % 2 === 1;
 }
 
 // Database Sync and Server Start
@@ -425,13 +464,15 @@ const startServer = async () => {
 
     // Run on alternate calendar dates (1, 3, 5, 7, ...), at 8:00 AM IST.
     // runDaily() also enforces the 36-hour minimum gap at month boundaries.
-    cron.schedule('0 8 1-31/2 * *', () => {
-      autoBlogService.runDaily().catch((error) => {
-        console.error('[AutoBlog] Scheduled run failed:', error);
-      });
+    cron.schedule(AUTO_BLOG_CRON, () => {
+      void runScheduledAutoBlog('scheduled');
     }, {
       timezone: AUTO_BLOG_TIMEZONE
     });
+    console.log(`[AutoBlog] Alternate-day schedule active: "${AUTO_BLOG_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
+    if (process.env.AUTO_BLOG_RUN_ON_STARTUP !== 'false' && isAutoBlogScheduledDate()) {
+      void runScheduledAutoBlog('startup recovery');
+    }
   });
 };
 

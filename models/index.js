@@ -15,6 +15,7 @@ const TpMap = require('./TpMap');
 const Portal = require('./Portal');
 const AppUser = require('./AppUser');
 const PasswordResetOtp = require('./PasswordResetOtp');
+const AutoBlogRun = require('./AutoBlogRun');
 
 // Define Relationships
 Lead.hasMany(PdfView, { foreignKey: 'lead_id' });
@@ -66,4 +67,5 @@ module.exports = {
   Portal
   ,AppUser
   ,PasswordResetOtp
+  ,AutoBlogRun
 };

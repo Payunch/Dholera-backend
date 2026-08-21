@@ -1,6 +1,6 @@
 const Parser = require('rss-parser');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { Update } = require('../models');
+const { Update, AutoBlogRun } = require('../models');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -315,14 +315,27 @@ async function generateImageForBlog(blogTitle) {
 
 async function runDaily(options = {}) {
   const { ignoreGap = false } = options;
+  const run = await AutoBlogRun.create({ startedAt: new Date(), status: 'running' }).catch((error) => {
+    console.error('[AutoBlog] Could not create run audit record:', error.message);
+    return null;
+  });
+  const finishRun = async (status, details, updateId = null) => {
+    if (run) {
+      await run.update({ status, details: details || null, updateId, completedAt: new Date() })
+        .catch((error) => console.error('[AutoBlog] Could not update run audit record:', error.message));
+    }
+  };
+
   console.log('[AutoBlog] Starting Dholera news auto-blog pipeline...');
   
   if (!process.env.GEMINI_API_KEY) {
     console.error('[AutoBlog] Aborted. GEMINI_API_KEY is missing from environment variables.');
-    return;
+    await finishRun('failed', 'GEMINI_API_KEY is missing.');
+    return null;
   }
 
-  // Enforce 1-day gap rule (at least 36 hours since last auto-blog post)
+  // Maintain the requested every-other-day cadence even when a service restarts.
+  const minimumGapHours = Math.max(1, Number(process.env.AUTO_BLOG_MIN_GAP_HOURS) || 36);
   if (!ignoreGap) {
     try {
       const lastAutoBlog = await Update.findOne({
@@ -331,8 +344,10 @@ async function runDaily(options = {}) {
       });
       if (lastAutoBlog && lastAutoBlog.createdAt) {
         const hoursSinceLast = (new Date() - new Date(lastAutoBlog.createdAt)) / (1000 * 60 * 60);
-        if (hoursSinceLast < 36) {
-          console.log(`[AutoBlog] Skipping run. Last auto-blog post was created ${hoursSinceLast.toFixed(1)} hours ago (enforcing 1-day gap).`);
+        if (hoursSinceLast < minimumGapHours) {
+          const reason = `Last auto-blog post was created ${hoursSinceLast.toFixed(1)} hours ago; minimum gap is ${minimumGapHours} hours.`;
+          console.log(`[AutoBlog] Skipping run. ${reason}`);
+          await finishRun('skipped_gap', reason, lastAutoBlog.id);
           return null;
         }
       }
@@ -348,11 +363,13 @@ async function runDaily(options = {}) {
     
     if (!feed.items || feed.items.length === 0) {
       console.log('[AutoBlog] No news found for Dholera today.');
-      return;
+      await finishRun('no_news', 'Google News returned no Dholera items.');
+      return null;
     }
 
     // Review up to three news sources so a rejected or irrelevant first item
     // does not prevent a quality blog from being produced.
+    const outcomes = [];
     for (let i = 0; i < Math.min(AUTO_BLOG_MAX_CANDIDATES, feed.items.length); i++) {
       const item = feed.items[i];
       console.log(`[AutoBlog] Evaluating News: ${item.title}`);
@@ -363,6 +380,7 @@ async function runDaily(options = {}) {
       });
       if (existing) {
          console.log(`[AutoBlog] Skipping, article already seems to exist.`);
+         outcomes.push(`${item.title}: already exists`);
          continue;
       }
 
@@ -380,6 +398,7 @@ async function runDaily(options = {}) {
 
           if (hasUnsafeAdvertisingClaims(blogData.content)) {
             console.warn('[AutoBlog] Generated copy failed the advertising-claims safety gate. Draft not saved.');
+            outcomes.push(`${item.title}: rejected by local advertising-claims safety gate`);
             continue;
           }
           
@@ -418,19 +437,24 @@ async function runDaily(options = {}) {
           });
 
           console.log(`[AutoBlog] Successfully created draft blog post with ID: ${newUpdate.id}`);
+          await finishRun('draft_created', `Draft created from: ${item.title}`, newUpdate.id);
           
           // Only create one blog post per day
           return newUpdate;
         }
+        outcomes.push(`${item.title}: Gemini did not return valid blog JSON`);
       } else {
         console.log(`[AutoBlog] News Rejected. Reason: ${verification.reason}`);
+        outcomes.push(`${item.title}: ${verification.reason}`);
       }
     }
     
     console.log('[AutoBlog] Daily run complete.');
+    await finishRun('no_draft', outcomes.join(' | '));
     return null;
   } catch (error) {
     console.error('[AutoBlog] Critical error during daily run:', error);
+    await finishRun('failed', error.message);
     return null;
   }
 }
