@@ -316,8 +316,9 @@ app.use('/api/import', require('./routes/import'));
 const PORT = process.env.PORT || 3000;
 const AUTO_BLOG_TIMEZONE = 'Asia/Kolkata';
 const AUTO_BLOG_TEST_DATE = '2026-08-08';
-// Run every other calendar day (1st, 3rd, 5th …) at 8:00 AM IST.
-const AUTO_BLOG_CRON = process.env.AUTO_BLOG_CRON || '0 8 1-31/2 * *';
+// Run daily at 8:00 AM IST: full web blogs on odd dates and concise app news
+// on even dates.
+const AUTO_BLOG_CRON = process.env.AUTO_BLOG_CRON || '0 8 * * *';
 let autoBlogRunInProgress = false;
 
 // This cron expression includes today's IST date and the task stops after its
@@ -375,7 +376,7 @@ async function runOneTimeLiveBlogTest() {
   }
 }
 
-async function runScheduledAutoBlog(trigger) {
+async function runScheduledAutoBlog(trigger, contentMode = getAutoBlogContentMode()) {
   if (autoBlogRunInProgress) {
     console.warn(`[AutoBlog] ${trigger} run skipped because another run is still in progress.`);
     return null;
@@ -384,7 +385,7 @@ async function runScheduledAutoBlog(trigger) {
   autoBlogRunInProgress = true;
   try {
     console.log(`[AutoBlog] Starting ${trigger} run.`);
-    return await autoBlogService.runDaily();
+    return await autoBlogService.runDaily({ contentMode });
   } catch (error) {
     console.error(`[AutoBlog] ${trigger} run failed:`, error);
     return null;
@@ -393,12 +394,12 @@ async function runScheduledAutoBlog(trigger) {
   }
 }
 
-function isAutoBlogScheduledDate() {
+function getAutoBlogContentMode() {
   const day = new Intl.DateTimeFormat('en-GB', {
     timeZone: AUTO_BLOG_TIMEZONE,
     day: 'numeric'
   }).format(new Date());
-  return Number(day) % 2 === 1;
+  return Number(day) % 2 === 1 ? 'web' : 'app';
 }
 
 // Database Sync and Server Start
@@ -469,8 +470,8 @@ const startServer = async () => {
     }, {
       timezone: AUTO_BLOG_TIMEZONE
     });
-    console.log(`[AutoBlog] Alternate-day schedule active: "${AUTO_BLOG_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
-    if (process.env.AUTO_BLOG_RUN_ON_STARTUP !== 'false' && isAutoBlogScheduledDate()) {
+    console.log(`[AutoBlog] Daily odd/even schedule active: "${AUTO_BLOG_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
+    if (process.env.AUTO_BLOG_RUN_ON_STARTUP !== 'false') {
       void runScheduledAutoBlog('startup recovery');
     }
   });

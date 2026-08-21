@@ -129,7 +129,8 @@ Respond with exactly one word and no punctuation: YES if all three checks pass; 
 /**
  * Generates an SEO optimized blog post based on the news snippet and editorial guidelines.
  */
-async function generateBlogPost(title, content, sourceUrl) {
+async function generateBlogPost(title, content, sourceUrl, options = {}) {
+  const isAppNews = options.contentMode === 'app';
   const currentDateStr = new Date().toLocaleDateString('en-IN', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
@@ -140,7 +141,7 @@ async function generateBlogPost(title, content, sourceUrl) {
   const prompt = `
 You are an expert SEO content writer and real estate blogger for "Dholera Smart City".
 Today's Date: ${currentDateStr}
-Write a comprehensive, engaging, and highly SEO-optimized blog post based on the following news.
+Write ${isAppNews ? 'a concise, factual mobile-app news brief' : 'a comprehensive, engaging, and highly SEO-optimized blog post'} based on the following news.
 Target Audience: Real estate investors, businesses, and people looking to buy land in Dholera SIR.
 
 Requirements for Editorial Quality:
@@ -156,6 +157,8 @@ Requirements for WordPress SEO Ranking:
 - **Structure:** Break text into 200-300 word sections. Use proper HTML tags (<h2>, <h3>, <p>, <ul>, <li>). 
 - **Internal/External Links:** Include at least 2 relevant external links to authoritative sources (using <a href="...">) and 3 placeholders for internal links (e.g., <a href="/blog/dholera-investment-guide">our guide</a>).
 - **CTA:** Include a strong, professional Call to Action at the end, along with contact details placeholder (e.g., Contact us at +91-XXXXXXXXXX).
+
+${isAppNews ? 'APP-ONLY OVERRIDE: Produce 180-300 words. Use a short summary plus 2-4 factual bullet points and one source link. Do not include a table of contents, investment CTA, sales language, or internal links.' : ''}
 
 Also provide SEO Metadata: tags (comma separated), seoTitle (max 60 chars), seoDescription (max 160 chars), and seoKeywords (comma separated).
 
@@ -314,7 +317,9 @@ async function generateImageForBlog(blogTitle) {
 }
 
 async function runDaily(options = {}) {
-  const { ignoreGap = false } = options;
+  const { ignoreGap = false, contentMode = 'web' } = options;
+  const isAppNews = contentMode === 'app';
+  const author = isAppNews ? 'Auto-Blogger AI App News' : 'Auto-Blogger AI';
   const run = await AutoBlogRun.create({ startedAt: new Date(), status: 'running' }).catch((error) => {
     console.error('[AutoBlog] Could not create run audit record:', error.message);
     return null;
@@ -339,7 +344,7 @@ async function runDaily(options = {}) {
   if (!ignoreGap) {
     try {
       const lastAutoBlog = await Update.findOne({
-        where: { author: 'Auto-Blogger AI' },
+        where: { author },
         order: [['createdAt', 'DESC']]
       });
       if (lastAutoBlog && lastAutoBlog.createdAt) {
@@ -391,7 +396,7 @@ async function runDaily(options = {}) {
         console.log(`[AutoBlog] News Verified! Reason: ${verification.reason}`);
         
         // 3. Generate Blog Post
-        const blogData = await generateBlogPost(item.title, item.contentSnippet || item.content, item.link);
+        const blogData = await generateBlogPost(item.title, item.contentSnippet || item.content, item.link, { contentMode });
         
         if (blogData) {
           console.log(`[AutoBlog] Blog post generated. Title: ${blogData.title}`);
@@ -407,7 +412,7 @@ async function runDaily(options = {}) {
   <h3>Ready to Explore Dholera Smart City?</h3>
   <p><a href="https://dholeraplatform.com/contact" style="font-weight: bold; font-size: 1.2em; color: #0056b3; text-decoration: none;">📞 Call Now: 7435808031<br>🌐 https://dholerahub.com</a></p>
 </div>`;
-          blogData.content += ctaHtml;
+          if (!isAppNews) blogData.content += ctaHtml;
           
           // 4. Generate Image
           let imageUrl = null;
@@ -422,14 +427,15 @@ async function runDaily(options = {}) {
           const newUpdate = await Update.create({
             title: blogData.title,
             content: blogData.content,
-            category: blogData.category || 'News',
+            category: isAppNews ? 'App News' : (blogData.category || 'News'),
             published: false, // Save as unpublished so Admin must approve it
             isApproved: false, // Explicitly mark as pending approval
             imageUrl: imageUrl,
             imagePosition: 'top',
             publishedAt: new Date(),
             lang: 'en',
-            author: 'Auto-Blogger AI',
+            author,
+            isExclusive: isAppNews,
             tags: blogData.tags,
             seoTitle: blogData.seoTitle,
             seoDescription: blogData.seoDescription,
