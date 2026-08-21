@@ -33,6 +33,8 @@ services:
         value: "36"
       - key: AUTO_BLOG_RUN_ON_STARTUP
         value: "true"
+      - key: AUTO_BLOG_AUTHOR
+        value: "Dholera Admin"
       - key: SESSION_SECRET
         generateValue: true
       - key: JWT_SECRET

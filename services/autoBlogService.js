@@ -319,8 +319,8 @@ async function generateImageForBlog(blogTitle) {
 async function runDaily(options = {}) {
   const { ignoreGap = false, contentMode = 'web' } = options;
   const isAppNews = contentMode === 'app';
-  const author = isAppNews ? 'Auto-Blogger AI App News' : 'Auto-Blogger AI';
-  const run = await AutoBlogRun.create({ startedAt: new Date(), status: 'running' }).catch((error) => {
+  const author = process.env.AUTO_BLOG_AUTHOR || 'Dholera Admin';
+  const run = await AutoBlogRun.create({ startedAt: new Date(), status: 'running', contentMode }).catch((error) => {
     console.error('[AutoBlog] Could not create run audit record:', error.message);
     return null;
   });
@@ -343,10 +343,13 @@ async function runDaily(options = {}) {
   const minimumGapHours = Math.max(1, Number(process.env.AUTO_BLOG_MIN_GAP_HOURS) || 36);
   if (!ignoreGap) {
     try {
-      const lastAutoBlog = await Update.findOne({
-        where: { author },
-        order: [['createdAt', 'DESC']]
+      const lastAutoBlogRun = await AutoBlogRun.findOne({
+        where: { status: 'draft_created', contentMode },
+        order: [['completedAt', 'DESC']]
       });
+      const lastAutoBlog = lastAutoBlogRun?.updateId
+        ? await Update.findByPk(lastAutoBlogRun.updateId)
+        : null;
       if (lastAutoBlog && lastAutoBlog.createdAt) {
         const hoursSinceLast = (new Date() - new Date(lastAutoBlog.createdAt)) / (1000 * 60 * 60);
         if (hoursSinceLast < minimumGapHours) {

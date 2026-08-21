@@ -18,6 +18,11 @@ const AutoBlogRun = sequelize.define('AutoBlogRun', {
     allowNull: false,
     defaultValue: 'running'
   },
+  contentMode: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'web'
+  },
   details: {
     type: DataTypes.TEXT,
     allowNull: true
