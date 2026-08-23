@@ -419,6 +419,12 @@ const startServer = async () => {
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoTitle VARCHAR(255);'); } catch (e) { }
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoDescription TEXT;'); } catch (e) { }
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN seoKeywords TEXT;'); } catch (e) { }
+    // Production keeps DB_SYNC_ALTER=false, so every model field introduced
+    // after the initial SQLite database needs an explicit idempotent patch.
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN slug VARCHAR(120);'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN imageAltText VARCHAR(255);'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN imageTitle VARCHAR(255);'); } catch (e) { }
+    try { await sequelize.query("ALTER TABLE AutoBlogRuns ADD COLUMN contentMode VARCHAR(32) DEFAULT 'web';"); } catch (e) { }
     console.log('[DB] Running robust schema patches for SQLite...');
     await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => { });
     await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => { });
