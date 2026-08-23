@@ -63,7 +63,7 @@ Return only valid JSON with exactly this shape:
   "faqQuestions": [""]
 }
 
-Rules: title 50-60 characters; meta description 140-160 characters; slug lowercase hyphen-separated; 5-8 tags; ALT text must naturally include the primary keyword; give four FAQ questions only when suitable.
+Rules: title 50-60 characters; meta description 140-160 characters; slug lowercase hyphen-separated; 5-8 tags; ALT text must naturally include the primary keyword. Return at most 5 missingItems, 5 improvements, and 4 FAQ questions. Keep every missing-item and improvement under 120 characters. Give four FAQ questions only when suitable.
 
 Current values:
 Title: ${safeText(title, 255)}
@@ -84,7 +84,7 @@ ${safeText(content, 45000)}`;
       const retryInstruction = attempt === 0 ? '' : '\n\nYour prior response could not be parsed. Return one valid JSON object only—no Markdown, comments, or prose.';
       const response = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: `${prompt}${retryInstruction}` }] }],
-        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1800, temperature: 0.2 }
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0.2 }
       });
       const rawResponse = response.response.text();
       try {
