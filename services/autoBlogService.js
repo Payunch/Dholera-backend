@@ -14,7 +14,10 @@ const AUTO_BLOG_MAX_CANDIDATES = Math.max(1, Math.min(Number(process.env.AUTO_BL
 const AUTO_BLOG_USE_VISION_SELECTION = process.env.AUTO_BLOG_USE_VISION_SELECTION !== 'false';
 
 // Configure the Gemini Client
-const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Automated blog generation uses only the paid key. Do not fall back to the
+// free SEO-review key: this scheduled workload can consume higher volume.
+const geminiApiKey = process.env.GEMINI_API_KEY || '';
+const ai = new GoogleGenerativeAI(geminiApiKey);
 
 function stripCodeFences(text) {
   return (text || '')
@@ -333,9 +336,9 @@ async function runDaily(options = {}) {
 
   console.log('[AutoBlog] Starting Dholera news auto-blog pipeline...');
   
-  if (!process.env.GEMINI_API_KEY) {
-    console.error('[AutoBlog] Aborted. GEMINI_API_KEY is missing from environment variables.');
-    await finishRun('failed', 'GEMINI_API_KEY is missing.');
+  if (!geminiApiKey) {
+    console.error('[AutoBlog] Aborted. GEMINI_API_KEY (paid auto-blog key) is missing.');
+    await finishRun('failed', 'Paid Gemini auto-blog key is missing.');
     return null;
   }
 

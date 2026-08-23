@@ -44,7 +44,7 @@ router.post('/seo-review', verifyToken, adminMutationLimiter, async (req, res) =
     return res.json(review);
   } catch (error) {
     console.error('[updates.seo-review]', error.message);
-    return res.status(process.env.GEMINI_API_KEY ? 502 : 503).json({ error: 'AI review is unavailable. Please try again shortly.' });
+    return res.status(process.env.GEMINI_API_KEY_free ? 502 : 503).json({ error: 'AI review is unavailable. Please try again shortly.' });
   }
 });
 

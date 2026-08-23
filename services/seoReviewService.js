@@ -15,9 +15,12 @@ function safeText(value, maxLength = 500) {
 }
 
 async function reviewBlogForSeo({ title, content, category, focusKeyword, seoTitle, seoDescription, slug, imageAltText, tags }) {
-  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured on the server.');
+  // The interactive admin review deliberately uses the free key only. It must
+  // never fall back to GEMINI_API_KEY, which is reserved for auto-blog jobs.
+  const geminiApiKey = process.env.GEMINI_API_KEY_free || '';
+  if (!geminiApiKey) throw new Error('Free Gemini SEO-review key is not configured on the server.');
 
-  const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const ai = new GoogleGenerativeAI(geminiApiKey);
   const model = ai.getGenerativeModel({ model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash' });
   const prompt = `You are a careful SEO editor for DholeraPlatform.com, an India-focused Dholera SIR information and real-estate portal.
 Review the blog below. Do not invent facts, prices, project approvals, timelines, or links. Do not make guaranteed-return claims.
