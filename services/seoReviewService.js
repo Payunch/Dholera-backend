@@ -86,7 +86,19 @@ ${safeText(content, 45000)}`;
         contents: [{ role: 'user', parts: [{ text: `${prompt}${retryInstruction}` }] }],
         generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1800, temperature: 0.2 }
       });
-      result = parseJson(response.response.text());
+      const rawResponse = response.response.text();
+      try {
+        result = parseJson(rawResponse);
+      } catch (parseError) {
+        const candidate = response.response.candidates?.[0];
+        console.warn('[SeoReview] Gemini returned unusable JSON response:', {
+          attempt: attempt + 1,
+          finishReason: candidate?.finishReason || 'unknown',
+          blocked: Boolean(response.response.promptFeedback?.blockReason),
+          preview: rawResponse.slice(0, 500)
+        });
+        throw parseError;
+      }
       break;
     } catch (error) {
       lastError = error;
