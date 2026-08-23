@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const parser = new Parser();
 // Quality-first editorial pipeline. These defaults retain the original
 // three-source review and AI image-fit selection.
-const AUTO_BLOG_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash';
+const AUTO_BLOG_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash';
 const AUTO_BLOG_MAX_CANDIDATES = Math.max(1, Math.min(Number(process.env.AUTO_BLOG_MAX_CANDIDATES) || 3, 3));
 const AUTO_BLOG_USE_VISION_SELECTION = process.env.AUTO_BLOG_USE_VISION_SELECTION !== 'false';
 
