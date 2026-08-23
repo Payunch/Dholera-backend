@@ -2,12 +2,34 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const stripCodeFences = (value = '') => value.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
+function extractBalancedJsonObject(value = '') {
+  const start = value.indexOf('{');
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const character = value[index];
+    if (escaped) { escaped = false; continue; }
+    if (character === '\\' && inString) { escaped = true; continue; }
+    if (character === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (character === '{') depth += 1;
+    if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, index + 1);
+    }
+  }
+  return null;
+}
+
 function parseJson(value) {
   const source = stripCodeFences(value);
-  const start = source.indexOf('{');
-  const end = source.lastIndexOf('}');
-  if (start < 0 || end < start) throw new Error('AI did not return a JSON object.');
-  return JSON.parse(source.slice(start, end + 1));
+  try { return JSON.parse(source); } catch (_) { /* extract an embedded response below */ }
+  const object = extractBalancedJsonObject(source);
+  if (!object) throw new Error('AI did not return a JSON object.');
+  return JSON.parse(object);
 }
 
 function safeText(value, maxLength = 500) {
@@ -55,11 +77,22 @@ Tags: ${safeText(tags, 400)}
 Article HTML/Markdown:
 ${safeText(content, 45000)}`;
 
-  const response = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1800, temperature: 0.2 }
-  });
-  const result = parseJson(response.response.text());
+  let result;
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const retryInstruction = attempt === 0 ? '' : '\n\nYour prior response could not be parsed. Return one valid JSON object only—no Markdown, comments, or prose.';
+      const response = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: `${prompt}${retryInstruction}` }] }],
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1800, temperature: 0.2 }
+      });
+      result = parseJson(response.response.text());
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!result) throw lastError || new Error('AI review did not return a usable result.');
   return {
     estimatedScore: Math.max(0, Math.min(100, Number(result.estimatedScore) || 0)),
     primaryKeyword: safeText(result.primaryKeyword, 160),
