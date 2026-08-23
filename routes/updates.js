@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
 const updatesController = require('../controllers/updatesController');
+const { reviewBlogForSeo } = require('../services/seoReviewService');
 
 const limitConfig = (prefix, fallbackWindowMs, fallbackMax) => ({
   windowMs: Number.parseInt(process.env[`${prefix}_WINDOW_MS`] || `${fallbackWindowMs}`, 10),
@@ -32,6 +33,20 @@ router.get('/', updatesController.getUpdates);
 
 // Admin feed: includes drafts and unapproved posts. Keep this before /:id.
 router.get('/admin/all', verifyToken, updatesController.getUpdates);
+
+// One server-side Gemini call for the editor. The key never reaches the browser.
+router.post('/seo-review', verifyToken, adminMutationLimiter, async (req, res) => {
+  try {
+    if (!req.body?.title || !req.body?.content) {
+      return res.status(400).json({ error: 'Add an article title and content before requesting an AI review.' });
+    }
+    const review = await reviewBlogForSeo(req.body);
+    return res.json(review);
+  } catch (error) {
+    console.error('[updates.seo-review]', error.message);
+    return res.status(process.env.GEMINI_API_KEY ? 502 : 503).json({ error: 'AI review is unavailable. Please try again shortly.' });
+  }
+});
 
 // GET single update by ID (public — intentional)
 router.get('/:id', updatesController.getUpdateById);
