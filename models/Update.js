@@ -75,6 +75,18 @@ const Update = sequelize.define('Update', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  slug: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  imageAltText: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  imageTitle: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   portal_id: {
     type: DataTypes.INTEGER,
     allowNull: true,

@@ -227,7 +227,7 @@ exports.getUpdateById = async (req, res) => {
 
 exports.createUpdate = async (req, res) => {
   try {
-    const { title, content, category, published, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
+    const { title, content, category, published, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -269,7 +269,10 @@ exports.createUpdate = async (req, res) => {
       tags: tags || null,
       seoTitle: seoTitle || null,
       seoDescription: seoDescription || null,
-      seoKeywords: seoKeywords || null
+      seoKeywords: seoKeywords || null,
+      slug: cleanText(slug, 120) || null,
+      imageAltText: cleanText(imageAltText, 255) || null,
+      imageTitle: cleanText(imageTitle, 255) || null
     });
 
     if (update.published) {
@@ -293,7 +296,7 @@ exports.updateUpdate = async (req, res) => {
     if (!update) return res.status(404).json({ error: 'Update not found' });
     const wasPublished = Boolean(update.published && update.isApproved);
 
-    const { title, content, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords } = req.body;
+    const { title, content, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
     
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
@@ -328,7 +331,10 @@ exports.updateUpdate = async (req, res) => {
       tags: tags !== undefined ? tags : update.tags,
       seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle,
       seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription,
-      seoKeywords: seoKeywords !== undefined ? seoKeywords : update.seoKeywords
+      seoKeywords: seoKeywords !== undefined ? seoKeywords : update.seoKeywords,
+      slug: slug !== undefined ? cleanText(slug, 120) || null : update.slug,
+      imageAltText: imageAltText !== undefined ? cleanText(imageAltText, 255) || null : update.imageAltText,
+      imageTitle: imageTitle !== undefined ? cleanText(imageTitle, 255) || null : update.imageTitle
     });
 
     const isNowPublished = Boolean(update.published && update.isApproved);
