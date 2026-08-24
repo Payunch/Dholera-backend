@@ -126,13 +126,13 @@ async function verifyManualBlogWithGeminiFree(title, content) {
 
   const prompt = `
 You are a strict compliance and verification officer for a real estate portal about "Dholera Smart City".
-Review the following news article title and content.
-1. Authenticity: Does this sound like a real news event about Dholera, Gujarat, India? (Ignore it if it sounds like obvious spam or unrelated).
+Review the following article title and content.
+1. Authenticity: Does this sound like a real news event, article, or update about Dholera, Gujarat, India? (Ignore it if it sounds like obvious spam or unrelated).
 2. Google Ads Policy: Does this content violate Google Ads policies? (e.g., hate speech, dangerous content, sensitive events like tragedies, adult content).
 3. Relevance: Is this relevant to investors or people interested in Dholera?
 
-News Title: ${title}
-News Content: ${safeText(content, 5000)}
+Article Title: ${title}
+Article Content: ${safeText(content, 5000)}
 
 Respond with exactly one word and no punctuation: YES if all three checks pass; otherwise NO.
 `;

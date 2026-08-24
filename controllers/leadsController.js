@@ -1,6 +1,7 @@
 const { Lead, PdfView, PdfDocument, Update, Setting } = require('../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
+const { Readable } = require('stream');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { verifyToken } = require('../routes/auth');
@@ -856,9 +857,22 @@ exports.importLeads = async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const fileName = String(req.file.originalname || '');
+    const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
+    if (!['.csv', '.xlsx'].includes(extension)) {
+      return res.status(400).json({ error: 'Please upload a CSV or XLSX file.' });
+    }
+
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(req.file.buffer);
+    if (extension === '.csv') {
+      await workbook.csv.read(Readable.from([req.file.buffer]));
+    } else {
+      await workbook.xlsx.load(req.file.buffer);
+    }
     const worksheet = workbook.getWorksheet(1); // Get first worksheet
+    if (!worksheet) {
+      return res.status(400).json({ error: 'The import file does not contain a worksheet.' });
+    }
     
     const leadsToCreate = [];
     const summary = { total: 0, created: 0, updated: 0, failed: 0 };

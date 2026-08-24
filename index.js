@@ -33,7 +33,6 @@ const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
 const BackupService = require('./services/backupService');
 const autoBlogService = require('./services/autoBlogService');
 const { publishDraftToLive } = require('./services/liveBlogPublisher');
-const { initializeWhatsAppWebhooks } = require('./services/whatsappWebhook');
 const { verifyAccessToken } = require('./services/adminSecurity');
 const cron = require('node-cron');
 

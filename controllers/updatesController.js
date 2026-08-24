@@ -306,6 +306,14 @@ exports.createUpdate = async (req, res) => {
         message: "Saved as draft. Publishing requires an SEO score of 90 or above.",
         data: update
       });
+    } else if (!isApproved) {
+      res.status(200).json({
+        success: true,
+        published: false,
+        moderationBlocked: true,
+        message: "Saved as draft. Content requires review before publishing.",
+        data: update
+      });
     } else {
       res.status(201).json(update);
     }
@@ -337,9 +345,19 @@ exports.updateUpdate = async (req, res) => {
     }
 
     // Determine final values considering isApproved
-    const parsedIsApproved = isApproved !== undefined ? (isApproved === 'true' || isApproved === true || isApproved === '1') : update.isApproved;
+    let parsedIsApproved = isApproved !== undefined ? (isApproved === 'true' || isApproved === true || isApproved === '1') : update.isApproved;
     const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
     const parsedIsExclusive = isExclusive !== undefined ? (isExclusive === 'true' || isExclusive === true || isExclusive === '1') : update.isExclusive;
+    
+    // --- GEMINI AI CONTENT MODERATION FOR EDITS ---
+    if (title !== undefined || content !== undefined) {
+      const newTitle = title !== undefined ? title : update.title;
+      const newContent = content !== undefined ? content : update.content;
+      const verification = await verifyManualBlogWithGeminiFree(newTitle, newContent);
+      if (!verification.verified) {
+        parsedIsApproved = false;
+      }
+    }
     
     // --- GEMINI AI SEO REVIEW GUARD ---
     let finalPublished = false;
@@ -399,6 +417,14 @@ exports.updateUpdate = async (req, res) => {
         published: false,
         seoScore: seoBlockedScore,
         message: "Saved as draft. Publishing requires an SEO score of 90 or above.",
+        data: update
+      });
+    } else if (!parsedIsApproved) {
+      res.status(200).json({
+        success: true,
+        published: false,
+        moderationBlocked: true,
+        message: "Saved as draft. Content requires review before publishing.",
         data: update
       });
     } else {
