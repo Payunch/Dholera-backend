@@ -189,7 +189,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     secure: isProd, // Only secure in production to allow local HTTP testing
-    sameSite: isProd ? 'none' : 'lax',
+    sameSite: 'lax', // Use lax to perfectly match admin_access_token domain strategy
     path: '/',
     maxAge: 24 * 60 * 60 * 1000, // 1 day
     ...(cookieDomain && { domain: cookieDomain })
@@ -255,6 +255,7 @@ app.use((req, res, next) => {
 // Helper endpoint for frontend to fetch the CSRF token (establishes session cookie)
 app.get('/api/auth/csrf-token', csrfProtection, (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     return res.json({ csrfToken: req.csrfToken() });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to generate CSRF token' });
