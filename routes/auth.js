@@ -15,8 +15,20 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Please try again later.' }
 });
 
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50,
+  keyGenerator: (req) => `${req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many refresh attempts. Please try again later.' }
+});
+
 router.post('/login', loginLimiter, authController.login);
-router.post('/refresh-token', authController.refreshToken);
+router.post('/mobile-login', loginLimiter, authController.mobileLogin);
+router.post('/refresh-token', refreshLimiter, authController.refreshToken);
+router.post('/mobile-refresh', refreshLimiter, authController.mobileRefresh);
+router.post('/mobile-logout', refreshLimiter, authController.mobileLogout);
 router.post('/logout', authController.logout);
 
 router.get('/sessions', authController.verifyToken, authController.getSessions);

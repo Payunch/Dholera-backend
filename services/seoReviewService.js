@@ -120,4 +120,38 @@ ${safeText(content, 45000)}`;
   };
 }
 
-module.exports = { reviewBlogForSeo };
+async function verifyManualBlogWithGeminiFree(title, content) {
+  const geminiApiKey = process.env.GEMINI_API_KEY_free || '';
+  if (!geminiApiKey) throw new Error('Free Gemini SEO-review key is not configured on the server.');
+
+  const prompt = `
+You are a strict compliance and verification officer for a real estate portal about "Dholera Smart City".
+Review the following news article title and content.
+1. Authenticity: Does this sound like a real news event about Dholera, Gujarat, India? (Ignore it if it sounds like obvious spam or unrelated).
+2. Google Ads Policy: Does this content violate Google Ads policies? (e.g., hate speech, dangerous content, sensitive events like tragedies, adult content).
+3. Relevance: Is this relevant to investors or people interested in Dholera?
+
+News Title: ${title}
+News Content: ${safeText(content, 5000)}
+
+Respond with exactly one word and no punctuation: YES if all three checks pass; otherwise NO.
+`;
+
+  try {
+    const ai = new GoogleGenerativeAI(geminiApiKey);
+    const model = ai.getGenerativeModel({ model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash' });
+    const response = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 32 }
+    });
+    
+    const text = response.response.text().trim().toUpperCase();
+    return { verified: text === 'YES' };
+  } catch (err) {
+    console.error('[verifyManualBlogWithGeminiFree] Error:', err);
+    // Safe harbor: if AI verification fails, block the publish
+    return { verified: false };
+  }
+}
+
+module.exports = { reviewBlogForSeo, verifyManualBlogWithGeminiFree };

@@ -4,8 +4,7 @@ const { cleanText, cleanHtml } = require('../utils/sanitize');
 const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
 const { translateBlogPost } = require('../services/translationService');
-const { verifyNewsWithGemini } = require('../services/autoBlogService');
-const { reviewBlogForSeo } = require('../services/seoReviewService');
+const { reviewBlogForSeo, verifyManualBlogWithGeminiFree } = require('../services/seoReviewService');
 const path = require('path');
 
 const isRemotePath = (p) => p.startsWith('http://') || p.startsWith('https://');
@@ -238,11 +237,12 @@ exports.createUpdate = async (req, res) => {
 
     // --- GEMINI AI CONTENT MODERATION (SAFE HARBOR) ---
     // If the author is explicitly set (e.g. a user or agent upload) OR we just want to protect all inputs:
-    const verification = await verifyNewsWithGemini(title, content);
+    const verification = await verifyManualBlogWithGeminiFree(title, content);
     const isApproved = verification.verified;
     
     // --- GEMINI AI SEO REVIEW GUARD ---
     let finalPublished = false;
+    let seoBlockedScore = null;
     const requestedPublish = published === 'true' || published === true || published === '1';
     
     if (isApproved && requestedPublish) {
@@ -252,6 +252,7 @@ exports.createUpdate = async (req, res) => {
       } else {
         console.warn(`[SEO Guard] Blocked publish. Score: ${seoReview.estimatedScore}`);
         finalPublished = false;
+        seoBlockedScore = seoReview.estimatedScore;
       }
     }
     
@@ -297,7 +298,17 @@ exports.createUpdate = async (req, res) => {
       );
     }
 
-    res.status(201).json(update);
+    if (seoBlockedScore) {
+      res.status(200).json({
+        success: true,
+        published: false,
+        seoScore: seoBlockedScore,
+        message: "Saved as draft. Publishing requires an SEO score of 90 or above.",
+        data: update
+      });
+    } else {
+      res.status(201).json(update);
+    }
   } catch (err) {
     console.error('[updatesController.createUpdate]', err);
     res.status(500).json({ error: 'Unable to create the update right now.' });
@@ -332,6 +343,7 @@ exports.updateUpdate = async (req, res) => {
     
     // --- GEMINI AI SEO REVIEW GUARD ---
     let finalPublished = false;
+    let seoBlockedScore = null;
     if (parsedIsApproved && parsedPublished) {
       const seoReview = await reviewBlogForSeo({ 
         title: title !== undefined ? title : update.title, 
@@ -346,8 +358,9 @@ exports.updateUpdate = async (req, res) => {
       if (seoReview.estimatedScore >= 90) {
         finalPublished = true;
       } else {
-        console.warn(`[SEO Guard] Blocked publish on update. Score: ${seoReview.estimatedScore}`);
+        console.warn(`[SEO Guard] Update blocked publish. Score: ${seoReview.estimatedScore}`);
         finalPublished = false;
+        seoBlockedScore = seoReview.estimatedScore;
       }
     }
 
@@ -380,7 +393,17 @@ exports.updateUpdate = async (req, res) => {
       );
     }
 
-    res.json(update);
+    if (seoBlockedScore) {
+      res.status(200).json({
+        success: true,
+        published: false,
+        seoScore: seoBlockedScore,
+        message: "Saved as draft. Publishing requires an SEO score of 90 or above.",
+        data: update
+      });
+    } else {
+      res.json(update);
+    }
   } catch (err) {
     console.error('[updatesController.updateUpdate]', err);
     res.status(500).json({ error: 'Unable to update the post right now.' });

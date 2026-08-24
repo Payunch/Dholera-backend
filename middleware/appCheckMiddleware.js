@@ -7,6 +7,8 @@
  */
 
 const admin = require('firebase-admin');
+const { verifyAccessToken } = require('../services/adminSecurity');
+const { Lead } = require('../models');
 
 /**
  * Middleware to enforce Firebase App Check
@@ -18,12 +20,32 @@ async function appCheckVerification(req, res, next) {
   }
 
   // 2. MOBILE & SESSION COMPATIBILITY: Priority to authenticated identity
-  // If we have an admin session, a lead token, or a login cookie, we bypass App Check.
-  if (req.query.token || req.headers.authorization || req.session?.isAdmin || req.cookies?.admin_access_token) {
+  // If we have a validated admin session, we bypass App Check.
+  if (req.session?.isAdmin) {
     return next();
   }
 
-  // 3. TRIAL DOCUMENT COMPATIBILITY: Allow trial PDF to bypass App Check
+  if (req.cookies?.admin_access_token || req.headers.authorization?.startsWith('Bearer ')) {
+    const token = req.cookies?.admin_access_token || req.headers.authorization.split(' ')[1];
+    try {
+      verifyAccessToken(token);
+      return next(); // Valid admin token, bypass App Check
+    } catch (e) {
+      // Invalid token, do not bypass, fall through to App Check
+    }
+  }
+
+  // 3. LEAD TOKEN COMPATIBILITY: Allow valid Lead access to bypass App Check
+  if (req.query.token) {
+    try {
+      const lead = await Lead.findOne({ where: { lead_token: req.query.token } });
+      if (lead) {
+        return next();
+      }
+    } catch (e) {}
+  }
+
+  // 4. TRIAL DOCUMENT COMPATIBILITY: Allow trial PDF to bypass App Check
   const freeTrialId = process.env.FREE_TRIAL_PDF_ID || '19';
   const pathParts = req.path.split('/');
   const pathId = req.params.id || pathParts[pathParts.length - 1];
@@ -40,11 +62,10 @@ async function appCheckVerification(req, res, next) {
   }
 
   try {
-    // Safety: If Firebase Admin was not initialized (missing service account), skip App Check.
-    // This avoids 500 errors in production while the admin is still setting up secrets.
+    // Safety: If Firebase Admin was not initialized, fail closed instead of bypassing.
     if (!admin.apps.length) {
-      console.warn('[AppCheck] Firebase not initialized. Skipping verification.');
-      return next();
+      console.error('[AppCheck] Firebase not initialized. Blocking verification request.');
+      return res.status(500).json({ error: 'Server configuration error: Firebase Admin SDK is not initialized.' });
     }
 
     const appCheckClaims = await admin.appCheck().verifyToken(appCheckToken);

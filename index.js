@@ -33,6 +33,8 @@ const { seedBlogIfEmpty } = require('./scripts/seed_blog_startup');
 const BackupService = require('./services/backupService');
 const autoBlogService = require('./services/autoBlogService');
 const { publishDraftToLive } = require('./services/liveBlogPublisher');
+const { initializeWhatsAppWebhooks } = require('./services/whatsappWebhook');
+const { verifyAccessToken } = require('./services/adminSecurity');
 const cron = require('node-cron');
 
 const http = require('http');
@@ -170,7 +172,10 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'))
   console.warn('PostgreSQL not detected: using in-memory session store (not suitable for production)');
 }
 
-const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'dev-session-secret';
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+if (!SESSION_SECRET) {
+  throw new Error('CRITICAL: SESSION_SECRET or JWT_SECRET must be set in environment variables.');
+}
 const isProd = process.env.NODE_ENV === 'production';
 let cookieDomain = process.env.COOKIE_DOMAIN;
 if (!cookieDomain && isProd) {
@@ -226,9 +231,19 @@ app.use((req, res, next) => {
   ].includes(req.path);
 
   // DELETE/PUT/POST endpoints for updates are protected by CORS preflight and verifyToken (JWT).
-  // Bypassing csurf here to avoid session-cookie domain issues across admin panels.
-  const isSafeDelete = req.method === 'DELETE' && (req.path.startsWith('/api/leads/') || req.path.startsWith('/api/updates/'));
-  const isSafeUpdateMutation = (req.method === 'PUT' || req.method === 'POST') && req.path.startsWith('/api/updates');
+  // We only bypass csurf here if the request explicitly uses a Bearer token (cross-domain integration).
+  // If it relies on ambient session cookies, CSRF protection MUST be enforced.
+  const isSafeDelete = req.method === 'DELETE' && req.path.startsWith('/api/leads/');
+  
+  const hasBearerToken = req.headers.authorization && req.headers.authorization.startsWith('Bearer ');
+  let isBearerValid = false;
+  if (hasBearerToken) {
+    try {
+      verifyAccessToken(req.headers.authorization.split(' ')[1]);
+      isBearerValid = true;
+    } catch (e) {}
+  }
+  const isSafeUpdateMutation = (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') && req.path.startsWith('/api/updates') && isBearerValid;
 
   const isPublicMutation = isPublicPath || isSafeDelete || isSafeUpdateMutation;
 

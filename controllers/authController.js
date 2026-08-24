@@ -15,9 +15,9 @@ const {
   getMfaProvisioningUri
 } = require('../services/adminSecurity');
 
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-session-secret';
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+const JWT_SECRET = process.env.JWT_SECRET;
 const LOGIN_LOCKOUT_BASE_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_BASE_MS || `${5 * 60 * 1000}`, 10);
 const LOGIN_LOCKOUT_MAX_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_MAX_MS || `${60 * 60 * 1000}`, 10);
 const LOGIN_LOCKOUT_THRESHOLD = Number.parseInt(process.env.ADMIN_LOCKOUT_THRESHOLD || '10', 10);
@@ -145,8 +145,7 @@ exports.login = async (req, res) => {
         res.json({ 
           ok: true, 
           username, 
-          mfaEnabled: isMfaEnabled(),
-          token: tokens.accessToken 
+          mfaEnabled: isMfaEnabled()
         });
       } catch (innerErr) {
         console.error('Unhandled error in session regenerate callback:', innerErr);
@@ -173,6 +172,46 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.mobileLogin = async (req, res) => {
+  if (!ADMIN_USER || !ADMIN_PASS || !JWT_SECRET) {
+    return res.status(503).json({ error: 'Admin auth is not configured on server.' });
+  }
+
+  const username = cleanText(req.body?.username, 80);
+  const password = cleanText(req.body?.password, 120);
+  const mfaCode = cleanText(req.body?.mfaCode, 16);
+
+  const lockKey = getLockoutKey(username, req.ip);
+  const lockInfo = failedLoginState.get(lockKey);
+
+  if (lockInfo?.lockUntil && lockInfo.lockUntil > Date.now()) {
+    return res.status(429).json({ error: 'Account temporarily locked.' });
+  }
+
+  if (safeEqual(username, ADMIN_USER) && safeEqual(password, ADMIN_PASS)) {
+    if (isMfaEnabled() && !verifyMfaCode(mfaCode)) {
+      registerLoginFailure(lockKey);
+      return res.status(401).json({ error: 'Invalid MFA code', mfaRequired: true });
+    }
+    clearLoginFailure(lockKey);
+
+    const tokens = issueAdminTokens({ username });
+    
+    // Dedicated native-admin flow: return tokens directly in JSON.
+    // Does NOT establish a browser cookie or web session.
+    res.json({ 
+      ok: true, 
+      username, 
+      mfaEnabled: isMfaEnabled(),
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    });
+  } else {
+    registerLoginFailure(lockKey);
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+};
+
 exports.refreshToken = async (req, res) => {
   const oldToken = getTokenFromRequest(req, 'admin_refresh_token');
   if (!oldToken) return res.status(401).json({ error: 'No refresh token' });
@@ -195,13 +234,47 @@ exports.refreshToken = async (req, res) => {
     res.json({ 
       success: true, 
       ok: true, 
-      username: payload.sub, 
-      accessToken: rotated.accessToken 
+      username: payload.sub
     });
   } catch (err) {
     clearAuthCookies(res);
     res.status(401).json({ error: 'Token rotation failed' });
   }
+};
+
+exports.mobileRefresh = async (req, res) => {
+  const oldToken = req.body?.refreshToken;
+  if (!oldToken) return res.status(401).json({ error: 'No refresh token provided' });
+
+  try {
+    const rotated = rotateRefreshToken(oldToken);
+    if (!rotated) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    const payload = verifyAccessToken(rotated.accessToken);
+    
+    // Dedicated native-admin flow: return tokens directly in JSON.
+    res.json({ 
+      success: true, 
+      ok: true, 
+      username: payload.sub, 
+      accessToken: rotated.accessToken,
+      refreshToken: rotated.refreshToken
+    });
+  } catch (err) {
+    res.status(401).json({ error: 'Token rotation failed' });
+  }
+};
+
+exports.mobileLogout = async (req, res) => {
+  const oldToken = req.body?.refreshToken;
+  if (oldToken) {
+    try {
+      revokeRefreshToken(oldToken);
+    } catch (e) {}
+  }
+  res.json({ ok: true });
 };
 
 exports.logout = async (req, res) => {
@@ -271,8 +344,8 @@ exports.getMfaStatus = (req, res) => {
 };
 
 exports.getMfaProvisioningUri = (req, res) => {
-  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-  const username = req.user?.username || req.session?.username || ADMIN_USER;
+  const username = req.user?.username || req.session?.username;
+  if (!username) return res.status(401).json({ error: 'Unauthorized' });
   const uri = getMfaProvisioningUri({ username });
   if (!uri) return res.status(404).json({ error: 'MFA is not enabled' });
   return res.json({ uri });

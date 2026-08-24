@@ -1,7 +1,10 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
-const ACCESS_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'dev-admin-access-secret';
+const ACCESS_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET;
+if (!ACCESS_SECRET) {
+  throw new Error('CRITICAL: ADMIN_JWT_SECRET or JWT_SECRET must be set in environment variables.');
+}
 const REFRESH_SECRET = process.env.ADMIN_REFRESH_TOKEN_SECRET || ACCESS_SECRET;
 const ADMIN_MFA_SECRET = (process.env.ADMIN_MFA_SECRET || '').replace(/\s+/g, '').toUpperCase();
 const ADMIN_MFA_ISSUER = process.env.ADMIN_MFA_ISSUER || 'Dholera Growth Evidence Platform';
