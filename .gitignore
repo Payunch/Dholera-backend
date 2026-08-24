@@ -21,3 +21,9 @@ uploads/pdfs/*-mutool.pdf
 # ADK cleanup
 backups/*.sqlite
 myAgent.js
+
+.envx
+data/database.sqlite-shm
+data/database.sqlite-wal
+data/sessions.sqlite
+uploads/images/
