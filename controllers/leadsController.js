@@ -1048,10 +1048,16 @@ exports.systemRestore = async (req, res) => {
 exports.googleAdsWebhook = async (req, res) => {
   try {
     const payload = req.body;
-    const webhookKey = process.env.GOOGLE_ADS_WEBHOOK_KEY || 'dholera_secret_key_0404'; // Updated key
+    const webhookKey = process.env.GOOGLE_ADS_WEBHOOK_KEY;
+    
+    // Fail closed if the key is not configured in the environment
+    if (!webhookKey) {
+      console.error('CRITICAL: GOOGLE_ADS_WEBHOOK_KEY is not defined in environment variables.');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
     
     // 1. Verify Key
-    if (payload.google_key !== webhookKey && payload.google_key !== 'dholera_secret_key_2026') {
+    if (payload.google_key !== webhookKey) {
       console.warn('Invalid Google Ads Webhook Key received:', payload.google_key);
       return res.status(401).json({ error: 'Unauthorized key' });
     }

@@ -5,6 +5,7 @@ const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
 const { translateBlogPost } = require('../services/translationService');
 const { verifyNewsWithGemini } = require('../services/autoBlogService');
+const { reviewBlogForSeo } = require('../services/seoReviewService');
 const path = require('path');
 
 const isRemotePath = (p) => p.startsWith('http://') || p.startsWith('https://');
@@ -239,7 +240,20 @@ exports.createUpdate = async (req, res) => {
     // If the author is explicitly set (e.g. a user or agent upload) OR we just want to protect all inputs:
     const verification = await verifyNewsWithGemini(title, content);
     const isApproved = verification.verified;
-    const finalPublished = isApproved ? (published === 'true' || published === true || published === '1') : false;
+    
+    // --- GEMINI AI SEO REVIEW GUARD ---
+    let finalPublished = false;
+    const requestedPublish = published === 'true' || published === true || published === '1';
+    
+    if (isApproved && requestedPublish) {
+      const seoReview = await reviewBlogForSeo({ title, content, category, seoTitle, seoDescription, slug, imageAltText, tags });
+      if (seoReview.estimatedScore >= 90) {
+        finalPublished = true;
+      } else {
+        console.warn(`[SEO Guard] Blocked publish. Score: ${seoReview.estimatedScore}`);
+        finalPublished = false;
+      }
+    }
     
     if (!isApproved) {
       console.warn(`[Content Moderation] Blocked/Flagged Upload. Reason: ${verification.reason}`);
@@ -315,7 +329,27 @@ exports.updateUpdate = async (req, res) => {
     const parsedIsApproved = isApproved !== undefined ? (isApproved === 'true' || isApproved === true || isApproved === '1') : update.isApproved;
     const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
     const parsedIsExclusive = isExclusive !== undefined ? (isExclusive === 'true' || isExclusive === true || isExclusive === '1') : update.isExclusive;
-    const finalPublished = parsedIsApproved ? parsedPublished : false; // Force unpublished if not approved
+    
+    // --- GEMINI AI SEO REVIEW GUARD ---
+    let finalPublished = false;
+    if (parsedIsApproved && parsedPublished) {
+      const seoReview = await reviewBlogForSeo({ 
+        title: title !== undefined ? title : update.title, 
+        content: content !== undefined ? content : update.content, 
+        category: category !== undefined ? category : update.category, 
+        seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle, 
+        seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription, 
+        slug: slug !== undefined ? slug : update.slug, 
+        imageAltText: imageAltText !== undefined ? imageAltText : update.imageAltText, 
+        tags: tags !== undefined ? tags : update.tags 
+      });
+      if (seoReview.estimatedScore >= 90) {
+        finalPublished = true;
+      } else {
+        console.warn(`[SEO Guard] Blocked publish on update. Score: ${seoReview.estimatedScore}`);
+        finalPublished = false;
+      }
+    }
 
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,
