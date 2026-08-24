@@ -246,13 +246,17 @@ exports.createUpdate = async (req, res) => {
     const requestedPublish = published === 'true' || published === true || published === '1';
     
     if (isApproved && requestedPublish) {
-      const seoReview = await reviewBlogForSeo({ title, content, category, seoTitle, seoDescription, slug, imageAltText, tags });
-      if (seoReview.estimatedScore >= 90) {
+      if (isExclusive === 'true' || isExclusive === true || isExclusive === '1') {
         finalPublished = true;
       } else {
-        console.warn(`[SEO Guard] Blocked publish. Score: ${seoReview.estimatedScore}`);
-        finalPublished = false;
-        seoBlockedScore = seoReview.estimatedScore;
+        const seoReview = await reviewBlogForSeo({ title, content, category, seoTitle, seoDescription, slug, imageAltText, tags });
+        if (seoReview.estimatedScore >= 80) {
+          finalPublished = true;
+        } else {
+          console.warn(`[SEO Guard] Blocked publish. Score: ${seoReview.estimatedScore}`);
+          finalPublished = false;
+          seoBlockedScore = seoReview.estimatedScore;
+        }
       }
     }
     
@@ -303,7 +307,7 @@ exports.createUpdate = async (req, res) => {
         success: true,
         published: false,
         seoScore: seoBlockedScore,
-        message: "Saved as draft. Publishing requires an SEO score of 90 or above.",
+        message: "Saved as draft. Publishing requires an SEO score of 80 or above.",
         data: update
       });
     } else if (!isApproved) {
@@ -362,25 +366,29 @@ exports.updateUpdate = async (req, res) => {
     // --- GEMINI AI SEO REVIEW GUARD ---
     let finalPublished = false;
     let seoBlockedScore = null;
-    if (parsedIsApproved && parsedPublished) {
-      const seoReview = await reviewBlogForSeo({ 
-        title: title !== undefined ? title : update.title, 
-        content: content !== undefined ? content : update.content, 
-        category: category !== undefined ? category : update.category, 
-        seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle, 
-        seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription, 
-        slug: slug !== undefined ? slug : update.slug, 
-        imageAltText: imageAltText !== undefined ? imageAltText : update.imageAltText, 
-        tags: tags !== undefined ? tags : update.tags 
-      });
-      if (seoReview.estimatedScore >= 90) {
-        finalPublished = true;
-      } else {
-        console.warn(`[SEO Guard] Update blocked publish. Score: ${seoReview.estimatedScore}`);
-        finalPublished = false;
-        seoBlockedScore = seoReview.estimatedScore;
+      if (parsedIsApproved && parsedPublished) {
+        if (parsedIsExclusive) {
+          finalPublished = true;
+        } else {
+          const seoReview = await reviewBlogForSeo({ 
+            title: title !== undefined ? title : update.title, 
+            content: content !== undefined ? content : update.content, 
+            category: category !== undefined ? category : update.category, 
+            seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle, 
+            seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription, 
+            slug: slug !== undefined ? slug : update.slug, 
+            imageAltText: imageAltText !== undefined ? imageAltText : update.imageAltText, 
+            tags: tags !== undefined ? tags : update.tags 
+          });
+          if (seoReview.estimatedScore >= 80) {
+            finalPublished = true;
+          } else {
+            console.warn(`[SEO Guard] Update blocked publish. Score: ${seoReview.estimatedScore}`);
+            finalPublished = false;
+            seoBlockedScore = seoReview.estimatedScore;
+          }
+        }
       }
-    }
 
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,
@@ -416,7 +424,7 @@ exports.updateUpdate = async (req, res) => {
         success: true,
         published: false,
         seoScore: seoBlockedScore,
-        message: "Saved as draft. Publishing requires an SEO score of 90 or above.",
+        message: "Saved as draft. Publishing requires an SEO score of 80 or above.",
         data: update
       });
     } else if (!parsedIsApproved) {
