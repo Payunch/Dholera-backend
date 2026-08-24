@@ -212,6 +212,30 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// POST upload new PDF
+router.post('/upload', verifyToken, upload.single('pdf'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No PDF file uploaded' });
+    }
+
+    const { title, category, is_protected, documentDate } = req.body;
+    
+    const newPdf = await PdfDocument.create({
+      title: title || req.file.originalname,
+      category: category || 'General',
+      file_path: req.file.path,
+      is_protected: is_protected === 'true' || is_protected === true,
+      documentDate: documentDate ? new Date(documentDate) : new Date()
+    });
+
+    res.json({ success: true, pdf: newPdf });
+  } catch (err) {
+    console.error('[PDF Upload Error]', err);
+    res.status(500).json({ success: false, error: 'Unable to upload PDF.' });
+  }
+});
+
 // GET user's unlocked PDFs
 router.get('/my-vault', async (req, res) => {
   try {
