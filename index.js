@@ -204,7 +204,15 @@ app.use((req, res, next) => {
   next();
 });
 
-const csrfProtection = csurf();
+const csrfProtection = csurf({
+  cookie: {
+    key: '_csrf',
+    secure: isProd,
+    sameSite: 'lax',
+    httpOnly: true,
+    ...(cookieDomain && { domain: cookieDomain })
+  }
+});
 
 // Apply CSRF only to admin/session-protected mutations.
 app.use((req, res, next) => {
@@ -256,7 +264,15 @@ app.use((req, res, next) => {
 app.get('/api/auth/csrf-token', csrfProtection, (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    return res.json({ csrfToken: req.csrfToken() });
+    const token = req.csrfToken();
+    if (req.session) {
+      req.session.save((err) => {
+        if (err) console.error('[CSRF] Failed to save session:', err);
+        return res.json({ csrfToken: token });
+      });
+    } else {
+      return res.json({ csrfToken: token });
+    }
   } catch (err) {
     return res.status(500).json({ error: 'Failed to generate CSRF token' });
   }
