@@ -44,7 +44,24 @@ router.post('/seo-review', verifyToken, adminMutationLimiter, async (req, res) =
     return res.json(review);
   } catch (error) {
     console.error('[updates.seo-review]', error.message);
-    return res.status(process.env.GEMINI_API_KEY_free ? 502 : 503).json({ error: 'AI review is unavailable. Please try again shortly.' });
+    const providerStatus = Number(error?.status || error?.response?.status);
+    const isQuotaError = providerStatus === 429 || /(?:\b429\b|quota exceeded|too many requests|resource exhausted)/i.test(error?.message || '');
+
+    if (isQuotaError) {
+      const retryMatch = String(error?.message || '').match(/(?:retry in|retryDelay["']?\s*:\s*["']?)(\d+(?:\.\d+)?)s/i);
+      const retryAfterSeconds = Math.max(1, Math.ceil(Number(retryMatch?.[1]) || 60));
+      res.set('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({
+        error: `AI review is temporarily rate-limited. Please wait about ${retryAfterSeconds} seconds and try once.`,
+        code: 'AI_REVIEW_RATE_LIMITED',
+        retryAfterSeconds
+      });
+    }
+
+    return res.status(process.env.GEMINI_API_KEY_free ? 502 : 503).json({
+      error: 'AI review is temporarily unavailable. Please try again later.',
+      code: 'AI_REVIEW_UNAVAILABLE'
+    });
   }
 });
 
