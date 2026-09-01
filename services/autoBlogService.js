@@ -5,6 +5,12 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const crypto = require('crypto');
+const {
+  EVERGREEN_PATHS,
+  isNearDuplicateTitle,
+  normalizeInternalLinks,
+  validateGeneratedBlog
+} = require('./autoBlogEditorialPolicy');
 
 const parser = new Parser();
 // Quality-first editorial pipeline. These defaults retain the original
@@ -142,28 +148,33 @@ async function generateBlogPost(title, content, sourceUrl, options = {}) {
   });
 
   const prompt = `
-You are an expert SEO content writer and real estate blogger for "Dholera Smart City".
+You are a careful news editor for DholeraPlatform.com, an independent Dholera SIR information and real-estate portal.
 Today's Date: ${currentDateStr}
 Write ${isAppNews ? 'a concise, factual mobile-app news brief' : 'a comprehensive, engaging, and highly SEO-optimized blog post'} based on the following news.
 Target Audience: Real estate investors, businesses, and people looking to buy land in Dholera SIR.
 
 Requirements for Editorial Quality:
+- **People-first purpose:** Explain what happened, what is confirmed, why it matters, and what remains uncertain. Do not pad the article for keywords.
+- **Original value:** Synthesize the supplied report into a useful explanation. Do not copy long passages or present the source's work as original reporting.
+- **No fabrication:** Use only facts in the supplied news. Never invent dates, prices, distances, approvals, quotes, statistics, project status, sources, or URLs.
 - **News Sourcing:** You MUST attribute the source of the news within the first paragraph (e.g., "According to a recent report by [Source Name]..."). Link to the source if applicable.
+- **Source boundary:** The supplied News Source URL is the only permitted external news link. Do not invent additional external links.
 - **Objective Tone:** AVOID over-promotional and absolute claims like 'guaranteed' or 'goldmine'. Use softer, compliant language such as 'expected to', 'projected', 'may contribute to', and 'potential'.
 - **Context Details:** Ensure key facts like location, current date (${currentDateStr}), and specific project names from the news are accurately included.
 - **Risk Disclaimer:** Include a standard, brief risk disclaimer at the very end of the post (e.g., "Disclaimer: Real estate investments are subject to market risks...").
 
-Requirements for WordPress SEO Ranking:
-- **Length:** Write a comprehensive post between 800 and 1,200 words.
+Requirements for Search and Reader Usefulness:
+- **Length:** For a web article, aim for 700-1,200 words only when the source provides enough substance. Never add unsupported filler.
 - **Table of Contents:** Include a dynamic Table of Contents at the top using a <ul> list with anchor links (e.g., <a href="#section1">) to the corresponding H2 tags which must have matching id attributes (e.g., <h2 id="section1">).
 - **Introduction:** State the core answer/summary within the first 100 words, including the primary keyword.
 - **Structure:** Break text into 200-300 word sections. Use proper HTML tags (<h2>, <h3>, <p>, <ul>, <li>). 
-- **Internal/External Links:** Include at least 2 relevant external links to authoritative sources (using <a href="...">) and 3 placeholders for internal links (e.g., <a href="/blog/dholera-investment-guide">our guide</a>).
-- **CTA:** Include a strong, professional Call to Action at the end, along with contact details placeholder (e.g., Contact us at +91-XXXXXXXXXX).
+- **Internal Links:** Include 2-3 genuinely relevant links selected only from: ${EVERGREEN_PATHS.join(', ')}. Use exact paths and natural anchor text. Never create placeholder links.
+- **Headings:** Do not output an H1 because the page template supplies it. Use descriptive H2/H3 headings without keyword stuffing.
+- **CTA:** End with a restrained invitation to read a relevant Dholera Platform guide. Do not add phone placeholders, urgency, or sales promises.
 
 ${isAppNews ? 'APP-ONLY OVERRIDE: Produce 180-300 words. Use a short summary plus 2-4 factual bullet points and one source link. Do not include a table of contents, investment CTA, sales language, or internal links.' : ''}
 
-Also provide SEO Metadata: tags (comma separated), seoTitle (max 60 chars), seoDescription (max 160 chars), and seoKeywords (comma separated).
+Also provide SEO Metadata: 3-6 focused tags (comma separated), seoTitle (35-60 chars), seoDescription (120-160 chars), and a short seoKeywords list. Use one natural primary topic without keyword stuffing.
 
 News Title: ${title}
 News Source URL: ${sourceUrl || 'Unknown'}
@@ -385,11 +396,15 @@ async function runDaily(options = {}) {
       const item = feed.items[i];
       console.log(`[AutoBlog] Evaluating News: ${item.title}`);
 
-      // Check if we already processed a very similar title recently
-      const existing = await Update.findOne({
-        where: { title: item.title }
+      // Exact title matching misses syndicated headlines rewritten by another
+      // publisher. Compare against recent topics to prevent cannibalization.
+      const recentUpdates = await Update.findAll({
+        attributes: ['title'],
+        order: [['createdAt', 'DESC']],
+        limit: 100
       });
-      if (existing) {
+      const existingTitles = recentUpdates.map(update => update.title).filter(Boolean);
+      if (isNearDuplicateTitle(item.title, existingTitles)) {
          console.log(`[AutoBlog] Skipping, article already seems to exist.`);
          outcomes.push(`${item.title}: already exists`);
          continue;
@@ -405,6 +420,7 @@ async function runDaily(options = {}) {
         const blogData = await generateBlogPost(item.title, item.contentSnippet || item.content, item.link, { contentMode });
         
         if (blogData) {
+          blogData.content = normalizeInternalLinks(blogData.content);
           console.log(`[AutoBlog] Blog post generated. Title: ${blogData.title}`);
 
           if (hasUnsafeAdvertisingClaims(blogData.content)) {
@@ -412,11 +428,20 @@ async function runDaily(options = {}) {
             outcomes.push(`${item.title}: rejected by local advertising-claims safety gate`);
             continue;
           }
+
+          const editorialReview = validateGeneratedBlog(blogData, { sourceUrl: item.link, contentMode });
+          if (!editorialReview.valid) {
+            const reason = editorialReview.errors.join(' ');
+            console.warn(`[AutoBlog] Generated copy failed the editorial SEO gate: ${reason}`);
+            outcomes.push(`${item.title}: rejected by editorial SEO gate (${reason})`);
+            continue;
+          }
           
-          // Inject the requested Contact CTA at the very end
+          // Add a restrained, canonical CTA after the generated copy passes
+          // the editorial gate. Human approval is still required to publish.
           const ctaHtml = `\n\n<div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
   <h3>Ready to Explore Dholera Smart City?</h3>
-  <p><a href="https://dholeraplatform.com/contact" style="font-weight: bold; font-size: 1.2em; color: #0056b3; text-decoration: none;">📞 Call Now: 7435808031<br>🌐 https://dholerahub.com</a></p>
+  <p><a href="https://www.dholeraplatform.com/contact" style="font-weight: bold; color: #0056b3; text-decoration: none;">Contact the Dholera Platform team</a> for project-specific questions and independent verification.</p>
 </div>`;
           if (!isAppNews) blogData.content += ctaHtml;
           
@@ -476,5 +501,6 @@ module.exports = {
   verifyNewsWithGemini,
   generateBlogPost,
   generateImageForBlog,
-  hasUnsafeAdvertisingClaims
+  hasUnsafeAdvertisingClaims,
+  validateGeneratedBlog
 };

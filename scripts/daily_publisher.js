@@ -76,7 +76,10 @@ async function publishNextBlog() {
             category: blogToPublish.meta.category || "Investment",
             imageUrl: "/uploads/dholera_blog_image.png", // fallback or use the first image in post
             imagePosition: "top",
-            published: true,
+            // Automation may prepare content, but an administrator must make
+            // the final editorial and factual publishing decision.
+            published: false,
+            isApproved: false,
             publishedAt: new Date(),
             lang: "en",
             author: "Dholera Admin",
@@ -108,7 +111,7 @@ async function publishNextBlog() {
                 body: JSON.stringify({
                     title: blogToPublish.meta.seo_title,
                     content: htmlContent,
-                    status: 'publish', // or 'draft'
+                    status: 'draft',
                     // Focus keywords and meta can be passed in meta properties for Yoast/RankMath
                     meta: {
                         rank_math_focus_keyword: blogToPublish.meta.focus_keyword || "",
