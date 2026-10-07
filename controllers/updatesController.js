@@ -112,30 +112,30 @@ exports.getUpdates = async (req, res) => {
       order: [['publishedAt', 'DESC']]
     });
 
-    // If requested language is not English, replace English titles/contents with translations where available
     if (targetLang !== 'en') {
-      // Find all translations for the requested language
-      const translations = await Update.findAll({
-        where: { lang: targetLang, original_id: { [Op.not]: null } }
-      });
-      const translationMap = {};
-      translations.forEach(t => { translationMap[t.original_id] = t; });
-
       updates = updates.map(update => {
-        const translated = translationMap[update.id];
-        if (translated) {
-          // Merge translated fields onto the original object structure
+        const titleKey = `title_${targetLang}`;
+        const contentKey = `content_${targetLang}`;
+        
+        const translatedTitle = update[titleKey];
+        const translatedContent = update[contentKey];
+        
+        if (translatedTitle && translatedContent) {
           return {
             ...update.toJSON(),
             original_title: update.title,
             original_slug: update.slug,
-            title: translated.title,
-            content: translated.content,
-            lang: translated.lang,
-            translated_id: translated.id // Provide reference to the actual translation row
+            title: translatedTitle,
+            content: translatedContent,
+            lang: targetLang
           };
         }
-        return update; // Fallback to English if translation missing
+        
+        // Return original if translation missing (Frontend should handle English slug mismatch fallback)
+        return {
+          ...update.toJSON(),
+          lang: targetLang // Lie to frontend so getBlogSlug expects English, preventing redirect loops! Wait, no.
+        };
       });
     }
 
@@ -161,58 +161,28 @@ exports.getUpdateById = async (req, res) => {
       return res.status(404).json({ error: 'Translations cannot be accessed directly by ID. Use ?lang= on the canonical ID.' });
     }
 
-    // If a different language is requested, try to find the linked translation
-    if (targetLang !== update.lang) {
-      const originalId = update.original_id || update.id;
-      let translated = await Update.findOne({
-        where: {
-          [Op.or]: [
-            { id: originalId, lang: targetLang },
-            { original_id: originalId, lang: targetLang }
-          ]
-        }
-      });
+    if (targetLang !== 'en') {
+      const titleKey = `title_${targetLang}`;
+      const contentKey = `content_${targetLang}`;
+      
+      const translatedTitle = update[titleKey];
+      const translatedContent = update[contentKey];
 
-      // AUTO-TRANSLATE FALLBACK
-      if (!translated && targetLang !== 'en') {
-         try {
-           const original = update.lang === 'en' ? update : await Update.findByPk(originalId);
-           if (original) {
-             const results = await translateBlogPost(original.toJSON(), [targetLang]);
-             if (results && results[0] && results[0].content && results[0].title) {
-               translated = await Update.create({
-                 title: results[0].title,
-                 content: results[0].content,
-                 category: original.category,
-                 lang: targetLang,
-                 original_id: original.id,
-                 published: true,
-                 publishedAt: original.publishedAt,
-                 imageUrl: original.imageUrl,
-                 author: original.author,
-                 tags: original.tags,
-                 seoTitle: original.seoTitle,
-                 seoDescription: original.seoDescription,
-                 seoKeywords: original.seoKeywords
-               });
-             } else {
-               console.error(`[Fallback] Translation failed or returned empty content for post ${original.id} to ${targetLang}`);
-             }
-           }
-         } catch (e) {
-           console.error(`[Fallback] Error during auto-translate for post ${originalId} to ${targetLang}:`, e.message);
-         }
-      }
-      if (translated) {
-        const originalObj = (update.lang === 'en' ? update : await Update.findByPk(originalId)).toJSON();
+      if (translatedTitle && translatedContent) {
+        const originalObj = update.toJSON();
         update = {
           ...originalObj,
           original_title: originalObj.title,
           original_slug: originalObj.slug,
-          title: translated.title,
-          content: translated.content,
-          lang: translated.lang,
-          translated_id: translated.id
+          title: translatedTitle,
+          content: translatedContent,
+          lang: targetLang
+        };
+      } else {
+        // Fallback to English but preserve the requested language to prevent redirect loops
+        update = {
+          ...update.toJSON(),
+          lang: targetLang
         };
       }
     }
@@ -240,7 +210,7 @@ exports.getUpdateById = async (req, res) => {
 
 exports.createUpdate = async (req, res) => {
   try {
-    const { title, content, category, published, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
+    const { title, content, title_gu, content_gu, title_hi, content_hi, category, published, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
     
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
@@ -290,6 +260,10 @@ exports.createUpdate = async (req, res) => {
     const update = await Update.create({
       title: cleanText(title, 255),
       content: cleanHtml(content, 50000),
+      title_gu: title_gu ? cleanText(title_gu, 255) : null,
+      content_gu: content_gu ? cleanHtml(content_gu, 50000) : null,
+      title_hi: title_hi ? cleanText(title_hi, 255) : null,
+      content_hi: content_hi ? cleanHtml(content_hi, 50000) : null,
       category: cleanText(category, 100) || 'General',
       published: finalPublished,
       isApproved: isApproved,
@@ -346,7 +320,7 @@ exports.updateUpdate = async (req, res) => {
     if (!update) return res.status(404).json({ error: 'Update not found' });
     const wasPublished = Boolean(update.published && update.isApproved);
 
-    const { title, content, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
+    const { title, content, title_gu, content_gu, title_hi, content_hi, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
     
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
@@ -406,6 +380,10 @@ exports.updateUpdate = async (req, res) => {
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,
       content: content !== undefined ? cleanHtml(content, 50000) : update.content,
+      title_gu: title_gu !== undefined ? (title_gu ? cleanText(title_gu, 255) : null) : update.title_gu,
+      content_gu: content_gu !== undefined ? (content_gu ? cleanHtml(content_gu, 50000) : null) : update.content_gu,
+      title_hi: title_hi !== undefined ? (title_hi ? cleanText(title_hi, 255) : null) : update.title_hi,
+      content_hi: content_hi !== undefined ? (content_hi ? cleanHtml(content_hi, 50000) : null) : update.content_hi,
       category: category !== undefined ? (cleanText(category, 100) || 'General') : update.category,
       published: finalPublished,
       isApproved: parsedIsApproved,

@@ -457,6 +457,10 @@ const startServer = async () => {
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN imageAltText VARCHAR(255);'); } catch (e) { }
     try { await sequelize.query('ALTER TABLE Updates ADD COLUMN imageTitle VARCHAR(255);'); } catch (e) { }
     try { await sequelize.query("ALTER TABLE AutoBlogRuns ADD COLUMN contentMode VARCHAR(32) DEFAULT 'web';"); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN title_gu VARCHAR(255);'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN content_gu TEXT;'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN title_hi VARCHAR(255);'); } catch (e) { }
+    try { await sequelize.query('ALTER TABLE Updates ADD COLUMN content_hi TEXT;'); } catch (e) { }
     console.log('[DB] Running robust schema patches for SQLite...');
     await sequelize.query("ALTER TABLE Leads ADD COLUMN utm_source VARCHAR(255) DEFAULT 'organic'").catch(() => { });
     await sequelize.query("ALTER TABLE Leads ADD COLUMN score INTEGER DEFAULT 0").catch(() => { });

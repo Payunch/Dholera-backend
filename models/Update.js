@@ -94,6 +94,22 @@ const Update = sequelize.define('Update', {
       model: 'Portals',
       key: 'id'
     }
+  },
+  title_gu: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  content_gu: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  title_hi: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  content_hi: {
+    type: DataTypes.TEXT,
+    allowNull: true
   }
 });
 

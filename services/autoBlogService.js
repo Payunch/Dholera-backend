@@ -183,8 +183,12 @@ News Content: ${content}
 
 Respond strictly in JSON format without markdown wrapping, like this:
 {
-  "title": "SEO Optimized Blog Title",
-  "content": "The full HTML content of the blog post...",
+  "title_en": "SEO Optimized Blog Title",
+  "title_gu": "SEO Optimized Blog Title in Gujarati",
+  "title_hi": "SEO Optimized Blog Title in Hindi",
+  "content_en": "The full HTML content of the blog post...",
+  "content_gu": "The full HTML content of the blog post in Gujarati...",
+  "content_hi": "The full HTML content of the blog post in Hindi...",
   "category": "News",
   "tags": "tag1, tag2, tag3",
   "seoTitle": "...",
@@ -421,7 +425,12 @@ async function runDaily(options = {}) {
         const blogData = await generateBlogPost(item.title, item.contentSnippet || item.content, item.link, { contentMode });
         
         if (blogData) {
+          blogData.title = blogData.title_en || blogData.title;
+          blogData.content = blogData.content_en || blogData.content;
           blogData.content = normalizeInternalLinks(blogData.content);
+          if (blogData.content_gu) blogData.content_gu = normalizeInternalLinks(blogData.content_gu);
+          if (blogData.content_hi) blogData.content_hi = normalizeInternalLinks(blogData.content_hi);
+          
           console.log(`[AutoBlog] Blog post generated. Title: ${blogData.title}`);
 
           if (hasUnsafeAdvertisingClaims(blogData.content)) {
@@ -440,11 +449,24 @@ async function runDaily(options = {}) {
           
           // Add a restrained, canonical CTA after the generated copy passes
           // the editorial gate. Human approval is still required to publish.
-          const ctaHtml = `\n\n<div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
+          const ctaHtmlEn = `\n\n<div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
   <h3>Ready to Explore Dholera Smart City?</h3>
   <p><a href="https://www.dholeraplatform.com/contact" style="font-weight: bold; color: #0056b3; text-decoration: none;">Contact the Dholera Platform team</a> for project-specific questions and independent verification.</p>
 </div>`;
-          if (!isAppNews) blogData.content += ctaHtml;
+          const ctaHtmlGu = `\n\n<div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
+  <h3>ધોલેરા સ્માર્ટ સિટી વિશે વધુ જાણવા માટે તૈયાર છો?</h3>
+  <p>પ્રોજેક્ટ સંબંધિત પ્રશ્નો અને સ્વતંત્ર ચકાસણી માટે <a href="https://www.dholeraplatform.com/contact" style="font-weight: bold; color: #0056b3; text-decoration: none;">ધોલેરા પ્લેટફોર્મ ટીમનો સંપર્ક કરો</a>.</p>
+</div>`;
+          const ctaHtmlHi = `\n\n<div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
+  <h3>धोलेरा स्मार्ट सिटी के बारे में अधिक जानने के लिए तैयार हैं?</h3>
+  <p>परियोजना-विशिष्ट प्रश्नों और स्वतंत्र सत्यापन के लिए <a href="https://www.dholeraplatform.com/contact" style="font-weight: bold; color: #0056b3; text-decoration: none;">धोलेरा प्लेटफॉर्म टीम से संपर्क करें</a>।</p>
+</div>`;
+
+          if (!isAppNews) {
+             blogData.content += ctaHtmlEn;
+             if (blogData.content_gu) blogData.content_gu += ctaHtmlGu;
+             if (blogData.content_hi) blogData.content_hi += ctaHtmlHi;
+          }
           
           // 4. Generate Image
           let imageUrl = null;
@@ -459,6 +481,10 @@ async function runDaily(options = {}) {
           const newUpdate = await Update.create({
             title: blogData.title,
             content: blogData.content,
+            title_gu: blogData.title_gu,
+            content_gu: blogData.content_gu,
+            title_hi: blogData.title_hi,
+            content_hi: blogData.content_hi,
             category: isAppNews ? 'App News' : (blogData.category || 'News'),
             published: false, // Save as unpublished so Admin must approve it
             isApproved: false, // Explicitly mark as pending approval
