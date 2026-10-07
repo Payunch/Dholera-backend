@@ -1,5 +1,5 @@
 // =============================================================================
-// PRODUCTION BATCH SCRIPT:
+// PRODUCTION BATCH SCRIPT (RESILIENT & RESUMABLE):
 // 1. Backs up database.sqlite
 // 2. Generates Bava Hindi & Bava Gujarati translations for all 28 posts
 // 3. Optimizes 80%+ SEO (seoTitle 50-60 chars, seoDesc 140-160 chars, tags, keywords, alt text)
@@ -58,6 +58,48 @@ const SLUG_MAP = {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+function stripCodeFences(text) {
+  return (text || '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+function extractBalancedJsonObject(value = '') {
+  const start = value.indexOf('{');
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const character = value[index];
+    if (escaped) { escaped = false; continue; }
+    if (character === '\\' && inString) { escaped = true; continue; }
+    if (character === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (character === '{') depth += 1;
+    if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return value.slice(start, index + 1);
+    }
+  }
+  return null;
+}
+
+function parseJson(raw) {
+  const cleaned = stripCodeFences(raw);
+  try {
+    return JSON.parse(cleaned);
+  } catch (_) {
+    const balanced = extractBalancedJsonObject(cleaned);
+    if (balanced) {
+      return JSON.parse(balanced);
+    }
+    throw new Error('Could not parse balanced JSON object from response.');
+  }
+}
+
 async function callGeminiWithRetry(prompt, maxRetries = 4) {
   const models = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash'];
   
@@ -73,7 +115,7 @@ async function callGeminiWithRetry(prompt, maxRetries = 4) {
         });
         const res = await model.generateContent(prompt);
         const text = res.response.text();
-        return JSON.parse(text);
+        return parseJson(text);
       } catch (err) {
         console.warn(`  [Model ${m} Attempt ${attempt + 1}] error: ${err.message}`);
         await sleep(1500 * (attempt + 1));
@@ -119,6 +161,23 @@ async function run() {
     console.log(`[${count}/${posts.length}] Processing Post ID ${post.id}: "${post.title}"`);
     console.log(`============================================================`);
 
+    // Check if translations already exist
+    const alreadyTranslated = post.title_hi && post.content_hi && post.title_gu && post.content_gu;
+    const targetDate = DATE_MAP[post.id] || post.publishedAt || new Date().toISOString();
+    const targetSlug = SLUG_MAP[post.id] || post.slug;
+
+    if (alreadyTranslated) {
+      console.log(`  ✓ Already has translations! Updating status, date, and slug only.`);
+      await post.update({
+        published: true,
+        isApproved: true,
+        publishedAt: targetDate,
+        slug: targetSlug
+      });
+      console.log(`  ✓ ID ${post.id} updated (Date: ${targetDate.split('T')[0]}, Slug: ${targetSlug})`);
+      continue;
+    }
+
     const cleanText = (post.content || '')
       .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -134,8 +193,8 @@ ${cleanText}
 
 Generate the following:
 1. "Bava Hindi" (सरल, बोलचाल की, आम इंसान को आसानी से समझ आने वाली हिंदी):
-   - title_hi: Catchy, simple Hindi title (natural spoken Hindi).
-   - content_hi: Full HTML article with <h2>, <h3>, <p>, <ul>, <li> tags. Must be easy to understand for everyday Indian investors. Explain why Dholera matters, development updates, plot details, and legal verification tips.
+   - title_hi: Catchy, simple Hindi title (natural spoken Hindi, not bookish).
+   - content_hi: Full HTML article with <h2>, <h3>, <p>, <ul>, <li> tags. Simple, conversational, informative. Explain key facts, benefits, and investment advice.
    Must end with:
    <hr/>
    <p><strong>संपर्क करें (Contact Us):</strong></p>
@@ -143,8 +202,8 @@ Generate the following:
    <p>🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 
 2. "Bava Gujarati" (સરળ, વ્યવહારુ બોલચાલની, સામાન્ય માણસને તરત સમજાય તેવી ગુજરાતી):
-   - title_gu: Catchy, simple Gujarati title (everyday colloquial Gujarati).
-   - content_gu: Full HTML article with <h2>, <h3>, <p>, <ul>, <li> tags. Simple, warm, and informative. Explain why Dholera matters, development updates, plot details, and legal verification tips.
+   - title_gu: Catchy, simple Gujarati title (daily conversational Gujarati).
+   - content_gu: Full HTML article with <h2>, <h3>, <p>, <ul>, <li> tags. Simple, warm, and clear.
    Must end with:
    <hr/>
    <p><strong>સંપર્ક કરો (Contact Us):</strong></p>
@@ -152,7 +211,7 @@ Generate the following:
    <p>🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 
 3. 80%+ SEO Optimization:
-   - seoTitle: Exactly 50 to 60 characters long. High click-through rate, includes primary keyword.
+   - seoTitle: Exactly 50 to 60 characters long. High CTR, includes core keyword.
    - seoDescription: Exactly 140 to 160 characters long. Compelling summary with actionable hook.
    - seoKeywords: 5 to 7 high-intent search keywords, comma-separated.
    - tags: 5 to 7 relevant tags, comma-separated.
@@ -182,7 +241,7 @@ Return ONLY a valid JSON object matching this schema:
       const updateFields = {
         published: true,
         isApproved: true,
-        publishedAt: DATE_MAP[post.id] || post.publishedAt || new Date().toISOString(),
+        publishedAt: targetDate,
         title_hi: generated.title_hi || post.title_hi,
         content_hi: generated.content_hi || post.content_hi,
         title_gu: generated.title_gu || post.title_gu,
@@ -193,7 +252,7 @@ Return ONLY a valid JSON object matching this schema:
         tags: generated.tags || post.tags,
         imageAltText: generated.imageAltText || post.imageAltText,
         imageTitle: generated.imageTitle || post.imageTitle,
-        slug: SLUG_MAP[post.id] || generated.slug || post.slug
+        slug: targetSlug || generated.slug || post.slug
       };
 
       // Ensure length constraints
@@ -217,7 +276,7 @@ Return ONLY a valid JSON object matching this schema:
       console.error(`  ✗ Failed to update post ID ${post.id}:`, err.message);
     }
 
-    // Brief throttle between posts to stay well within API quotas
+    // Brief throttle between posts
     await sleep(1500);
   }
 
