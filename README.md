@@ -715,3 +715,18 @@ npm start
 node -e "require('dotenv').config(); require('./services/autoBlogService').runDaily();"
 
 flutter --suppress-analytics build apk --release --flavor prod
+
+@This is an HTTPS/TLS certificate problem, not an Axios or CSRF/login-code problem.
+net::ERR_CERT_DATE_INVALID means the browser rejected the certificate for api.dholeraplatform.com because its validity dates do not match the current time—usually:
+- the API server certificate has expired, or
+- the server/browser machine clock is incorrect, or
+- a proxy/CDN is serving an old certificate.
+Because the certificate check fails before HTTP is established, all calls fail: CSRF token fetch, login, and POST requests.
+Fix it on the server/CDN handling api.dholeraplatform.com:
+1. Inspect/renew the SSL certificate (e.g. Let’s Encrypt/Certbot, Nginx, Cloudflare, load balancer).
+2. Ensure the renewed certificate is assigned to that exact hostname.
+3. Reload/restart the web server or proxy.
+4. Verify server and client system time/date are correct.
+For example, on a Certbot/Nginx server:
+sudo certbot renew
+sudo systemctl reload nginx@
