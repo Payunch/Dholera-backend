@@ -127,6 +127,8 @@ exports.getUpdates = async (req, res) => {
           // Merge translated fields onto the original object structure
           return {
             ...update.toJSON(),
+            original_title: update.title,
+            original_slug: update.slug,
             title: translated.title,
             content: translated.content,
             lang: translated.lang,
