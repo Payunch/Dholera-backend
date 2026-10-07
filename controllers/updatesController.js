@@ -203,7 +203,18 @@ exports.getUpdateById = async (req, res) => {
            console.error(`[Fallback] Error during auto-translate for post ${originalId} to ${targetLang}:`, e.message);
          }
       }
-      if (translated) update = translated;
+      if (translated) {
+        const originalObj = (update.lang === 'en' ? update : await Update.findByPk(originalId)).toJSON();
+        update = {
+          ...originalObj,
+          original_title: originalObj.title,
+          original_slug: originalObj.slug,
+          title: translated.title,
+          content: translated.content,
+          lang: translated.lang,
+          translated_id: translated.id
+        };
+      }
     }
 
     // Only show if published unless 'all' is true
