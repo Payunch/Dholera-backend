@@ -25,7 +25,7 @@ function titleSimilarity(first, second) {
   return intersection / new Set([...left, ...right]).size;
 }
 
-function isNearDuplicateTitle(candidate, existingTitles = [], threshold = 0.72) {
+function isNearDuplicateTitle(candidate, existingTitles = [], threshold = 0.35) {
   return existingTitles.some(title => titleSimilarity(candidate, title) >= threshold);
 }
 
