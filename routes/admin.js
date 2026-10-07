@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const upload = multer();
+const fs = require('fs');
+const path = require('path');
 const { sequelize } = require('../models');
 const models = require('../models');
 const { verifyToken } = require('./auth');
@@ -38,6 +40,15 @@ router.get('/backup', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('Backup error:', err);
     return res.status(500).json({ error: 'Failed to generate backup' });
+  }
+});
+// GET /api/admin/backup/sqlite
+router.get('/backup/sqlite', verifyToken, (req, res) => {
+  const dbPath = path.join(__dirname, '..', 'data', 'database.sqlite');
+  if (fs.existsSync(dbPath)) {
+    res.download(dbPath, `database_live_${new Date().toISOString().split('T')[0]}.sqlite`);
+  } else {
+    res.status(404).json({ error: 'Database file not found' });
   }
 });
 
