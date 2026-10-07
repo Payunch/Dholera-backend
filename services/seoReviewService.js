@@ -43,7 +43,7 @@ async function reviewBlogForSeo({ title, content, category, focusKeyword, seoTit
   if (!geminiApiKey) throw new Error('Free Gemini SEO-review key is not configured on the server.');
 
   const ai = new GoogleGenerativeAI(geminiApiKey);
-  const model = ai.getGenerativeModel({ model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash' });
+  const model = ai.getGenerativeModel({ model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash' });
   const prompt = `You are a careful SEO editor for DholeraPlatform.com, an India-focused Dholera SIR information and real-estate portal.
 Review the blog below. Do not invent facts, prices, project approvals, timelines, or links. Do not make guaranteed-return claims.
 Give specific improvements that help the editor meet a 90+ on-page SEO checklist. This is an estimate, not a Rank Math score.
