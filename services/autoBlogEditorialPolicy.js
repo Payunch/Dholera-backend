@@ -57,7 +57,7 @@ function validateGeneratedBlog(blog, { sourceUrl, contentMode = 'web' } = {}) {
     } catch (_) { return false; }
   });
 
-  if (title.length < 25 || title.length > 110) errors.push('Article title must be 25-110 characters.');
+  if (title.length < 25 || title.length > 65) errors.push('Article title must be 25-65 characters.');
   if (seoTitle.length < 35 || seoTitle.length > 60) errors.push('SEO title must be 35-60 characters.');
   if (description.length < 120 || description.length > 160) errors.push('SEO description must be 120-160 characters.');
   if (isApp ? wordCount < 140 || wordCount > 350 : wordCount < 650 || wordCount > 1400) {

@@ -165,10 +165,11 @@ Requirements for Editorial Quality:
 
 Requirements for Search and Reader Usefulness:
 - **Length:** For a web article, aim for 700-1,200 words only when the source provides enough substance. Never add unsupported filler.
+- **Title Length (CRITICAL):** Your output "title" MUST be extremely short, punchy, and under 60 characters total. Do NOT summarize the entire article in the title.
 - **Table of Contents:** Include a dynamic Table of Contents at the top using a <ul> list with anchor links (e.g., <a href="#section1">) to the corresponding H2 tags which must have matching id attributes (e.g., <h2 id="section1">).
 - **Introduction:** State the core answer/summary within the first 100 words, including the primary keyword.
 - **Structure:** Break text into 200-300 word sections. Use proper HTML tags (<h2>, <h3>, <p>, <ul>, <li>). 
-- **Internal Links:** Include 2-3 genuinely relevant links selected only from: ${EVERGREEN_PATHS.join(', ')}. Use exact paths and natural anchor text. Never create placeholder links.
+- **Internal Links (CRITICAL):** Include 2-3 genuinely relevant links selected only from: ${EVERGREEN_PATHS.join(', ')}. You MUST explicitly link to high-value hub pages like "/investment-guide" or "/tp-maps" inside the body text. Use exact paths and natural anchor text. Never create placeholder links.
 - **Headings:** Do not output an H1 because the page template supplies it. Use descriptive H2/H3 headings without keyword stuffing.
 - **CTA:** End with a restrained invitation to read a relevant Dholera Platform guide. Do not add phone placeholders, urgency, or sales promises.
 
