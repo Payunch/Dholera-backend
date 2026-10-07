@@ -12,17 +12,25 @@ const Comment = sequelize.define('Comment', {
     allowNull: false,
   },
   author_name: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(50),
     allowNull: false,
+  },
+  author_email: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   content: {
     type: DataTypes.TEXT,
     allowNull: false,
   },
   status: {
-    type: DataTypes.STRING,
+    type: DataTypes.ENUM('pending', 'approved', 'spam', 'rejected'),
     allowNull: false,
-    defaultValue: 'approved', // 'approved', 'rejected', 'pending'
+    defaultValue: 'pending',
+  },
+  ip_hash: {
+    type: DataTypes.STRING,
+    allowNull: true,
   }
 }, {
   tableName: 'Comments',
