@@ -1,57 +1,52 @@
-const { Update } = require('./models');
+const sqlite3 = require('sqlite3').verbose();
+const db = new sqlite3.Database('./data/database.sqlite');
 
-const contactSnippet = `
+const contactFooter = `
+
 <p class="wp-block-paragraph"></p>
 
 <p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`;
 
-async function fixContactBlock() {
-  try {
-    const posts = await Update.findAll();
-    let updatedCount = 0;
-    
-    for (const post of posts) {
-      let content = post.content;
-      
-      // We want to ensure the exact contactSnippet is perfectly at the end.
-      // First, let's remove any line that contains the phone number, website url, or the contact pitch
-      // This will wipe out all previous imperfect variations and our previous insertion
-      
-      let modified = false;
-      
-      // Regex to remove paragraphs containing specific contact details
-      const phoneRegex = /<p[^>]*>.*?(\+91\s*7435808031|📞|Call\/WhatsApp:).*?<\/p>/gi;
-      const webRegex = /<p[^>]*>.*?(🌐|Website:|dholeraplatform\.com\/contact).*?<\/p>/gi;
-      const pitchRegex = /<p[^>]*>.*?Contact us today to discuss your requirements.*?<\/p>/gi;
-      
-      // Also remove empty wp-block-paragraph that we might have added right before the block
-      const emptyPRegex = /<p class="wp-block-paragraph"><\/p>/gi;
+db.all("SELECT id, content FROM Updates WHERE lang = 'en'", [], (err, rows) => {
+  if (err) throw err;
 
-      const origLength = content.length;
-      content = content.replace(phoneRegex, '');
-      content = content.replace(webRegex, '');
-      content = content.replace(pitchRegex, '');
-      content = content.replace(emptyPRegex, '');
+  let updateCount = 0;
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+    const stmt = db.prepare("UPDATE Updates SET content = ? WHERE id = ?");
+
+    for (const row of rows) {
+      let content = row.content;
+
+      // Clean up previous attempts/variations of the footer
+      // 1. Remove exact matches of the previous contact strings
+      content = content.replace(/<p class="wp-block-paragraph"><\/p>\s*<p class="wp-block-paragraph">📞 Call\/WhatsApp:[^<]*<a href="https:\/\/wa\.me\/[0-9]+"[^>]*><strong>\+[0-9\s]+<\/strong><\/a><\/p>\s*<p class="wp-block-paragraph">🌐 Website:[^<]*<a href="[^"]+"[^>]*><strong>[^<]+<\/strong><\/a><\/p>\s*<p class="wp-block-paragraph">Contact us today[^<]+<\/p>/gi, '');
+
+      // 2. Remove loose matches of just the Call/WhatsApp line to the end
+      // This will catch partial footers
+      content = content.replace(/<p class="wp-block-paragraph">\s*📞 Call\/WhatsApp[\s\S]*?(<\/p>\s*){1,5}$/gi, '');
+
       content = content.trim();
 
-      // Now we append the PERFECT snippet at the very end
-      content = content + "\n" + contactSnippet;
-      
-      if (post.content !== content) {
-        post.content = content;
-        await post.save();
-        updatedCount++;
-      }
-    }
-    
-    console.log(`Successfully normalized contact blocks on ${updatedCount} posts.`);
-    process.exit(0);
-  } catch(e) {
-    console.error("Error fixing DB:", e);
-    process.exit(1);
-  }
-}
+      // Append the standardized footer
+      content = content + contactFooter;
 
-fixContactBlock();
+      stmt.run(content, row.id);
+      updateCount++;
+    }
+
+    stmt.finalize();
+    db.run("COMMIT", () => {
+      console.log(`Successfully updated ${updateCount} English blog posts with the standardized contact footer.`);
+      // After updating EN, we should delete all translations so they get regenerated with the new footer!
+      db.run("DELETE FROM Updates WHERE original_id IS NOT NULL", (err) => {
+          if (err) console.error(err);
+          else console.log("Deleted old translations to force regeneration.");
+          db.close();
+      });
+    });
+  });
+});

@@ -21,53 +21,81 @@ function getTranslateClient() {
   }
 }
 
-async function translateInChunks(text, lang) {
-  if (!text) return text;
-  const translateClient = getTranslateClient();
-  if (!translateClient) return text;
-  if (text.length < 4000) {
-    return await translateClient(text, { to: lang });
-  }
+const cheerio = require('cheerio');
+const translateClient = require('translate-google');
 
-  const parts = text.split(/(<\/p>|\n)/i);
-  const chunks = [];
-  let currentChunk = '';
+async function translateHtmlContent(html, lang) {
+  if (!html) return html;
+  
+  const $ = cheerio.load(html, null, false);
+  const textNodes = [];
 
-  for (const part of parts) {
-    if (part.trim() === '') {
-       currentChunk += part;
-       continue;
-    }
-    if ((currentChunk.length + part.length) > 4000 && currentChunk.trim().length > 0) {
-      chunks.push(currentChunk);
-      currentChunk = part;
-    } else {
-      currentChunk += part;
+  function traverse(i, node) {
+    if (node.type === 'text') {
+      const text = node.data.trim();
+      if (text) {
+        textNodes.push(node);
+      }
+    } else if (node.type === 'tag') {
+      if (node.name !== 'script' && node.name !== 'style') {
+        $(node).contents().each(traverse);
+      }
     }
   }
-  if (currentChunk.trim().length > 0) chunks.push(currentChunk);
 
-  let translatedText = '';
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    console.log(`    [Chunk ${i+1}/${chunks.length}] Translating ${chunk.length} chars...`);
-    
-    // Add a 2-second delay between chunks to respect rate limits
-    if (i > 0) await sleep(2000);
-    
-    const translatedChunk = await translateClient(chunk, { to: lang });
-    translatedText += translatedChunk;
+  // When isDocument is false, the root is not body, it's the root itself.
+  $.root().contents().each(traverse);
+
+  if (textNodes.length === 0) return html;
+
+  const stringsToTranslate = textNodes.map(n => n.data.trim());
+  console.log('[Translation Debug] Found', stringsToTranslate.length, 'strings to translate');
+  
+  try {
+    // Translate in batches of 10 to avoid Google Translate API limits/errors
+    const batchSize = 10;
+    const translatedStrings = [];
+
+    for (let i = 0; i < stringsToTranslate.length; i += batchSize) {
+      const batch = stringsToTranslate.slice(i, i + batchSize);
+      const payloadObj = {};
+      for (let j = 0; j < batch.length; j++) {
+        payloadObj[j] = batch[j];
+      }
+
+      console.log(`[Translation Debug] Translating batch ${i} to ${i + batch.length}...`);
+      if (i > 0) await sleep(1500); // Respect rate limits
+
+      try {
+        const translatedObj = await translateClient(payloadObj, { to: lang });
+        for (let j = 0; j < batch.length; j++) {
+          translatedStrings.push(translatedObj[j] || batch[j]); // Fallback to original if missing
+        }
+      } catch (err) {
+        console.error(`[Translation Debug] Batch failed:`, err.message);
+        // Fallback to original for this batch
+        for (let j = 0; j < batch.length; j++) {
+          translatedStrings.push(batch[j]);
+        }
+      }
+    }
+
+    // Replace text in nodes
+    let replaceCount = 0;
+    for (let i = 0; i < textNodes.length; i++) {
+      if (translatedStrings[i] && translatedStrings[i] !== stringsToTranslate[i]) {
+        textNodes[i].data = textNodes[i].data.replace(stringsToTranslate[i], translatedStrings[i]);
+        replaceCount++;
+      }
+    }
+    console.log('[Translation Debug] Replaced', replaceCount, 'nodes');
+  } catch (err) {
+    console.error('[Translation] Cheerio batch translate failed:', err.message);
   }
 
-  return translatedText;
+  return $.html();
 }
 
-/**
- * Translates a blog payload into multiple languages.
- * @param {Object} payload { title, content, category }
- * @param {Array} targetLangs List of language codes (e.g., ['hi', 'gu'])
- * @returns {Promise<Array>} List of translated payloads
- */
 async function translateBlogPost(payload, targetLangs = ['hi', 'gu']) {
   if (!autoTranslationEnabled) {
     return targetLangs.map(() => payload);
@@ -76,25 +104,25 @@ async function translateBlogPost(payload, targetLangs = ['hi', 'gu']) {
 
   for (const lang of targetLangs) {
     try {
-      console.log(`[Translation] Translating "${payload.title}" to ${lang}...`);
+      console.log(`[Translation] Translating "${payload.title}" to ${lang} using cheerio + translate-google...`);
       
-      const translateClient = getTranslateClient();
-      if (!translateClient) {
-        translations.push(payload);
-        continue;
+      let translatedTitle = payload.title;
+      try {
+          translatedTitle = await translateClient(payload.title, { to: lang });
+      } catch (e) {
+          console.error(`[Translation] Title translation failed for lang ${lang}:`, e.message);
       }
-      const translatedTitle = await translateClient(payload.title, { to: lang });
-      const translatedContent = await translateInChunks(payload.content, lang);
       
+      const translatedContent = await translateHtmlContent(payload.content, lang);
+
       translations.push({
         ...payload,
         title: translatedTitle,
         content: translatedContent,
-        category: payload.category // Category stays the same or could be translated
+        category: payload.category
       });
     } catch (err) {
       console.error(`[Translation] Failed for lang ${lang}:`, err.message);
-      // Fallback: use English if translation fails
       translations.push(payload);
     }
   }

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const commentsController = require('../controllers/commentsController');
 
+const { verifyToken } = require('./auth');
+
 // POST a new comment
 router.post('/', commentsController.createComment);
 
@@ -9,9 +11,9 @@ router.post('/', commentsController.createComment);
 router.get('/:updateId', commentsController.getPublicComments);
 
 // GET all comments for admin
-router.get('/admin/all', commentsController.adminGetComments);
+router.get('/admin/all', verifyToken, commentsController.adminGetComments);
 
 // PATCH moderate comment
-router.patch('/admin/:id', commentsController.adminModerateComment);
+router.patch('/admin/:id', verifyToken, commentsController.adminModerateComment);
 
 module.exports = router;
