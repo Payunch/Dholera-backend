@@ -339,6 +339,7 @@ app.use('/api/content', require('./routes/content'));
 app.use('/api/intelligence', require('./routes/intelligence'));
 app.use('/api/tblmng', require('./routes/tblmng'));
 app.use('/api/user', require('./routes/user'));
+app.use('/api/comments', require('./routes/comments'));
 app.use('/api/generalsetting', require('./routes/generalsettings'));
 app.use('/api/invoicesetting', require('./routes/generalsettings'));
 app.use('/api/defaultentrysetting', require('./routes/generalsettings'));
