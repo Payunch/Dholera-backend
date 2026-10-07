@@ -417,6 +417,21 @@ exports.updateUpdate = async (req, res) => {
         update.title,
         { type: 'insight', id: update.id.toString() }
       );
+      
+      try {
+        const { pushIndexUrl } = require('../scripts/googleIndexing');
+        
+        // Generate the slug (this matches the frontend getBlogSlug logic)
+        let slugStr = update.slug;
+        if (!slugStr) {
+          slugStr = (update.title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        }
+        
+        const frontendUrl = `https://www.dholeraplatform.com/blogs/${slugStr}`;
+        await pushIndexUrl(frontendUrl);
+      } catch (e) {
+        console.error('[Google Indexing] Failed to push:', e);
+      }
     }
 
     if (seoBlockedScore) {
