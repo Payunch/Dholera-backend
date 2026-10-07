@@ -669,6 +669,7 @@ exports.exportLeads = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
+    console.error('EXPORT LEADS ERROR:', err);
     res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
 };
