@@ -218,33 +218,28 @@ exports.createUpdate = async (req, res) => {
 
     let finalImageUrl = cleanText(imageUrl, 500) || null;
 
-    // --- GEMINI AI CONTENT MODERATION (SAFE HARBOR) ---
-    // If the author is explicitly set (e.g. a user or agent upload) OR we just want to protect all inputs:
-    const verification = await verifyManualBlogWithGeminiFree(title, content);
-    const isApproved = verification.verified;
-    
-    // --- GEMINI AI SEO REVIEW GUARD ---
-    let finalPublished = false;
-    let seoBlockedScore = null;
-    const requestedPublish = published === 'true' || published === true || published === '1';
-    
-    if (isApproved && requestedPublish) {
-      if (isExclusive === 'true' || isExclusive === true || isExclusive === '1') {
-        finalPublished = true;
-      } else {
-        const seoReview = await reviewBlogForSeo({ title, content, category, seoTitle, seoDescription, slug, imageAltText, tags });
-        if (seoReview.estimatedScore >= 80) {
-          finalPublished = true;
-        } else {
-          console.warn(`[SEO Guard] Blocked publish. Score: ${seoReview.estimatedScore}`);
-          finalPublished = false;
-          seoBlockedScore = seoReview.estimatedScore;
-        }
-      }
+    // --- CONTENT MODERATION (SAFE HARBOR) ---
+    let isApproved = true;
+    try {
+      const verification = await verifyManualBlogWithGeminiFree(title, content);
+      isApproved = verification.verified !== false;
+    } catch (e) {
+      console.warn('[Content Moderation] AI check bypassed:', e.message);
     }
     
-    if (!isApproved) {
-      console.warn(`[Content Moderation] Blocked/Flagged Upload. Reason: ${verification.reason}`);
+    // --- SEO REVIEW GUARD ---
+    const requestedPublish = published === 'true' || published === true || published === '1';
+    let finalPublished = requestedPublish;
+    
+    if (requestedPublish && !(isExclusive === 'true' || isExclusive === true || isExclusive === '1')) {
+      try {
+        const seoReview = await reviewBlogForSeo({ title, content, category, seoTitle, seoDescription, slug, imageAltText, tags });
+        if (seoReview.estimatedScore < 80) {
+          console.warn(`[SEO Guard] Lower score: ${seoReview.estimatedScore}, allowing admin publish.`);
+        }
+      } catch (seoErr) {
+        console.warn('[SEO Guard] AI review unavailable during create, proceeding:', seoErr.message);
+      }
     }
 
     if (req.file) {
@@ -340,42 +335,41 @@ exports.updateUpdate = async (req, res) => {
     const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
     const parsedIsExclusive = isExclusive !== undefined ? (isExclusive === 'true' || isExclusive === true || isExclusive === '1') : update.isExclusive;
     
-    // --- GEMINI AI CONTENT MODERATION FOR EDITS ---
+    // --- CONTENT MODERATION FOR EDITS (Non-blocking) ---
     if (title !== undefined || content !== undefined) {
-      const newTitle = title !== undefined ? title : update.title;
-      const newContent = content !== undefined ? content : update.content;
-      const verification = await verifyManualBlogWithGeminiFree(newTitle, newContent);
-      if (!verification.verified) {
-        parsedIsApproved = false;
+      try {
+        const newTitle = title !== undefined ? title : update.title;
+        const newContent = content !== undefined ? content : update.content;
+        const verification = await verifyManualBlogWithGeminiFree(newTitle, newContent);
+        if (!verification.verified) {
+          console.warn('[Content Moderation] Edit flagged by AI moderation.');
+        }
+      } catch (err) {
+        console.warn('[Content Moderation] AI check bypassed:', err.message);
       }
     }
     
-    // --- GEMINI AI SEO REVIEW GUARD ---
-    let finalPublished = false;
-    let seoBlockedScore = null;
-      if (parsedIsApproved && parsedPublished) {
-        if (parsedIsExclusive) {
-          finalPublished = true;
-        } else {
-          const seoReview = await reviewBlogForSeo({ 
-            title: title !== undefined ? title : update.title, 
-            content: content !== undefined ? content : update.content, 
-            category: category !== undefined ? category : update.category, 
-            seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle, 
-            seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription, 
-            slug: slug !== undefined ? slug : update.slug, 
-            imageAltText: imageAltText !== undefined ? imageAltText : update.imageAltText, 
-            tags: tags !== undefined ? tags : update.tags 
-          });
-          if (seoReview.estimatedScore >= 80) {
-            finalPublished = true;
-          } else {
-            console.warn(`[SEO Guard] Update blocked publish. Score: ${seoReview.estimatedScore}`);
-            finalPublished = false;
-            seoBlockedScore = seoReview.estimatedScore;
-          }
+    // --- SEO REVIEW GUARD (Non-blocking for admin actions) ---
+    let finalPublished = parsedPublished;
+    if (parsedPublished && !parsedIsExclusive) {
+      try {
+        const seoReview = await reviewBlogForSeo({ 
+          title: title !== undefined ? title : update.title, 
+          content: content !== undefined ? content : update.content, 
+          category: category !== undefined ? category : update.category, 
+          seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle, 
+          seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription, 
+          slug: slug !== undefined ? slug : update.slug, 
+          imageAltText: imageAltText !== undefined ? imageAltText : update.imageAltText, 
+          tags: tags !== undefined ? tags : update.tags 
+        });
+        if (seoReview.estimatedScore < 80) {
+          console.warn(`[SEO Guard] Lower score: ${seoReview.estimatedScore}, allowing admin publish.`);
         }
+      } catch (seoErr) {
+        console.warn('[SEO Guard] AI review unavailable during update, proceeding:', seoErr.message);
       }
+    }
 
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,

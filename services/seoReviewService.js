@@ -139,7 +139,7 @@ Respond with exactly one word and no punctuation: YES if all three checks pass; 
 
   try {
     const ai = new GoogleGenerativeAI(geminiApiKey);
-    const model = ai.getGenerativeModel({ model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash' });
+    const model = ai.getGenerativeModel({ model: process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash' });
     const response = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 32 }
