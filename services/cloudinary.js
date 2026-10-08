@@ -1,12 +1,5 @@
 const { v2: cloudinary } = require('cloudinary');
 
-const hasCloudinaryDsn = Boolean(process.env.CLOUDINARY_URL && process.env.CLOUDINARY_URL.trim());
-const hasCloudinaryVars = Boolean(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
-);
-
 let isConfigured = false;
 
 function configureCloudinary() {
@@ -14,14 +7,13 @@ function configureCloudinary() {
     return cloudinary;
   }
 
-  // Parse CLOUDINARY_URL if present to ensure individual keys are set
-  // DSN format: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
-  if (process.env.CLOUDINARY_URL) {
+  // Option A: Single DSN
+  if (process.env.CLOUDINARY_URL && process.env.CLOUDINARY_URL.trim()) {
     try {
       const url = new URL(process.env.CLOUDINARY_URL);
       const cloud_name = url.hostname;
-      const api_key = url.username;
-      const api_secret = url.password;
+      const api_key = decodeURIComponent(url.username);
+      const api_secret = decodeURIComponent(url.password);
 
       cloudinary.config({
         cloud_name,
@@ -37,13 +29,19 @@ function configureCloudinary() {
     }
   }
 
-  if (hasCloudinaryVars) {
+  // Option B: Individual variables
+  if (
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  ) {
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME.trim(),
+      api_key: process.env.CLOUDINARY_API_KEY.trim(),
+      api_secret: process.env.CLOUDINARY_API_SECRET.trim(),
       secure: true
     });
+    console.log('[Cloudinary] Configured via individual env vars');
     isConfigured = true;
   }
 
@@ -51,11 +49,16 @@ function configureCloudinary() {
 }
 
 function hasCloudinaryConfig() {
-  return hasCloudinaryDsn || hasCloudinaryVars;
+  return Boolean(
+    (process.env.CLOUDINARY_URL && process.env.CLOUDINARY_URL.trim()) ||
+    (process.env.CLOUDINARY_CLOUD_NAME &&
+     process.env.CLOUDINARY_API_KEY &&
+     process.env.CLOUDINARY_API_SECRET)
+  );
 }
 
 module.exports = {
   cloudinary: configureCloudinary(),
   configureCloudinary,
   hasCloudinaryConfig
-};
+};

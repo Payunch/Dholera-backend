@@ -122,18 +122,22 @@ const storage = {
           const subDir = isPdf ? 'pdfs' : 'images';
 
           if (hasCloudinaryConfig()) {
-            const result = await uploadToCloudinary(buffer, file, folder);
-            cb(null, {
-              destination: 'cloudinary',
-              filename: result.public_id,
-              path: result.secure_url,
-              size: result.bytes,
-              public_id: result.public_id,
-              format: result.format,
-              secure_url: result.secure_url,
-              resource_type: result.resource_type || 'auto',
-            });
-            return;
+            try {
+              const result = await uploadToCloudinary(buffer, file, folder);
+              cb(null, {
+                destination: 'cloudinary',
+                filename: result.public_id,
+                path: result.secure_url,
+                size: result.bytes,
+                public_id: result.public_id,
+                format: result.format,
+                secure_url: result.secure_url,
+                resource_type: result.resource_type || 'auto',
+              });
+              return;
+            } catch (cloudErr) {
+              console.warn('[Upload] Cloudinary upload failed, falling back to local storage:', cloudErr.message || cloudErr);
+            }
           }
 
           const finalPath = await writeLocalFile(buffer, file, subDir);
