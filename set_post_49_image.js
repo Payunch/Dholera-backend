@@ -16,7 +16,9 @@ async function main() {
     imageUrl,
     imageAltText,
     imageTitle,
-    imagePosition: 'top'
+    imagePosition: 'top',
+    published: true,
+    isApproved: true
   });
 
   console.log(`✓ Successfully updated Post ID 49:`);
