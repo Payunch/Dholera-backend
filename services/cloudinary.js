@@ -1,3 +1,5 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { v2: cloudinary } = require('cloudinary');
 
 let isConfigured = false;
