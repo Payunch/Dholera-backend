@@ -5,6 +5,7 @@
  * In production, translations are disabled unless ENABLE_AUTO_TRANSLATION=true.
  */
 
+require('dotenv').config();
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const autoTranslationEnabled = process.env.ENABLE_AUTO_TRANSLATION === 'true';
 let translate = null;
