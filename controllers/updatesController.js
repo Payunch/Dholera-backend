@@ -7,7 +7,7 @@ const { translateBlogPost, generateBavaTranslations } = require('../services/tra
 const { reviewBlogForSeo, verifyManualBlogWithGeminiFree } = require('../services/seoReviewService');
 const path = require('path');
 
-const isRemotePath = (p) => p.startsWith('http://') || p.startsWith('https://');
+const isRemotePath = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
 
 exports.recoverPost = async (req, res) => {
   try {
@@ -301,15 +301,7 @@ exports.createUpdate = async (req, res) => {
         .catch(err => console.warn(`[Auto-Translate] Background translation skipped for post ID ${update.id}:`, err.message));
     }
 
-    if (seoBlockedScore) {
-      res.status(200).json({
-        success: true,
-        published: false,
-        seoScore: seoBlockedScore,
-        message: "Saved as draft. Publishing requires an SEO score of 80 or above.",
-        data: update
-      });
-    } else if (!isApproved) {
+    if (!isApproved) {
       res.status(200).json({
         success: true,
         published: false,
@@ -335,13 +327,19 @@ exports.updateUpdate = async (req, res) => {
     const { title, content, title_gu, content_gu, title_hi, content_hi, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
     
     let finalImageUrl = update.imageUrl;
-    if (imageUrl !== undefined) finalImageUrl = cleanText(imageUrl, 500) || null;
+    if (imageUrl !== undefined) {
+      if (typeof imageUrl === 'string') {
+        finalImageUrl = cleanText(imageUrl, 500) || null;
+      } else if (!imageUrl) {
+        finalImageUrl = null;
+      }
+    }
 
     if (req.file) {
       const filePath = req.file.secure_url || req.file.path;
       if (isRemotePath(filePath)) {
         finalImageUrl = filePath;
-      } else {
+      } else if (typeof filePath === 'string') {
         const uploadsBase = path.resolve(__dirname, '..');
         finalImageUrl = '/' + path.relative(uploadsBase, filePath).replace(/\\/g, '/');
       }
@@ -352,41 +350,8 @@ exports.updateUpdate = async (req, res) => {
     const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
     const parsedIsExclusive = isExclusive !== undefined ? (isExclusive === 'true' || isExclusive === true || isExclusive === '1') : update.isExclusive;
     
-    // --- CONTENT MODERATION FOR EDITS (Non-blocking) ---
-    if (title !== undefined || content !== undefined) {
-      try {
-        const newTitle = title !== undefined ? title : update.title;
-        const newContent = content !== undefined ? content : update.content;
-        const verification = await verifyManualBlogWithGeminiFree(newTitle, newContent);
-        if (!verification.verified) {
-          console.warn('[Content Moderation] Edit flagged by AI moderation.');
-        }
-      } catch (err) {
-        console.warn('[Content Moderation] AI check bypassed:', err.message);
-      }
-    }
-    
-    // --- SEO REVIEW GUARD (Non-blocking for admin actions) ---
+    // Admin edits are direct and fast
     let finalPublished = parsedPublished;
-    if (parsedPublished && !parsedIsExclusive) {
-      try {
-        const seoReview = await reviewBlogForSeo({ 
-          title: title !== undefined ? title : update.title, 
-          content: content !== undefined ? content : update.content, 
-          category: category !== undefined ? category : update.category, 
-          seoTitle: seoTitle !== undefined ? seoTitle : update.seoTitle, 
-          seoDescription: seoDescription !== undefined ? seoDescription : update.seoDescription, 
-          slug: slug !== undefined ? slug : update.slug, 
-          imageAltText: imageAltText !== undefined ? imageAltText : update.imageAltText, 
-          tags: tags !== undefined ? tags : update.tags 
-        });
-        if (seoReview.estimatedScore < 80) {
-          console.warn(`[SEO Guard] Lower score: ${seoReview.estimatedScore}, allowing admin publish.`);
-        }
-      } catch (seoErr) {
-        console.warn('[SEO Guard] AI review unavailable during update, proceeding:', seoErr.message);
-      }
-    }
 
     await update.update({
       title: title !== undefined ? cleanText(title, 255) : update.title,
@@ -453,15 +418,7 @@ exports.updateUpdate = async (req, res) => {
         .catch(err => console.warn(`[Auto-Translate] Background translation skipped for post ID ${update.id}:`, err.message));
     }
 
-    if (seoBlockedScore) {
-      res.status(200).json({
-        success: true,
-        published: false,
-        seoScore: seoBlockedScore,
-        message: "Saved as draft. Publishing requires an SEO score of 80 or above.",
-        data: update
-      });
-    } else if (!parsedIsApproved) {
+    if (!parsedIsApproved) {
       res.status(200).json({
         success: true,
         published: false,
