@@ -127,7 +127,68 @@ async function translateBlogPost(payload, targetLangs = ['hi', 'gu']) {
     }
   }
 
-  return translations;
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+function stripCodeFences(text) {
+  return (text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 }
 
-module.exports = { translateBlogPost };
+async function generateBavaTranslations({ title, content }) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  const ai = new GoogleGenerativeAI(geminiApiKey);
+  const models = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash'];
+
+  const prompt = `You are an expert bilingual content translator for Dholera Smart City real estate.
+Translate the following English blog post into TWO languages:
+
+1. "Bava Hindi" (सरल, बोलचाल की, आम इंसान को आसानी से समझ आने वाली हिंदी):
+   - Natural, conversational, everyday Hindi that any prospective investor or land buyer can immediately understand.
+   - Avoid overly complex, bookish, or Sanskritized words. Keep English industry terms like "Smart City", "Expressway", "Airport", "Plot", "Investment", "Metro" in simple Hinglish/Devanagari (e.g. स्मार्ट सिटी, एक्सप्रेसवे).
+
+2. "Bava Gujarati" (સરળ, વ્યવહારુ બોલચાલની, સામાન્ય માણસને તરત સમજાય તેવી ગુજરાતી):
+   - Natural, colloquial Gujarati business/conversational style used in Gujarat.
+   - Avoid heavy archaic terms. Keep key terms naturally transliterated (e.g. સ્માર્ટ સિટી, પ્લોટ, રોકાણ).
+
+CRITICAL INSTRUCTIONS:
+- Preserve all HTML tags (<p>, <h2>, <h3>, <ul>, <ol>, <li>, <a>, <strong>, <em>, <table>, etc.) and anchor href links exactly.
+- Return ONLY a valid JSON object with these exact keys:
+{
+  "title_hi": "Simple Hindi Title",
+  "content_hi": "Full HTML content translated into Bava Hindi",
+  "title_gu": "Simple Gujarati Title",
+  "content_gu": "Full HTML content translated into Bava Gujarati"
+}
+
+English Title: ${title}
+English Content:
+${content}
+`;
+
+  let lastError = null;
+  for (const m of models) {
+    try {
+      const model = ai.getGenerativeModel({
+        model: m,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2
+        }
+      });
+      const response = await model.generateContent(prompt);
+      const text = response.response.text();
+      const parsed = JSON.parse(stripCodeFences(text));
+      if (parsed.title_hi && parsed.content_hi && parsed.title_gu && parsed.content_gu) {
+        return parsed;
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn(`[generateBavaTranslations] Model ${m} failed: ${err.message}`);
+    }
+  }
+  throw new Error(`All translation models failed: ${lastError?.message}`);
+}
+
+module.exports = { translateBlogPost, generateBavaTranslations };

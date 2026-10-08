@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 const { cleanText, cleanHtml } = require('../utils/sanitize');
 const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
-const { translateBlogPost } = require('../services/translationService');
+const { translateBlogPost, generateBavaTranslations } = require('../services/translationService');
 const { reviewBlogForSeo, verifyManualBlogWithGeminiFree } = require('../services/seoReviewService');
 const path = require('path');
 
@@ -284,6 +284,23 @@ exports.createUpdate = async (req, res) => {
       );
     }
 
+    // Background auto-translation into Bava Hindi & Gujarati if not provided
+    if (!update.title_hi || !update.title_gu) {
+      generateBavaTranslations({ title: update.title, content: update.content })
+        .then(async (trans) => {
+          if (trans.title_hi && trans.title_gu) {
+            await update.update({
+              title_hi: trans.title_hi,
+              content_hi: trans.content_hi,
+              title_gu: trans.title_gu,
+              content_gu: trans.content_gu
+            });
+            console.log(`[Auto-Translate] Background generated translations for new post ID ${update.id}`);
+          }
+        })
+        .catch(err => console.warn(`[Auto-Translate] Background translation skipped for post ID ${update.id}:`, err.message));
+    }
+
     if (seoBlockedScore) {
       res.status(200).json({
         success: true,
@@ -417,6 +434,23 @@ exports.updateUpdate = async (req, res) => {
       } catch (e) {
         console.error('[Google Indexing] Failed to push:', e);
       }
+    }
+
+    // Background auto-translation into Bava Hindi & Gujarati if missing or requested
+    if ((!update.title_hi || !update.title_gu) || (req.body.autoTranslate === 'true')) {
+      generateBavaTranslations({ title: update.title, content: update.content })
+        .then(async (trans) => {
+          if (trans.title_hi && trans.title_gu) {
+            await update.update({
+              title_hi: trans.title_hi,
+              content_hi: trans.content_hi,
+              title_gu: trans.title_gu,
+              content_gu: trans.content_gu
+            });
+            console.log(`[Auto-Translate] Background updated translations for post ID ${update.id}`);
+          }
+        })
+        .catch(err => console.warn(`[Auto-Translate] Background translation skipped for post ID ${update.id}:`, err.message));
     }
 
     if (seoBlockedScore) {

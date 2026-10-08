@@ -5,6 +5,7 @@ const { verifyToken } = require('./auth');
 const upload = require('../middleware/upload');
 const updatesController = require('../controllers/updatesController');
 const { reviewBlogForSeo } = require('../services/seoReviewService');
+const { generateBavaTranslations } = require('../services/translationService');
 
 const limitConfig = (prefix, fallbackWindowMs, fallbackMax) => ({
   windowMs: Number.parseInt(process.env[`${prefix}_WINDOW_MS`] || `${fallbackWindowMs}`, 10),
@@ -62,6 +63,21 @@ router.post('/seo-review', verifyToken, adminMutationLimiter, async (req, res) =
       error: 'AI review is temporarily unavailable. Please try again later.',
       code: 'AI_REVIEW_UNAVAILABLE'
     });
+  }
+});
+
+// AI Translation endpoint for Admin editor (Hindi & Gujarati)
+router.post('/auto-translate', verifyToken, adminMutationLimiter, async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    if (!title || !content) {
+      return res.status(400).json({ error: 'Add an article title and content before generating translations.' });
+    }
+    const result = await generateBavaTranslations({ title, content });
+    return res.json(result);
+  } catch (error) {
+    console.error('[updates.auto-translate]', error.message);
+    return res.status(500).json({ error: error.message || 'Translation failed. Please try again.' });
   }
 });
 
