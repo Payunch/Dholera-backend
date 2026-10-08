@@ -127,6 +127,9 @@ async function translateBlogPost(payload, targetLangs = ['hi', 'gu']) {
     }
   }
 
+  return translations;
+}
+
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 function stripCodeFences(text) {
