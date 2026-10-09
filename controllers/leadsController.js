@@ -741,7 +741,7 @@ exports.createLead = async (req, res) => {
       }
     );
 
-    await maybeNotifyLeadIfHighInterest(lead, { pages: safeJsonParse(visitedPages, []), totalTimeSpent: timeSpent });
+    await maybeNotifyHighInterestLead(lead, { pages: safeJsonParse(visitedPages, []), totalTimeSpent: timeSpent });
     
     res.status(201).json(lead);
   } catch (err) {
