@@ -5,6 +5,7 @@ const { getPremiumBlogPosts } = require('../utils/discoverDholeraPost');
 const { sendInvestorNotification } = require('../services/notificationService');
 const { translateBlogPost, generateBavaTranslations } = require('../services/translationService');
 const { reviewBlogForSeo, verifyManualBlogWithGeminiFree } = require('../services/seoReviewService');
+const { notifySearchEngines } = require('../services/indexingService');
 const path = require('path');
 
 const isRemotePath = (p) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://'));
@@ -282,6 +283,10 @@ exports.createUpdate = async (req, res) => {
         update.title,
         { type: 'insight', id: update.id.toString() }
       );
+      // Trigger search engine indexing notifications asynchronously
+      notifySearchEngines(update).catch((e) =>
+        console.warn('[IndexingService] notifySearchEngines error in create:', e.message)
+      );
     }
 
     // Background auto-translation into Bava Hindi & Gujarati if not provided
@@ -385,20 +390,10 @@ exports.updateUpdate = async (req, res) => {
         { type: 'insight', id: update.id.toString() }
       );
       
-      try {
-        const { pushIndexUrl } = require('../scripts/googleIndexing');
-        
-        // Generate the slug (this matches the frontend getBlogSlug logic)
-        let slugStr = update.slug;
-        if (!slugStr) {
-          slugStr = (update.title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-        }
-        
-        const frontendUrl = `https://www.dholeraplatform.com/blogs/${slugStr}`;
-        await pushIndexUrl(frontendUrl);
-      } catch (e) {
-        console.error('[Google Indexing] Failed to push:', e);
-      }
+      // Dispatch indexing pings (Google Sitemap, IndexNow, Google Indexing API)
+      notifySearchEngines(update).catch((e) =>
+        console.warn('[IndexingService] notifySearchEngines error in update:', e.message)
+      );
     }
 
     // Background auto-translation into Bava Hindi & Gujarati if missing or requested
