@@ -70,7 +70,7 @@ const TODAY_BLOG = {
   isApproved: true,
   isExclusive: false,
   author: "Naresh Gohel",
-  imageUrl: "https://res.cloudinary.com/dhf36t4vw/image/upload/v1791864285/dholera/images/dholera-expressway-connectivity-2026.jpg",
+  imageUrl: "https://res.cloudinary.com/dhf36t4vw/image/upload/v1792082269/dholera/images/dholera-expressway-connectivity-2026.jpg",
   imagePosition: "top",
   tags: "Dholera SIR, Ahmedabad Dholera Expressway, NH-751 Highway, Dholera Connectivity, TP1 Expressway Plots, Smart City Transit, Industrial Land Valuation",
   seoTitle: "Ahmedabad Dholera Expressway: 2026 Handover & Land Value",
@@ -92,7 +92,7 @@ The commissioning of the <strong>Ahmedabad Dholera Expressway</strong> permanent
 </p>
 
 <figure class="my-8">
-  <img src="https://res.cloudinary.com/dhf36t4vw/image/upload/v1791864285/dholera/images/dholera-expressway-connectivity-2026.jpg" alt="Ahmedabad Dholera Expressway NH-751 high-speed highway corridor and interchange access in 2026" class="w-full rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800" />
+  <img src="https://res.cloudinary.com/dhf36t4vw/image/upload/v1792082269/dholera/images/dholera-expressway-connectivity-2026.jpg" alt="Ahmedabad Dholera Expressway NH-751 high-speed highway corridor and interchange access in 2026" class="w-full rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800" />
   <figcaption class="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">Figure 1: High-speed 4-lane carriageway of the Ahmedabad Dholera Expressway (NH-751) featuring dedicated central median reservation for the future Semi High-Speed Rail / Metro network.</figcaption>
 </figure>
 
@@ -176,7 +176,7 @@ The direct economic correlation between expressway access times and per-square-y
 </div>
 
 <figure class="my-8">
-  <img src="https://res.cloudinary.com/dhf36t4vw/image/upload/v1791864284/dholera/images/arialviewdholeraexpress.webp" alt="Aerial view of Ahmedabad Dholera Expressway connecting to central smart city sectors" class="w-full rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800" />
+  <img src="https://res.cloudinary.com/dhf36t4vw/image/upload/v1792082281/dholera/images/arialviewdholeraexpress.webp" alt="Aerial view of Ahmedabad Dholera Expressway connecting to central smart city sectors" class="w-full rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800" />
   <figcaption class="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">Figure 2: Aerial perspective of the Ahmedabad Dholera Expressway illustrating grade-separated cloverleaf interchanges routing traffic toward TP1 and the Activation Area.</figcaption>
 </figure>
 
