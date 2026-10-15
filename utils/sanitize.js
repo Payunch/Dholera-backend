@@ -11,11 +11,26 @@ const cleanText = (value, maxLen = 255) => {
 
 const cleanHtml = (value, maxLen = 50000) => {
   if (value === undefined || value === null) return '';
-  return String(value)
+  let str = String(value)
     // Strip null bytes and dangerous control chars BUT preserve \n, \r, \t
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .trim()
-    .slice(0, maxLen);
+    .trim();
+
+  // Strip dangerous tags completely including their inner content
+  str = str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  str = str.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+  str = str.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+  str = str.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+  str = str.replace(/<embed\b[^>]*>/gi, '');
+  str = str.replace(/<applet\b[^>]*>/gi, '');
+
+  // Strip all inline event handlers (onerror=, onclick=, onload=, etc.)
+  str = str.replace(/\s+on[a-zA-Z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+
+  // Strip javascript: and vbscript: URIs in attributes
+  str = str.replace(/(href|src|action)\s*=\s*['"]?\s*(?:javascript|vbscript|data\s*:\s*text\/html):/gi, '$1="about:blank');
+
+  return str.slice(0, maxLen);
 };
 
 const cleanEmail = (value) => {

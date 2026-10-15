@@ -108,6 +108,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-CSRF-Token', 'X-Firebase-AppCheck']
 }));
 app.use(globalLimiter);
+
+// Hardened Security: Block any direct attempts to read sqlite databases, env configs, git, or data folders
+app.use((req, res, next) => {
+  if (/\.(sqlite|sqlite3|db|env|git|bak|backup)(\/|$)/i.test(req.path) || /^\/data(\/|$)/i.test(req.path)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  next();
+});
+
 app.use(express.json({ limit: '20mb' })); // Allow large rich-text posts and editor payloads
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(morgan('dev'));

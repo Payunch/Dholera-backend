@@ -21,24 +21,24 @@ const limitConfig = (prefix, fallbackWindowMs, fallbackMax) => ({
 });
 
 const otpLimiter = rateLimit({
-  ...limitConfig('LEAD_OTP_LIMIT', 15 * 60 * 1000, 5),
-  message: { error: 'Too many OTP requests from this IP, please try again after 15 minutes' },
+  ...limitConfig('LEAD_OTP_LIMIT', 15 * 60 * 1000, 3),
+  message: { error: 'Too many OTP requests from this IP. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const formLimiter = rateLimit({
-  ...limitConfig('LEAD_FORM_LIMIT', 60 * 60 * 1000, 15),
-  message: { error: 'Too many form submissions from this IP, please try again after an hour' },
+  ...limitConfig('LEAD_FORM_LIMIT', 60 * 60 * 1000, 10),
+  message: { error: 'Too many form submissions from this IP, please try again after an hour.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const onboardRateLimiter = rateLimit({
-  ...limitConfig('LEAD_ONBOARD_LIMIT', 60 * 60 * 1000, 20),
+  ...limitConfig('LEAD_ONBOARD_LIMIT', 15 * 60 * 1000, 5),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many onboarding attempts from this IP, please try again later.' }
+  message: { error: 'Too many onboarding attempts. Please try again after 15 minutes.' }
 });
 
 router.get('/', verifyToken, leadsController.getLeads);
