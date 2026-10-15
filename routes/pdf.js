@@ -206,7 +206,12 @@ router.get('/list', async (req, res) => {
       attributes: ['id', 'title', 'category', 'createdAt', 'documentDate'],
       order: [['id', 'ASC']]
     });
-    res.json(pdfs);
+    // Filter out test titles and raw file dumps
+    const sanitized = pdfs.filter((p) => {
+      const t = (p.title || '').toLowerCase();
+      return !t.includes('test') && !t.includes('mutool') && !/^file\s+[a-z0-9]+/i.test(t);
+    });
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: 'Unable to complete this action right now.' });
   }
