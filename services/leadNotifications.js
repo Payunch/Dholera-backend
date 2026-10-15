@@ -27,7 +27,10 @@ const createMailer = () => {
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
-    }
+    },
+    connectionTimeout: 3000,
+    greetingTimeout: 3000,
+    socketTimeout: 3000
   });
 };
 

@@ -265,38 +265,52 @@ exports.onboardLead = async (req, res) => {
       });
     }
 
-    // AI Intelligence Update
-    await LeadIntelligenceService.updateLeadIntelligence(lead);
-
-    await logAuditEvent({
-      eventType: 'lead.onboard.success',
-      actorType: 'lead',
-      actorId: localPhone,
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { leadId: lead.id }
-    });
-
-    const { sendAdminNotification } = require('../services/notificationService');
-    await sendAdminNotification(
-      'New User Onboarded',
-      `${lead.name} (${lead.phone}) joined the platform.`,
-      { 
-        type: 'lead_onboard', 
-        lead_id: lead.id.toString(),
-        name: lead.name,
-        phone: lead.phone,
-        source: lead.source || 'Website',
-        createdAt: lead.createdAt.toISOString()
-      }
-    );
-
+    // Return success immediately so the UI navigates in < 50ms
     res.json({
       success: true,
       lead_token: lead.lead_token,
       name: lead.name,
       phone: lead.phone
+    });
+
+    setImmediate(async () => {
+      try {
+        await LeadIntelligenceService.updateLeadIntelligence(lead);
+      } catch (e) {
+        console.error('[onboardLead.intelligence]', e.message);
+      }
+
+      try {
+        await logAuditEvent({
+          eventType: 'lead.onboard.success',
+          actorType: 'lead',
+          actorId: localPhone,
+          success: true,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          details: { leadId: lead.id }
+        });
+      } catch (e) {
+        console.error('[onboardLead.audit]', e.message);
+      }
+
+      try {
+        const { sendAdminNotification } = require('../services/notificationService');
+        await sendAdminNotification(
+          'New User Onboarded',
+          `${lead.name} (${lead.phone}) joined the platform.`,
+          { 
+            type: 'lead_onboard', 
+            lead_id: lead.id.toString(),
+            name: lead.name,
+            phone: lead.phone,
+            source: lead.source || 'Website',
+            createdAt: lead.createdAt.toISOString()
+          }
+        );
+      } catch (e) {
+        console.error('[onboardLead.adminNotification]', e.message);
+      }
     });
   } catch (err) {
     console.error('Onboard error:', err);
@@ -388,42 +402,49 @@ exports.verifyOtp = async (req, res) => {
       req.session.verifiedLeadId = lead.id;
     }
 
-    // AI Intelligence Update
-    await LeadIntelligenceService.updateLeadIntelligence(lead);
-
-    await logAuditEvent({
-      eventType: 'lead.otp_verify.success',
-      actorType: 'lead',
-      actorId: localPhone,
-      success: true,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { leadId: lead.id }
-    });
-
-    const { sendAdminNotification } = require('../services/notificationService');
-    await sendAdminNotification(
-      'New Lead Verified via OTP',
-      `${lead.name} (${lead.phone}) completed OTP verification and unlocked PDFs.`,
-      { 
-        type: 'lead_otp_verify', 
-        lead_id: lead.id.toString(),
-        name: lead.name,
-        phone: lead.phone,
-        createdAt: lead.createdAt.toISOString()
-      }
-    );
-
-    // Trigger automated welcome message asynchronously (fire and forget)
-    maybeSendWelcomeMessage(lead).catch(err => {
-      console.error('Failed to send automated welcome message:', err);
-    });
-
+    // Return success immediately so the UI navigates in < 50ms
     res.json({
       success: true,
       lead_token: lead.lead_token,
       name: lead.name,
       phone: lead.phone
+    });
+
+    setImmediate(async () => {
+      try {
+        await LeadIntelligenceService.updateLeadIntelligence(lead);
+      } catch (e) {}
+
+      try {
+        await logAuditEvent({
+          eventType: 'lead.otp_verify.success',
+          actorType: 'lead',
+          actorId: localPhone,
+          success: true,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          details: { leadId: lead.id }
+        });
+      } catch (e) {}
+
+      try {
+        const { sendAdminNotification } = require('../services/notificationService');
+        await sendAdminNotification(
+          'New Lead Verified via OTP',
+          `${lead.name} (${lead.phone}) completed OTP verification and unlocked PDFs.`,
+          { 
+            type: 'lead_otp_verify', 
+            lead_id: lead.id.toString(),
+            name: lead.name,
+            phone: lead.phone,
+            createdAt: lead.createdAt.toISOString()
+          }
+        );
+      } catch (e) {}
+
+      try {
+        await maybeSendWelcomeMessage(lead);
+      } catch (e) {}
     });
   } catch (err) {
     console.error('Verify OTP error:', err);
@@ -721,29 +742,47 @@ exports.createLead = async (req, res) => {
       preferred_language
     });
 
-    // AI Intelligence Update
-    await LeadIntelligenceService.updateLeadIntelligence(lead);
-    
-    // Automated Welcome Message
-    await maybeSendWelcomeMessage(lead);
-
-    const { sendAdminNotification } = require('../services/notificationService');
-    await sendAdminNotification(
-      'New Lead Registered',
-      `${lead.name} has joined the platform via ${lead.source}`,
-      { 
-        type: 'lead_registration', 
-        lead_id: lead.id.toString(),
-        name: lead.name,
-        phone: lead.phone,
-        source: lead.source || 'Website',
-        createdAt: lead.createdAt.toISOString()
-      }
-    );
-
-    await maybeNotifyHighInterestLead(lead, { pages: safeJsonParse(visitedPages, []), totalTimeSpent: timeSpent });
-    
+    // Send HTTP response immediately so browser navigates to thank-you page in < 50ms
     res.status(201).json(lead);
+
+    // Run AI Intelligence & external notifications asynchronously in the background
+    setImmediate(async () => {
+      try {
+        await LeadIntelligenceService.updateLeadIntelligence(lead);
+      } catch (err) {
+        console.error('[createLead.intelligence]', err.message);
+      }
+      
+      try {
+        await maybeSendWelcomeMessage(lead);
+      } catch (err) {
+        console.error('[createLead.welcome]', err.message);
+      }
+
+      try {
+        const { sendAdminNotification } = require('../services/notificationService');
+        await sendAdminNotification(
+          'New Lead Registered',
+          `${lead.name} has joined the platform via ${lead.source}`,
+          { 
+            type: 'lead_registration', 
+            lead_id: lead.id.toString(),
+            name: lead.name,
+            phone: lead.phone,
+            source: lead.source || 'Website',
+            createdAt: lead.createdAt.toISOString()
+          }
+        );
+      } catch (err) {
+        console.error('[createLead.adminNotification]', err.message);
+      }
+
+      try {
+        await maybeNotifyHighInterestLead(lead, { pages: safeJsonParse(visitedPages, []), totalTimeSpent: timeSpent });
+      } catch (err) {
+        console.error('[createLead.highInterest]', err.message);
+      }
+    });
   } catch (err) {
     console.error('[leadsController.createLead]', err);
     res.status(400).json({ error: 'Unable to create the lead right now.' });
