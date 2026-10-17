@@ -58,8 +58,9 @@ function getSeoReview(data) {
   return { score, checks, wordCount, density: Number(density.toFixed(2)), internalLinks, externalLinks, faqs, keyword };
 }
 
-const COVER_IMAGE = 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1792260451/dholera/images/dholera-semiconductor-sez-notification-2026.jpg';
-const FIGURE2_IMAGE = 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1792260452/dholera/images/dholera-tp2-sez-ancillary-corridor-2026.jpg';
+const COVER_IMAGE = 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1792260950/dholera/images/dholera-semiconductor-sez-fab-2026-oct17.jpg';
+const FIGURE2_IMAGE = 'https://res.cloudinary.com/dhf36t4vw/image/upload/v1792260951/dholera/images/dholera-100mld-water-pipeline-tp2-2026-oct17.jpg';
+
 
 const BLOG_DATA = {
   title: "Dholera Semiconductor SEZ 2026: Official Notification, 100 MLD Water Link & TP2 Land Surge",
