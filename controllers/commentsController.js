@@ -1,6 +1,7 @@
 const { Comment } = require('../models');
 const crypto = require('crypto');
 const { cleanText } = require('../utils/sanitize');
+const { checkContentSafety } = require('../utils/moderation');
 
 // Rate limiting map (in memory)
 // In production, consider Redis, but an in-memory map is fine for SQLite level traffic
@@ -43,21 +44,39 @@ exports.createComment = async (req, res) => {
     history.push(now);
     ipRequests.set(ipHash, history);
 
-    // 4. Sanitize and Insert
+    // 4. Sanitize
     const sanitizedBody = cleanText(body).substring(0, 1000);
     const sanitizedName = cleanText(authorName).substring(0, 50);
     const sanitizedEmail = authorEmail ? cleanText(authorEmail).substring(0, 255) : null;
+
+    // 5. Intelligent Vulgarity & Safety Check
+    // If vulgarity/abuse is detected, hold for admin review ('pending').
+    // Otherwise, auto-approve immediately ('approved') so genuine readers see their comments right away!
+    const bodySafety = checkContentSafety(sanitizedBody);
+    const nameSafety = checkContentSafety(sanitizedName);
+    const isFlagged = bodySafety.isVulgarOrSuspicious || nameSafety.isVulgarOrSuspicious;
+
+    const initialStatus = isFlagged ? 'pending' : 'approved';
 
     const comment = await Comment.create({
       update_id: updateId,
       author_name: sanitizedName,
       author_email: sanitizedEmail,
       content: sanitizedBody,
-      status: 'pending',
+      status: initialStatus,
       ip_hash: ipHash
     });
 
-    res.status(201).json({ success: true, message: 'Comment submitted and is pending moderation.' });
+    const userMessage = isFlagged
+      ? 'Comment submitted for review before publishing.'
+      : 'Comment published successfully!';
+
+    res.status(201).json({
+      success: true,
+      message: userMessage,
+      status: initialStatus,
+      data: initialStatus === 'approved' ? comment : undefined
+    });
   } catch (error) {
     console.error('[CreateComment Error]', error);
     res.status(500).json({ error: 'Internal server error' });
