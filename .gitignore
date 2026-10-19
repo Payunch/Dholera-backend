@@ -27,3 +27,7 @@ data/database.sqlite-shm
 data/database.sqlite-wal
 data/sessions.sqlite
 uploads/images/
+scripts/upload_*.js
+scripts/uploaded_*.json
+
+
