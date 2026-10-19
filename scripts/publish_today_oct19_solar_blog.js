@@ -194,30 +194,31 @@ For corporate real estate buyers and institutional investors, acquiring land par
   <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4">Explore Verified High-Growth Opportunities in Dholera SIR</h3>
   <ul class="space-y-3">
     <li>
-      <a href="/projects" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1.5 text-base">
-        Browse Government-Approved Plots in TP1 & TP2 <span class="text-lg leading-none">→</span>
+      <a href="/projects" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center text-base">
+        <span class="text-lg font-bold text-orange-500 mr-2 leading-none">→</span> Browse Government-Approved Plots in TP1 & TP2
       </a>
     </li>
     <li>
-      <a href="/dholera-smart-city-portal" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1.5 text-base">
-        Interactive Dholera SIR Smart City Zoning Portal <span class="text-lg leading-none">→</span>
+      <a href="/dholera-smart-city-portal" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center text-base">
+        <span class="text-lg font-bold text-orange-500 mr-2 leading-none">→</span> Interactive Dholera SIR Smart City Zoning Portal
       </a>
     </li>
     <li>
-      <a href="/contact" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1.5 text-base">
-        Schedule Private On-Site Industrial Corridor Inspection <span class="text-lg leading-none">→</span>
+      <a href="/contact" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center text-base">
+        <span class="text-lg font-bold text-orange-500 mr-2 leading-none">→</span> Schedule Private On-Site Industrial Corridor Inspection
       </a>
     </li>
     <li>
-      <a href="/blogs" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1.5 text-base">
-        Read Complete Dholera Smart City Infrastructure Archive <span class="text-lg leading-none">→</span>
+      <a href="/blogs" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center text-base">
+        <span class="text-lg font-bold text-orange-500 mr-2 leading-none">→</span> Read Complete Dholera Smart City Infrastructure Archive
       </a>
     </li>
     <li>
-      <a href="/dholera-sir-smart-city" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1.5 text-base">
-        Comprehensive Dholera SIR Master Plan & Investment Guide <span class="text-lg leading-none">→</span>
+      <a href="/dholera-sir-smart-city" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center text-base">
+        <span class="text-lg font-bold text-orange-500 mr-2 leading-none">→</span> Comprehensive Dholera SIR Master Plan & Investment Guide
       </a>
     </li>
+
   </ul>
 </div>
 
