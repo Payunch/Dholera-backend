@@ -18,47 +18,45 @@ async function updateDb(dbFilePath) {
   });
 
   try {
-    // 1. Updates table
-    const [beforeUpdates] = await seq.query("SELECT COUNT(*) as cnt FROM Updates WHERE content LIKE '%74358%'");
-    console.log(`Updates table rows with 74358 before: ${beforeUpdates[0].cnt}`);
+    const [tables] = await seq.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+    
+    for (const t of tables) {
+      const tableName = t.name;
+      const [cols] = await seq.query(`PRAGMA table_info("${tableName}")`);
+      
+      for (const c of cols) {
+        const colName = c.name;
+        try {
+          const [check] = await seq.query(`SELECT COUNT(*) as cnt FROM "${tableName}" WHERE "${colName}" LIKE '%74358%'`);
+          if (check[0].cnt > 0) {
+            console.log(`Found ${check[0].cnt} rows in [${tableName}].[${colName}]. Updating...`);
+            
+            await seq.query(`
+              UPDATE "${tableName}"
+              SET "${colName}" = REPLACE("${colName}", '74358 08031', '82004 48270')
+              WHERE "${colName}" LIKE '%74358 08031%'
+            `);
+            
+            await seq.query(`
+              UPDATE "${tableName}"
+              SET "${colName}" = REPLACE("${colName}", '74358-08031', '82004-48270')
+              WHERE "${colName}" LIKE '%74358-08031%'
+            `);
+            
+            await seq.query(`
+              UPDATE "${tableName}"
+              SET "${colName}" = REPLACE("${colName}", '7435808031', '8200448270')
+              WHERE "${colName}" LIKE '%7435808031%'
+            `);
 
-    await seq.query(`
-      UPDATE Updates
-      SET content = REPLACE(content, '74358 08031', '82004 48270')
-      WHERE content LIKE '%74358 08031%'
-    `);
-
-    await seq.query(`
-      UPDATE Updates
-      SET content = REPLACE(content, '74358-08031', '82004-48270')
-      WHERE content LIKE '%74358-08031%'
-    `);
-
-    await seq.query(`
-      UPDATE Updates
-      SET content = REPLACE(content, '7435808031', '8200448270')
-      WHERE content LIKE '%7435808031%'
-    `);
-
-    const [afterUpdates] = await seq.query("SELECT COUNT(*) as cnt FROM Updates WHERE content LIKE '%74358%'");
-    console.log(`Updates table rows with 74358 after: ${afterUpdates[0].cnt}`);
-
-    // 2. Settings table
-    try {
-      const [settings] = await seq.query("SELECT * FROM Settings WHERE value LIKE '%74358%'");
-      console.log(`Settings entries with 74358: ${settings.length}`);
-      if (settings.length > 0) {
-        await seq.query("UPDATE Settings SET value = REPLACE(value, '7435808031', '8200448270') WHERE value LIKE '%7435808031%'");
-        await seq.query("UPDATE Settings SET value = REPLACE(value, '74358 08031', '82004 48270') WHERE value LIKE '%74358 08031%'");
+            const [after] = await seq.query(`SELECT COUNT(*) as cnt FROM "${tableName}" WHERE "${colName}" LIKE '%74358%'`);
+            console.log(`[${tableName}].[${colName}] now has ${after[0].cnt} rows with 74358.`);
+          }
+        } catch (e) {
+          // ignore non-searchable columns
+        }
       }
-    } catch (e) {
-      // Table might not exist in all copies
     }
-
-    // Verify 8200448270 rows
-    const [rowsWithNew] = await seq.query("SELECT COUNT(*) as cnt FROM Updates WHERE content LIKE '%8200448270%'");
-    console.log(`Updates table rows with 8200448270 now: ${rowsWithNew[0].cnt}`);
-
   } catch (err) {
     console.error(`Error updating ${dbFilePath}:`, err.message);
   } finally {
@@ -78,7 +76,7 @@ async function main() {
 
 if (require.main === module) {
   main().then(() => {
-    console.log('\nDatabase update completed successfully!');
+    console.log('\nAll databases updated comprehensively!');
     process.exit(0);
   }).catch(err => {
     console.error(err);
