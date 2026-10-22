@@ -5,7 +5,7 @@ const sequelize = require('../config/database');
 async function insertBlog() {
   try {
     await sequelize.authenticate();
-    
+
     const blogData = {
       title: "Dholera Smart City Is India's First Greenfield Industrial Smart City - Latest Updates",
       content: `<p>According to a recent report by <a href="https://news.google.com/rss/articles/CBMirgFBVV95cUxQRmxCZ1ZZZ1JvaTV0Q04wb0R4SnhHaDJSRVUtRUtkTW9MTjBsVEwtX2ZjbENrWVVucU9JUTJJR2UwS21MTHBmeWJGc05IbnVOUkUxSXBQaEFjQWRHVUM5cFJHOXh6cDZMVml0MHo2NUtTU3BKU1VSWVR1TTNVbjZhc3NoLXA3ZUc1ai1KcFc1V2ZONGpuY3lVVDRvZmdCakZrT1hiQjFVZWYxelNHZHc?oc=5" target="_blank">CMO Gujarat</a>, Dholera Smart City is rapidly advancing as India's First Greenfield Industrial Smart City.</p>
@@ -17,7 +17,7 @@ async function insertBlog() {
 <i>Disclaimer: Real estate investments are subject to market risks. Please do your own research before investing.</i>
 <div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
   <h3>Ready to Explore Dholera Smart City?</h3>
-  <p><a href="https://dholeraplatform.com/contact" style="font-weight: bold; font-size: 1.2em; color: #0056b3; text-decoration: none;">📞 Call Now: 7435808031<br>🌐 https://dholerahub.com</a></p>
+  <p><a href="https://dholeraplatform.com/contact" style="font-weight: bold; font-size: 1.2em; color: #0056b3; text-decoration: none;">📞 Call Now: 8200448270<br>🌐 https://dholerahub.com</a></p>
 </div>`,
       category: "News",
       published: true,

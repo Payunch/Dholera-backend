@@ -13,16 +13,16 @@ const isRemotePath = (p) => typeof p === 'string' && (p.startsWith('http://') ||
 exports.recoverPost = async (req, res) => {
   try {
     const { id, content, lang } = req.body;
-    
+
     // Find all posts that share this original_id (the translated posts)
     // and delete them so they can be freshly translated from the recovered content
     if (lang === 'en') {
       await Update.destroy({ where: { original_id: id } });
     }
-    
+
     // Update the actual post
     await Update.update({ content }, { where: { id } });
-    
+
     res.json({ success: true });
   } catch (err) {
     console.error('[updatesController.recoverPost]', err);
@@ -33,33 +33,33 @@ exports.recoverPost = async (req, res) => {
 exports.migrateDbNow = async (req, res) => {
   try {
     const updates = await Update.findAll();
-    
+
     let count = 0;
     for (const update of updates) {
       let content = update.content;
       let modified = false;
-      
+
       // Cleanup old contact text from DB
-      if (content.includes('dholerahub.com') || content.includes('7435808031') || content.includes('Contact us today') || content.includes('Want to learn more about Dholera?')) {
-        
+      if (content.includes('dholerahub.com') || content.includes('8200448270') || content.includes('Contact us today') || content.includes('Want to learn more about Dholera?')) {
+
         // Remove old banners
         content = content.replace(/<div class="mt-8 rounded-2xl bg-slate-50[^]*?Contact Us Now<\/a>[\s\S]*?<\/div>/g, '');
         content = content.replace(/<div class="mt-8 rounded-2xl bg-slate-50[^]*?<\/div>/g, '');
-        
+
         // Remove old text paragraphs
-        content = content.replace(/<p[^>]*>[\s\S]*?(?:7435808031|dholerahub\.com|Contact us today|Call\/WhatsApp)[\s\S]*?<\/p>/gi, '');
-        content = content.replace(/📞[\s\S]*?7435808031/g, '');
+        content = content.replace(/<p[^>]*>[\s\S]*?(?:8200448270|dholerahub\.com|Contact us today|Call\/WhatsApp)[\s\S]*?<\/p>/gi, '');
+        content = content.replace(/📞[\s\S]*?8200448270/g, '');
         content = content.replace(/🌐[\s\S]*?dholerahub\.com/g, '');
         content = content.replace(/Contact us today[\s\S]*?Dholera SIR\./gi, '');
-        
-        const newContactBlock = `\n<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>\n<p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>\n<p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`;
-        
+
+        const newContactBlock = `\n<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>\n<p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>\n<p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`;
+
         if (!content.includes('href="https://dholeraplatform.com/contact"')) {
           content = content + newContactBlock;
         }
         modified = true;
       }
-      
+
       if (modified) {
         update.content = content.trim();
         await update.save();
@@ -80,7 +80,7 @@ exports.getUpdates = async (req, res) => {
     const where = {};
     const includeAll = req.path === '/admin/all';
     const exclusiveOnly = (req.query.exclusive || '').toString().toLowerCase() === 'true';
-    
+
     // The public route must never reveal drafts. The admin-only route above is
     // protected by verifyToken and is the sole way to include all posts.
     if (!includeAll) {
@@ -117,10 +117,10 @@ exports.getUpdates = async (req, res) => {
       updates = updates.map(update => {
         const titleKey = `title_${targetLang}`;
         const contentKey = `content_${targetLang}`;
-        
+
         const translatedTitle = update[titleKey];
         const translatedContent = update[contentKey];
-        
+
         if (translatedTitle && translatedContent) {
           return {
             ...update.toJSON(),
@@ -131,7 +131,7 @@ exports.getUpdates = async (req, res) => {
             lang: targetLang
           };
         }
-        
+
         // Return original if translation missing (Frontend should handle English slug mismatch fallback)
         return {
           ...update.toJSON(),
@@ -152,7 +152,7 @@ exports.getUpdateById = async (req, res) => {
     const { all, lang, audience } = req.query;
     const targetLang = lang || 'en';
     let update = await Update.findByPk(req.params.id);
-    
+
     if (!update) {
       return res.status(404).json({ error: 'Update not found' });
     }
@@ -165,7 +165,7 @@ exports.getUpdateById = async (req, res) => {
     if (targetLang !== 'en') {
       const titleKey = `title_${targetLang}`;
       const contentKey = `content_${targetLang}`;
-      
+
       const translatedTitle = update[titleKey];
       const translatedContent = update[contentKey];
 
@@ -212,7 +212,7 @@ exports.getUpdateById = async (req, res) => {
 exports.createUpdate = async (req, res) => {
   try {
     const { title, content, title_gu, content_gu, title_hi, content_hi, category, published, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
-    
+
     if (!title || !content) {
       return res.status(400).json({ error: 'Title and content are required' });
     }
@@ -227,11 +227,11 @@ exports.createUpdate = async (req, res) => {
     } catch (e) {
       console.warn('[Content Moderation] AI check bypassed:', e.message);
     }
-    
+
     // --- SEO REVIEW GUARD ---
     const requestedPublish = published === 'true' || published === true || published === '1';
     let finalPublished = requestedPublish;
-    
+
     if (requestedPublish && !(isExclusive === 'true' || isExclusive === true || isExclusive === '1')) {
       try {
         const seoReview = await reviewBlogForSeo({ title, content, category, seoTitle, seoDescription, slug, imageAltText, tags });
@@ -330,7 +330,7 @@ exports.updateUpdate = async (req, res) => {
     const wasPublished = Boolean(update.published && update.isApproved);
 
     const { title, content, title_gu, content_gu, title_hi, content_hi, category, published, isApproved, isExclusive, imageUrl, imagePosition, publishedAt, author, tags, seoTitle, seoDescription, seoKeywords, slug, imageAltText, imageTitle } = req.body;
-    
+
     let finalImageUrl = update.imageUrl;
     if (imageUrl !== undefined) {
       if (typeof imageUrl === 'string') {
@@ -354,7 +354,7 @@ exports.updateUpdate = async (req, res) => {
     let parsedIsApproved = isApproved !== undefined ? (isApproved === 'true' || isApproved === true || isApproved === '1') : update.isApproved;
     const parsedPublished = published !== undefined ? (published === 'true' || published === true || published === '1') : update.published;
     const parsedIsExclusive = isExclusive !== undefined ? (isExclusive === 'true' || isExclusive === true || isExclusive === '1') : update.isExclusive;
-    
+
     // Admin edits are direct and fast
     let finalPublished = parsedPublished;
 
@@ -389,7 +389,7 @@ exports.updateUpdate = async (req, res) => {
         update.title,
         { type: 'insight', id: update.id.toString() }
       );
-      
+
       // Dispatch indexing pings (Google Sitemap, IndexNow, Google Indexing API)
       notifySearchEngines(update).catch((e) =>
         console.warn('[IndexingService] notifySearchEngines error in update:', e.message)
@@ -446,7 +446,7 @@ exports.fixLiveServer = async (req, res) => {
   try {
     // 1. Fix old blogs
     await Update.update({ isApproved: true }, { where: { published: true } });
-    
+
     // 2. Run auto blog right now (in background)
     const autoBlogService = require('../services/autoBlogService');
     autoBlogService.runDaily().catch(e => console.error(e));
@@ -485,10 +485,10 @@ exports.seedDiscoverDholera = async (req, res) => {
       }
     }
 
-    return res.json({ 
-      message: 'Premium blog posts seeded', 
-      created: createdCount, 
-      updated: updatedCount 
+    return res.json({
+      message: 'Premium blog posts seeded',
+      created: createdCount,
+      updated: updatedCount
     });
   } catch (err) {
     console.error('[updatesController.seedDiscoverDholera]', err);

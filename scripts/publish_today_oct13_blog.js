@@ -27,7 +27,7 @@ function evaluateSeo(data) {
   const externalLinks = (safeContent.match(/<a\s+[^>]*href=["']https?:\/\//gi) || []).length;
   const internalLinks = (safeContent.match(/<a\s+[^>]*href=["']\//gi) || []).length;
   const faqs = (safeContent.match(/<h[23][^>]*>\s*(?:faq|frequently asked|what |how |is |can |when |why )/gi) || []).length;
-  
+
   const kwSlug = makeSlug(keyword);
   const slugHasKeyword = Boolean(keyword) && (safeSlug.includes(kwSlug) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSlug.includes(w)));
   const titleHasKeyword = Boolean(keyword) && (safeSeoTitle.toLowerCase().includes(keyword) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSeoTitle.toLowerCase().includes(w)));
@@ -194,7 +194,7 @@ Investors can review official governmental notifications via the <a href="https:
 The Dholera SIR Activation Area represents the operational epicenter of India's greenfield industrial growth. With completed trunk utilities, live corporate investments, and unmatched connectivity to the Expressway and Metro, land holdings in this priority corridor offer enduring stability and capital growth for forward-looking investors.
 </p>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -232,7 +232,7 @@ The Dholera SIR Activation Area represents the operational epicenter of India's 
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -270,7 +270,7 @@ The Dholera SIR Activation Area represents the operational epicenter of India's 
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`
 };

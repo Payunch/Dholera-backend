@@ -27,7 +27,7 @@ function evaluateSeo(data) {
   const externalLinks = (safeContent.match(/<a\s+[^>]*href=["']https?:\/\//gi) || []).length;
   const internalLinks = (safeContent.match(/<a\s+[^>]*href=["']\//gi) || []).length;
   const faqs = (safeContent.match(/<h[23][^>]*>\s*(?:faq|frequently asked|what |how |is |can |when |why )/gi) || []).length;
-  
+
   const kwSlug = makeSlug(keyword);
   const slugHasKeyword = Boolean(keyword) && (safeSlug.includes(kwSlug) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSlug.includes(w)));
   const titleHasKeyword = Boolean(keyword) && (safeSeoTitle.toLowerCase().includes(keyword) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSeoTitle.toLowerCase().includes(w)));
@@ -194,7 +194,7 @@ Investors can consult verified official maps and statutory notifications via the
 The commissioning of the Dholera Multi-Modal Logistics Hub positions Dholera SIR at the strategic center of India’s trade corridors. As rail freight operations ramp up and international manufacturers establish their export bases, land positioned within sanctioned TP schemes represents an enduring institutional real estate asset built for generational capital appreciation.
 </p>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -232,7 +232,7 @@ The commissioning of the Dholera Multi-Modal Logistics Hub positions Dholera SIR
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -270,7 +270,7 @@ The commissioning of the Dholera Multi-Modal Logistics Hub positions Dholera SIR
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`
 };

@@ -27,7 +27,7 @@ function evaluateSeo(data) {
   const externalLinks = (safeContent.match(/<a\s+[^>]*href=["']https?:\/\//gi) || []).length;
   const internalLinks = (safeContent.match(/<a\s+[^>]*href=["']\//gi) || []).length;
   const faqs = (safeContent.match(/<h[23][^>]*>\s*(?:faq|frequently asked|what |how |is |can |when |why )/gi) || []).length;
-  
+
   const kwSlug = makeSlug(keyword);
   const slugHasKeyword = Boolean(keyword) && (safeSlug.includes(kwSlug) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSlug.includes(w)));
   const titleHasKeyword = Boolean(keyword) && (safeSeoTitle.toLowerCase().includes(keyword) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSeoTitle.toLowerCase().includes(w)));
@@ -194,7 +194,7 @@ Investors can review official governmental notifications via the <a href="https:
 Dholera Solar Park is not merely a monumental renewable energy installation; it is the economic engine supplying clean, reliable, low-cost electricity that powers Dholera SIR's transformation into a world-class smart metropolis. By investing in legally vetted, sanctioned plots in TP1 and TP2 today, investors secure prime real estate assets at the foundation of India's green industrial future.
 </p>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -232,7 +232,7 @@ Dholera Solar Park is not merely a monumental renewable energy installation; it 
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -270,7 +270,7 @@ Dholera Solar Park is not merely a monumental renewable energy installation; it 
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`
 };
@@ -413,7 +413,7 @@ Investors can consult verified official maps on the <a href="https://dholera.guj
 The Ahmedabad Dholera Metro is the defining infrastructure artery connecting Gujarat’s existing economic powerhouse with its smartest future metropolis. As viaduct civil execution accelerates through 2026, land along the expressway median and within sanctioned TOD zones in TP1 and TP2 offers exceptional long-term capital appreciation for discerning real estate investors.
 </p>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -452,7 +452,7 @@ The Ahmedabad Dholera Metro is the defining infrastructure artery connecting Guj
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -491,7 +491,7 @@ The Ahmedabad Dholera Metro is the defining infrastructure artery connecting Guj
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`
 };

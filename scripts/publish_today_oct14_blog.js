@@ -27,7 +27,7 @@ function evaluateSeo(data) {
   const externalLinks = (safeContent.match(/<a\s+[^>]*href=["']https?:\/\//gi) || []).length;
   const internalLinks = (safeContent.match(/<a\s+[^>]*href=["']\//gi) || []).length;
   const faqs = (safeContent.match(/<h[23][^>]*>\s*(?:faq|frequently asked|what |how |is |can |when |why |where )/gi) || []).length;
-  
+
   const kwSlug = makeSlug(keyword);
   const slugHasKeyword = Boolean(keyword) && (safeSlug.includes(kwSlug) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSlug.includes(w)));
   const titleHasKeyword = Boolean(keyword) && (safeSeoTitle.toLowerCase().includes(keyword) || keyword.split(/\s+/).filter(w => w.length > 3).some(w => safeSeoTitle.toLowerCase().includes(w)));
@@ -194,7 +194,7 @@ Investors can review official zoning maps and statutory notifications via the <a
 The Dholera Semiconductor Ancillary Park is the catalyst turning Dholera SIR into South Asia's foremost high-tech electronics capital. As international supply-chain vendors break ground across TP2 and workforce demand surges throughout TP1, land holdings in sanctioned Town Planning corridors offer unmatched institutional security and long-term capital appreciation.
 </p>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -232,7 +232,7 @@ The Dholera Semiconductor Ancillary Park is the catalyst turning Dholera SIR int
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`,
 
@@ -270,7 +270,7 @@ The Dholera Semiconductor Ancillary Park is the catalyst turning Dholera SIR int
   </div>
 </div>
 
-<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/917435808031" target="_blank" rel="noopener noreferrer"><strong>+91 7435808031</strong></a></p>
+<p class="wp-block-paragraph">📞 Call/WhatsApp: <a href="https://wa.me/918200448270" target="_blank" rel="noopener noreferrer"><strong>+91 8200448270</strong></a></p>
 <p class="wp-block-paragraph">🌐 Website: <a href="https://dholeraplatform.com/contact"><strong>https://dholeraplatform.com/contact</strong></a></p>
 <p class="wp-block-paragraph">Contact us today to discuss your requirements and discover the best land investment opportunities in Dholera SIR.</p>`
 };

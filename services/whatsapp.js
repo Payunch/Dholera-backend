@@ -34,7 +34,7 @@ const getBusinessSettings = async () => {
 
   const config = {
     site_owner_name: 'Naresh Gohel',
-    phone: '7435808031',
+    phone: '8200448270',
     email: 'gohelnaresh7707@gmail.com',
     facebook: '',
     instagram: '',
@@ -56,9 +56,9 @@ const getBusinessSettings = async () => {
 const buildManualWhatsAppMessage = async (lead) => {
   const config = await getBusinessSettings();
   const phone = normalizePhone(lead.phone);
-  
+
   const greeting = lead.name ? `Hello ${lead.name}! 👋` : 'Hello! 👋';
-  
+
   let interestMsg = 'We noticed your interest in our planning maps and projects.';
   if (lead.visited_pages) {
     try {
@@ -69,7 +69,7 @@ const buildManualWhatsAppMessage = async (lead) => {
         }).join(' and ');
         interestMsg = `We noticed you were recently looking at ${pageNames} plans on our website.`;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const message = `${greeting}
@@ -160,7 +160,7 @@ const sendTemplateMessage = async ({ phone, templateName, languageCode = WHATSAP
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       console.error('WhatsApp API Error:', data);
       throw new Error(data?.error?.message || 'Failed to send WhatsApp message');
