@@ -1,15 +1,45 @@
 const admin = require('firebase-admin');
 
-// Note: Ensure FIREBASE_SERVICE_ACCOUNT is set in your environment variables.
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) 
-  : null;
+const fs = require('fs');
+const path = require('path');
+
+// Load Firebase Service Account from env variable or file
+let serviceAccount = null;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      : process.env.FIREBASE_SERVICE_ACCOUNT;
+  } catch (e) {
+    console.error('[Notification] Error parsing FIREBASE_SERVICE_ACCOUNT env:', e.message);
+  }
+}
+
+if (!serviceAccount) {
+  const possiblePaths = [
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+    path.join(__dirname, '../config/firebase-service-account.json'),
+    path.join(__dirname, '../../user-management-admin-1128f-firebase-adminsdk-fbsvc-90b9de76f9.json'),
+  ];
+  for (const p of possiblePaths) {
+    if (p && fs.existsSync(p)) {
+      try {
+        serviceAccount = JSON.parse(fs.readFileSync(p, 'utf8'));
+        console.log(`[Notification] Loaded Firebase Service Account from ${p}`);
+        break;
+      } catch (err) {
+        console.warn(`[Notification] Failed loading from ${p}:`, err.message);
+      }
+    }
+  }
+}
 
 if (serviceAccount && admin.apps.length === 0) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
-  console.log('[Notification] Firebase Admin Initialized');
+  console.log('[Notification] Firebase Admin Initialized successfully for project:', serviceAccount.project_id);
 } else if (!serviceAccount) {
   console.warn('[Notification] Firebase Service Account missing. Push notifications disabled.');
 }

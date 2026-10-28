@@ -31,3 +31,7 @@ scripts/upload_*.js
 scripts/uploaded_*.json
 downloads/
 *.apk
+
+*firebase*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
