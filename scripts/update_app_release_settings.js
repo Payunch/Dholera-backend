@@ -2,7 +2,7 @@ const { Setting } = require('../models');
 
 async function updateAppReleaseSettings() {
   const settingsToUpdate = [
-    { key: 'apkUrl', value: 'https://www.dholeraplatform.com/downloads/dholera.apk', category: 'app_release' },
+    { key: 'apkUrl', value: 'https://api.dholeraplatform.com/downloads/dholera.apk', category: 'app_release' },
     { key: 'latestBuildNumber', value: '6', category: 'app_release' },
     { key: 'requiredBuildNumber', value: '5', category: 'app_release' },
     { key: 'latestVersionName', value: '1.0.3', category: 'app_release' },
