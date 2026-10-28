@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const authController = require('../controllers/authController');
 
 const LOGIN_WINDOW_MS = Number.parseInt(process.env.ADMIN_LOGIN_WINDOW_MS || `${15 * 60 * 1000}`, 10);
-const LOGIN_MAX_ATTEMPTS = Number.parseInt(process.env.ADMIN_LOGIN_MAX_ATTEMPTS || '20', 10);
+const LOGIN_MAX_ATTEMPTS = Number.parseInt(process.env.ADMIN_LOGIN_MAX_ATTEMPTS || '5', 10);
 
 const loginLimiter = rateLimit({
   windowMs: LOGIN_WINDOW_MS,

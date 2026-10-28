@@ -20,7 +20,7 @@ const ADMIN_PASS = process.env.ADMIN_PASS;
 const JWT_SECRET = process.env.JWT_SECRET;
 const LOGIN_LOCKOUT_BASE_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_BASE_MS || `${5 * 60 * 1000}`, 10);
 const LOGIN_LOCKOUT_MAX_MS = Number.parseInt(process.env.ADMIN_LOCKOUT_MAX_MS || `${60 * 60 * 1000}`, 10);
-const LOGIN_LOCKOUT_THRESHOLD = Number.parseInt(process.env.ADMIN_LOCKOUT_THRESHOLD || '10', 10);
+const LOGIN_LOCKOUT_THRESHOLD = Number.parseInt(process.env.ADMIN_LOCKOUT_THRESHOLD || '5', 10);
 const failedLoginState = new Map();
 
 const safeEqual = (a, b) => {
