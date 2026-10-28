@@ -419,30 +419,14 @@ async function runOneTimeLiveBlogTest() {
   }
 }
 
-async function runScheduledAutoBlog(trigger, contentMode = getAutoBlogContentMode()) {
-  if (autoBlogRunInProgress) {
-    console.warn(`[AutoBlog] ${trigger} run skipped because another run is still in progress.`);
-    return null;
-  }
-
-  autoBlogRunInProgress = true;
+async function runScheduledAutoBlog(trigger, forceSlot = null) {
   try {
-    console.log(`[AutoBlog] Starting ${trigger} run.`);
-    return await autoBlogService.runDaily({ contentMode });
+    console.log(`[AutoBlog] Checking daily slot for ${trigger}...`);
+    return await autoBlogService.checkAndRunDailySlot({ trigger, forceSlot });
   } catch (error) {
-    console.error(`[AutoBlog] ${trigger} run failed:`, error);
+    console.error(`[AutoBlog] ${trigger} run failed:`, error.message);
     return null;
-  } finally {
-    autoBlogRunInProgress = false;
   }
-}
-
-function getAutoBlogContentMode() {
-  const day = new Intl.DateTimeFormat('en-GB', {
-    timeZone: AUTO_BLOG_TIMEZONE,
-    day: 'numeric'
-  }).format(new Date());
-  return Number(day) % 2 === 1 ? 'web' : 'app';
 }
 
 // Database Sync and Server Start
@@ -519,14 +503,24 @@ const startServer = async () => {
     // One-time test uploads for today only. The normal schedule remains below.
     scheduleOneTimeAutoBlogTest(10, 25, '10:25 AM live blog', runOneTimeLiveBlogTest);
 
-    // Run on alternate calendar dates (1, 3, 5, 7, ...), at 8:00 AM IST.
-    // runDaily() also enforces the 36-hour minimum gap at month boundaries.
-    cron.schedule(AUTO_BLOG_CRON, () => {
-      void runScheduledAutoBlog('scheduled');
+    // Twice daily automated blog generation (Morning 09:00 AM IST & Evening 08:00 PM IST)
+    const MORNING_CRON = process.env.AUTO_BLOG_MORNING_CRON || '0 9 * * *';
+    const EVENING_CRON = process.env.AUTO_BLOG_EVENING_CRON || '0 20 * * *';
+
+    cron.schedule(MORNING_CRON, () => {
+      void runScheduledAutoBlog('morning_scheduled', 'morning');
     }, {
       timezone: AUTO_BLOG_TIMEZONE
     });
-    console.log(`[AutoBlog] Daily odd/even schedule active: "${AUTO_BLOG_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
+
+    cron.schedule(EVENING_CRON, () => {
+      void runScheduledAutoBlog('evening_scheduled', 'evening');
+    }, {
+      timezone: AUTO_BLOG_TIMEZONE
+    });
+
+    console.log(`[AutoBlog] Twice-a-day schedule active: Morning at "${MORNING_CRON}" & Evening at "${EVENING_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
+
     if (process.env.AUTO_BLOG_RUN_ON_STARTUP !== 'false') {
       void runScheduledAutoBlog('startup recovery');
     }

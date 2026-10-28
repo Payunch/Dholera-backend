@@ -10,9 +10,18 @@ const parseInteger = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const autoBlogService = require('../services/autoBlogService');
+
 // Public app release info for APK distribution and forced-update checks.
 router.get('/app-info', async (req, res) => {
   try {
+    // When a user opens the mobile app, trigger auto-blog catch-up if today's slot is pending
+    setImmediate(() => {
+      autoBlogService.checkAndRunDailySlot({ trigger: 'app_open' }).catch(err => {
+        console.warn('[AutoBlog] App-open trigger catch-up error:', err.message);
+      });
+    });
+
     const settings = await Setting.findAll({
       where: { category: 'app_release' }
     });
