@@ -567,6 +567,25 @@ async function executeSlotPipeline(slot, triggerSource = 'scheduled') {
     });
 
     console.log(`[AutoBlog] ✓ AUTO-APPROVED & PUBLISHED: ID ${newUpdate.id} (${slot.toUpperCase()} Edition) - "${title}"`);
+
+    // Dispatch push notification to all mobile app investors
+    try {
+      const { sendInvestorNotification } = require('./notificationService');
+      await sendInvestorNotification(
+        'New Dholera Intelligence Report',
+        title,
+        {
+          type: 'insight',
+          id: newUpdate.id.toString(),
+          slug: newUpdate.slug || '',
+          title: title,
+          imageUrl: imageUrl || ''
+        }
+      );
+      console.log(`[AutoBlog] ✓ Push notification dispatched to topic 'investors' for "${title}"`);
+    } catch (notifErr) {
+      console.warn('[AutoBlog] Push notification dispatch failed:', notifErr.message);
+    }
     await finishRun('published', `Published ${slot} blog: ${title}`, newUpdate.id);
 
     return newUpdate;

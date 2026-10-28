@@ -42,10 +42,27 @@ async function sendDirectNotification(token, title, body, data = {}) {
  * Sends a push notification to a topic.
  */
 async function sendTopicNotification(topic, title, body, data = {}) {
-  if (!serviceAccount) return;
+  if (!serviceAccount) {
+    console.warn(`[Notification] Cannot send to topic '${topic}': Firebase Service Account not configured.`);
+    return { success: false, error: 'Firebase Service Account missing' };
+  }
 
   const message = {
-    notification: { title, body },
+    notification: { 
+      title, 
+      body,
+      ...(data.imageUrl ? { imageUrl: data.imageUrl } : {})
+    },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'dholera_general_channel',
+        sound: 'default',
+        priority: 'high',
+        clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        ...(data.imageUrl ? { imageUrl: data.imageUrl } : {})
+      }
+    },
     data: { 
       ...data,
       click_action: 'FLUTTER_NOTIFICATION_CLICK' 
@@ -55,6 +72,7 @@ async function sendTopicNotification(topic, title, body, data = {}) {
 
   try {
     const response = await admin.messaging().send(message);
+    console.log(`[Notification] Push notification sent to topic '${topic}':`, response);
     return { success: true, response };
   } catch (error) {
     console.error('[Notification] Error sending to topic:', error);
