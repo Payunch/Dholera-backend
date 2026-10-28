@@ -293,6 +293,8 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
+app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
+
 app.get('/healthz', (req, res) => {
   res.json({ ok: true, service: 'dholera-backend' });
 });
