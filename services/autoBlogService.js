@@ -17,6 +17,7 @@ const parser = new Parser();
 // Gemini Free API configuration with fallback models
 const GEMINI_MODELS = [
   process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
   'gemini-3.8-flash'
 ];
 

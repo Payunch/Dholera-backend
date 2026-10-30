@@ -44,14 +44,43 @@ if (serviceAccount && admin.apps.length === 0) {
   console.warn('[Notification] Firebase Service Account missing. Push notifications disabled.');
 }
 
+function formatValidImageUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/')) {
+    return `https://api.dholeraplatform.com${trimmed}`;
+  }
+  return null;
+}
+
 /**
  * Sends a push notification to a specific FCM token.
  */
 async function sendDirectNotification(token, title, body, data = {}) {
   if (!serviceAccount || !token) return;
 
+  const formattedImageUrl = formatValidImageUrl(data.imageUrl);
+
   const message = {
-    notification: { title, body },
+    notification: { 
+      title, 
+      body,
+      ...(formattedImageUrl ? { imageUrl: formattedImageUrl } : {})
+    },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'dholera_general_channel',
+        sound: 'default',
+        priority: 'high',
+        clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        ...(formattedImageUrl ? { imageUrl: formattedImageUrl } : {})
+      }
+    },
     data: { 
       ...data,
       click_action: 'FLUTTER_NOTIFICATION_CLICK' 
@@ -77,11 +106,13 @@ async function sendTopicNotification(topic, title, body, data = {}) {
     return { success: false, error: 'Firebase Service Account missing' };
   }
 
+  const formattedImageUrl = formatValidImageUrl(data.imageUrl);
+
   const message = {
     notification: { 
       title, 
       body,
-      ...(data.imageUrl ? { imageUrl: data.imageUrl } : {})
+      ...(formattedImageUrl ? { imageUrl: formattedImageUrl } : {})
     },
     android: {
       priority: 'high',
@@ -90,7 +121,7 @@ async function sendTopicNotification(topic, title, body, data = {}) {
         sound: 'default',
         priority: 'high',
         clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-        ...(data.imageUrl ? { imageUrl: data.imageUrl } : {})
+        ...(formattedImageUrl ? { imageUrl: formattedImageUrl } : {})
       }
     },
     data: { 
