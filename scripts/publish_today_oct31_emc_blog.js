@@ -377,3 +377,4 @@ syncDatabases().catch(err => {
   console.error('[FATAL]', err);
   process.exit(1);
 });
+
