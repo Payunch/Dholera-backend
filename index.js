@@ -504,25 +504,31 @@ const startServer = async () => {
     scheduleOneTimeAutoBlogTest(10, 25, '10:25 AM live blog', runOneTimeLiveBlogTest);
 
     // Twice daily automated blog generation (Morning 09:00 AM IST & Evening 08:00 PM IST)
-    const MORNING_CRON = process.env.AUTO_BLOG_MORNING_CRON || '0 9 * * *';
-    const EVENING_CRON = process.env.AUTO_BLOG_EVENING_CRON || '0 20 * * *';
+    const isAutoBlogEnabled = process.env.AUTO_BLOG_ENABLED !== 'false' && process.env.DISABLE_AUTO_BLOG !== 'true';
 
-    cron.schedule(MORNING_CRON, () => {
-      void runScheduledAutoBlog('morning_scheduled', 'morning');
-    }, {
-      timezone: AUTO_BLOG_TIMEZONE
-    });
+    if (!isAutoBlogEnabled) {
+      console.log('[AutoBlog] Automated cron blogging is DISABLED via environment configuration.');
+    } else {
+      const MORNING_CRON = process.env.AUTO_BLOG_MORNING_CRON || '0 9 * * *';
+      const EVENING_CRON = process.env.AUTO_BLOG_EVENING_CRON || '0 20 * * *';
 
-    cron.schedule(EVENING_CRON, () => {
-      void runScheduledAutoBlog('evening_scheduled', 'evening');
-    }, {
-      timezone: AUTO_BLOG_TIMEZONE
-    });
+      cron.schedule(MORNING_CRON, () => {
+        void runScheduledAutoBlog('morning_scheduled', 'morning');
+      }, {
+        timezone: AUTO_BLOG_TIMEZONE
+      });
 
-    console.log(`[AutoBlog] Twice-a-day schedule active: Morning at "${MORNING_CRON}" & Evening at "${EVENING_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
+      cron.schedule(EVENING_CRON, () => {
+        void runScheduledAutoBlog('evening_scheduled', 'evening');
+      }, {
+        timezone: AUTO_BLOG_TIMEZONE
+      });
 
-    if (process.env.AUTO_BLOG_RUN_ON_STARTUP !== 'false') {
-      void runScheduledAutoBlog('startup recovery');
+      console.log(`[AutoBlog] Twice-a-day schedule active: Morning at "${MORNING_CRON}" & Evening at "${EVENING_CRON}" (${AUTO_BLOG_TIMEZONE}).`);
+
+      if (process.env.AUTO_BLOG_RUN_ON_STARTUP !== 'false') {
+        void runScheduledAutoBlog('startup recovery');
+      }
     }
   });
 };
