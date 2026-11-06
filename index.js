@@ -250,14 +250,14 @@ app.use((req, res, next) => {
   // We only bypass csurf here if the request explicitly uses a Bearer token (cross-domain integration).
   // If it relies on ambient session cookies, CSRF protection MUST be enforced.
   const isSafeDelete = req.method === 'DELETE' && req.path.startsWith('/api/leads/');
-  
+
   const hasBearerToken = req.headers.authorization && req.headers.authorization.startsWith('Bearer ');
   let isBearerValid = false;
   if (hasBearerToken) {
     try {
       verifyAccessToken(req.headers.authorization.split(' ')[1]);
       isBearerValid = true;
-    } catch (e) {}
+    } catch (e) { }
   }
   const isSafeUpdateMutation = (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') && req.path.startsWith('/api/updates') && isBearerValid;
 

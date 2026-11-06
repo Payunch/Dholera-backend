@@ -786,7 +786,7 @@ async function publishAllFlagshipBlogs() {
     console.log(`  Internal Links:  ${evalResult.internalLinks}`);
     console.log(`  External Links:  ${evalResult.externalLinks}`);
     console.log(`  FAQ Count:       ${evalResult.faqs}`);
-    
+
     if (evalResult.score < 100) {
       console.error(`[FATAL] SEO Score is below 100 for ${blog.targetDate}! (${evalResult.score})`);
       evalResult.checks.filter(([, passed]) => !passed).forEach(([rule, , pts]) => {
