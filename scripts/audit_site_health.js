@@ -11,11 +11,27 @@ const path = require('path');
 
 const BASE_URL = 'https://www.dholeraplatform.com';
 
-function fetchUrl(url) {
+function fetchUrl(url, maxRedirects = 3) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, { headers: { 'User-Agent': 'DholeraSeoAuditor/1.0' } }, (res) => {
+      // Follow 301/302/307/308 redirects
+      if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location && maxRedirects > 0) {
+        let redirectTarget = res.headers.location;
+        if (!redirectTarget.startsWith('http')) {
+          redirectTarget = `${BASE_URL}${redirectTarget}`;
+        }
+        return fetchUrl(redirectTarget, maxRedirects - 1).then((redirectedResp) => {
+          resolve({
+            ...redirectedResp,
+            redirectFrom: url,
+            redirectCode: res.statusCode,
+            latencyMs: Date.now() - startTime
+          });
+        });
+      }
+
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
@@ -129,10 +145,12 @@ async function runAudit() {
     `${BASE_URL}/tp-maps`,
     `${BASE_URL}/projects`,
     `${BASE_URL}/infrastructure`,
+    `${BASE_URL}/investment-guide`,
     `${BASE_URL}/invest`,
     `${BASE_URL}/blogs`,
     `${BASE_URL}/robots.txt`,
     `${BASE_URL}/llms.txt`,
+    `${BASE_URL}/llms-full.txt`,
   ];
 
   // Fetch recent flagship blog slugs from local / production DB

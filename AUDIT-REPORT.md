@@ -1,14 +1,14 @@
 # DholeraPlatform Site Health & SEO Audit Report
-*Generated on: 2026-11-14T16:08:35.055Z*
-*Overall Site Health Score: **70/100*** | *Average Response Latency: **2342ms***
+*Generated on: 2026-11-14T16:31:14.428Z*
+*Overall Site Health Score: **94/100*** | *Average Response Latency: **1521ms***
 
 ---
 
 ## Executive Summary
-- **Total URLs Audited:** 23
-- **Critical / High Issues:** 2
-- **Medium Warnings:** 0
-- **Average Server Latency:** 2342ms
+- **Total URLs Audited:** 25
+- **Critical / High Issues:** 0
+- **Medium Warnings:** 2
+- **Average Server Latency:** 1521ms
 - **GEO llms.txt Status:** ✅ Live & Accessible
 - **Robots.txt Status:** ✅ Valid
 
@@ -17,11 +17,11 @@
 ## Action Plan: Priority Breakdown
 
 ### 🚨 1. Do Today (Immediate Fixes)
-- **[CRITICAL]** `/invest`: HTTP 404: Page unreachable
-- **[CRITICAL]** `/blogs/dholera-residential-land-2026-gated-townships-tp1-plots-cost`: HTTP 0: read ECONNRESET
+*No critical issues found! All tested pages responded with 200 OK and core tags intact.*
 
 ### ⚠️ 2. Do This Week (Optimizations)
-*No medium warnings detected.*
+- `/investment-guide`: Missing canonical URL link
+- `/invest`: Missing canonical URL link
 
 ### 💡 3. Do Later (Enhancements)
 - `/`: Title length suboptimal (72 chars, ideal 45–65)
@@ -30,6 +30,8 @@
 - `/tp-maps`: Title length suboptimal (80 chars, ideal 45–65)
 - `/projects`: Title length suboptimal (85 chars, ideal 45–65)
 - `/infrastructure`: Title length suboptimal (76 chars, ideal 45–65)
+- `/investment-guide`: No Schema.org JSON-LD structured data detected
+- `/invest`: No Schema.org JSON-LD structured data detected
 - `/blogs`: No Schema.org JSON-LD structured data detected
 
 ---
@@ -38,29 +40,31 @@
 
 | Page Path | Status | Latency | Title Length | H1 Count | Structured Data | Issues |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `/` | `200` | 3849ms | 72 chars | 1 | ❌ | 3 |
-| `/tp-maps` | `200` | 1004ms | 80 chars | 1 | ✅ | 1 |
-| `/projects` | `200` | 577ms | 85 chars | 1 | ✅ | 1 |
-| `/infrastructure` | `200` | 531ms | 76 chars | 1 | ✅ | 1 |
-| `/invest` | `404` | 66ms | 0 | 0 | ❌ | 1 |
-| `/blogs` | `200` | 3355ms | 70 chars | 1 | ❌ | 1 |
-| `/robots.txt` | `200` | 589ms | N/A (Text) | N/A | N/A | None |
-| `/llms.txt` | `200` | 98ms | N/A (Text) | N/A | N/A | None |
-| `/blogs/dholera-labh-pacham-land-2026-...` | `200` | 3111ms | 65 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-choth-plot-demand-2026...` | `200` | 2170ms | 68 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-thij-land-booking-2026...` | `200` | 2079ms | 66 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-bestu-varsh-land-2026-...` | `200` | 1891ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-festive-land-surge-202...` | `200` | 1860ms | 68 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-diwali-plot-offers-202...` | `200` | 1709ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-airport-plots-2026-aer...` | `200` | 1810ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-land-prices-2026-tp-sc...` | `200` | 1688ms | 64 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-plot-registry-2026-leg...` | `200` | 1734ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-residential-land-2026-...` | `0` | 12807ms | 0 | 0 | ❌ | 1 |
-| `/blogs/dholera-commercial-plots-2026-...` | `200` | 4427ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-land-investment-2026-p...` | `200` | 2395ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-smart-city-plots-2026-...` | `200` | 2036ms | 65 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-land-buying-guide-2026...` | `200` | 2086ms | 62 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-electronics-manufactur...` | `200` | 2002ms | 62 chars | 1 | ✅ | 0 |
+| `/` | `200` | 3446ms | 72 chars | 1 | ❌ | 3 |
+| `/tp-maps` | `200` | 166ms | 80 chars | 1 | ✅ | 1 |
+| `/projects` | `200` | 100ms | 85 chars | 1 | ✅ | 1 |
+| `/infrastructure` | `200` | 217ms | 76 chars | 1 | ✅ | 1 |
+| `/investment-guide` | `200` | 159ms | 65 chars | 1 | ❌ | 2 |
+| `/invest` | `200` | 870ms | 65 chars | 1 | ❌ | 2 |
+| `/blogs` | `200` | 3512ms | 70 chars | 1 | ❌ | 1 |
+| `/robots.txt` | `200` | 55ms | N/A (Text) | N/A | N/A | None |
+| `/llms.txt` | `200` | 76ms | N/A (Text) | N/A | N/A | None |
+| `/llms-full.txt` | `200` | 420ms | N/A (Text) | N/A | N/A | None |
+| `/blogs/dholera-labh-pacham-land-2026-...` | `200` | 2991ms | 65 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-choth-plot-demand-2026...` | `200` | 2080ms | 68 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-thij-land-booking-2026...` | `200` | 2034ms | 66 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-bestu-varsh-land-2026-...` | `200` | 1885ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-festive-land-surge-202...` | `200` | 2062ms | 68 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-diwali-plot-offers-202...` | `200` | 1802ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-airport-plots-2026-aer...` | `200` | 2067ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-land-prices-2026-tp-sc...` | `200` | 1877ms | 64 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-plot-registry-2026-leg...` | `200` | 1809ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-residential-land-2026-...` | `200` | 1575ms | 68 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-commercial-plots-2026-...` | `200` | 1721ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-land-investment-2026-p...` | `200` | 1755ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-smart-city-plots-2026-...` | `200` | 1693ms | 65 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-land-buying-guide-2026...` | `200` | 1897ms | 62 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-electronics-manufactur...` | `200` | 1763ms | 62 chars | 1 | ✅ | 0 |
 
 ---
 *Report generated by Dholera Internal SEO Auditor (100% Free Open-Source Tool).*
