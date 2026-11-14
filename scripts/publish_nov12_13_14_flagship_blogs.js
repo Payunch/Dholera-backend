@@ -767,7 +767,7 @@ async function publishFestiveFlagships() {
     if (!validSlugs.includes(item.slug)) {
       console.log(`[CLEANUP] Deleting duplicate/unwanted post: ID ${item.id} - "${item.title}" (${item.slug})`);
       if (AutoBlogRun) {
-        await AutoBlogRun.destroy({ where: { updateId: item.id } }).catch(() => {});
+        await AutoBlogRun.destroy({ where: { updateId: item.id } }).catch(() => { });
       }
       await item.destroy();
     }
@@ -801,7 +801,7 @@ async function publishFestiveFlagships() {
       if (item.slug !== blog.slug) {
         console.log(`[CLEANUP] Removing non-flagship post on ${blog.targetDate}: ID ${item.id} - "${item.title}"`);
         if (AutoBlogRun) {
-          await AutoBlogRun.destroy({ where: { updateId: item.id } }).catch(() => {});
+          await AutoBlogRun.destroy({ where: { updateId: item.id } }).catch(() => { });
         }
         await item.destroy();
       }
@@ -903,3 +903,4 @@ publishFestiveFlagships().catch(err => {
   console.error('[FATAL]', err);
   process.exit(1);
 });
+
