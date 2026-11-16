@@ -1,6 +1,6 @@
 # DholeraPlatform Site Health & SEO Audit Report
-*Generated on: 2026-11-16T06:23:02.277Z*
-*Overall Site Health Score: **100/100*** | *Average Response Latency: **1612ms***
+*Generated on: 2026-11-16T06:41:22.863Z*
+*Overall Site Health Score: **100/100*** | *Average Response Latency: **2330ms***
 
 ---
 
@@ -8,7 +8,7 @@
 - **Total URLs Audited:** 25
 - **Critical / High Issues:** 0
 - **Medium Warnings:** 0
-- **Average Server Latency:** 1612ms
+- **Average Server Latency:** 2330ms
 - **GEO llms.txt Status:** ✅ Live & Accessible
 - **Robots.txt Status:** ✅ Valid
 
@@ -23,6 +23,10 @@
 *No medium warnings detected.*
 
 ### 💡 3. Do Later (Enhancements)
+- `/blogs/why-80-percent-of-dholera-land-is-not-ready-tp1-tp2-reality`: Title length suboptimal (75 chars, ideal 45–65)
+- `/blogs/why-80-percent-of-dholera-land-is-not-ready-tp1-tp2-reality`: Meta description length (178 chars, ideal 135–165)
+- `/blogs/dholera-land-scam-playbook-5-unapproved-agricultural-traps-defense`: Title length suboptimal (79 chars, ideal 45–65)
+- `/blogs/dholera-land-scam-playbook-5-unapproved-agricultural-traps-defense`: Meta description length (183 chars, ideal 135–165)
 - `/blogs/the-brutal-truth-about-dholera-sir-2026-ground-reality-risks`: Title length suboptimal (83 chars, ideal 45–65)
 - `/blogs/the-brutal-truth-about-dholera-sir-2026-ground-reality-risks`: Meta description length (183 chars, ideal 135–165)
 - `/blogs/how-to-verify-collector-na-7-12-land-title-dholera-sir-checklist`: Title length suboptimal (87 chars, ideal 45–65)
@@ -36,31 +40,31 @@
 
 | Page Path | Status | Latency | Title Length | H1 Count | Structured Data | Issues |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `/` | `200` | 1719ms | 48 chars | 1 | ✅ | 0 |
-| `/tp-maps` | `200` | 358ms | 57 chars | 1 | ✅ | 0 |
-| `/projects` | `200` | 159ms | 56 chars | 1 | ✅ | 0 |
-| `/infrastructure` | `200` | 298ms | 60 chars | 1 | ✅ | 0 |
-| `/investment-guide` | `200` | 214ms | 64 chars | 1 | ✅ | 0 |
-| `/invest` | `200` | 286ms | 64 chars | 1 | ✅ | 0 |
-| `/blogs` | `200` | 4338ms | 57 chars | 1 | ✅ | 0 |
-| `/robots.txt` | `200` | 69ms | N/A (Text) | N/A | N/A | None |
-| `/llms.txt` | `200` | 65ms | N/A (Text) | N/A | N/A | None |
-| `/llms-full.txt` | `200` | 83ms | N/A (Text) | N/A | N/A | None |
-| `/blogs/the-brutal-truth-about-dholera...` | `200` | 3493ms | 83 chars | 1 | ✅ | 2 |
-| `/blogs/how-to-verify-collector-na-7-1...` | `200` | 1993ms | 87 chars | 1 | ✅ | 2 |
-| `/blogs/dholera-tp1-vs-tp2-plot-prices...` | `200` | 1632ms | 78 chars | 1 | ✅ | 2 |
-| `/blogs/dholera-expressway-land-2026-h...` | `200` | 1863ms | 64 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-semiconductor-plots-20...` | `200` | 2123ms | 66 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-labh-pacham-land-2026-...` | `200` | 2170ms | 65 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-choth-plot-demand-2026...` | `200` | 2160ms | 68 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-thij-land-booking-2026...` | `200` | 2184ms | 66 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-bestu-varsh-land-2026-...` | `200` | 2118ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-festive-land-surge-202...` | `200` | 2541ms | 68 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-diwali-plot-offers-202...` | `200` | 1954ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-airport-plots-2026-aer...` | `200` | 2195ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-land-prices-2026-tp-sc...` | `200` | 2124ms | 64 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-plot-registry-2026-leg...` | `200` | 2036ms | 67 chars | 1 | ✅ | 0 |
-| `/blogs/dholera-residential-land-2026-...` | `200` | 2131ms | 68 chars | 1 | ✅ | 0 |
+| `/` | `200` | 1345ms | 48 chars | 1 | ✅ | 0 |
+| `/tp-maps` | `200` | 196ms | 57 chars | 1 | ✅ | 0 |
+| `/projects` | `200` | 207ms | 56 chars | 1 | ✅ | 0 |
+| `/infrastructure` | `200` | 230ms | 60 chars | 1 | ✅ | 0 |
+| `/investment-guide` | `200` | 255ms | 64 chars | 1 | ✅ | 0 |
+| `/invest` | `200` | 473ms | 64 chars | 1 | ✅ | 0 |
+| `/blogs` | `200` | 14875ms | 57 chars | 1 | ✅ | 0 |
+| `/robots.txt` | `200` | 61ms | N/A (Text) | N/A | N/A | None |
+| `/llms.txt` | `200` | 64ms | N/A (Text) | N/A | N/A | None |
+| `/llms-full.txt` | `200` | 52ms | N/A (Text) | N/A | N/A | None |
+| `/blogs/why-80-percent-of-dholera-land...` | `200` | 3997ms | 75 chars | 1 | ✅ | 2 |
+| `/blogs/dholera-land-scam-playbook-5-u...` | `200` | 2463ms | 79 chars | 1 | ✅ | 2 |
+| `/blogs/the-brutal-truth-about-dholera...` | `200` | 2432ms | 83 chars | 1 | ✅ | 2 |
+| `/blogs/how-to-verify-collector-na-7-1...` | `200` | 2797ms | 87 chars | 1 | ✅ | 2 |
+| `/blogs/dholera-tp1-vs-tp2-plot-prices...` | `200` | 2502ms | 78 chars | 1 | ✅ | 2 |
+| `/blogs/dholera-expressway-land-2026-h...` | `200` | 2604ms | 64 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-semiconductor-plots-20...` | `200` | 2545ms | 66 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-labh-pacham-land-2026-...` | `200` | 2330ms | 65 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-choth-plot-demand-2026...` | `200` | 2263ms | 68 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-thij-land-booking-2026...` | `200` | 2335ms | 66 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-bestu-varsh-land-2026-...` | `200` | 3058ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-festive-land-surge-202...` | `200` | 2972ms | 68 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-diwali-plot-offers-202...` | `200` | 2830ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-airport-plots-2026-aer...` | `200` | 2567ms | 67 chars | 1 | ✅ | 0 |
+| `/blogs/dholera-land-prices-2026-tp-sc...` | `200` | 2806ms | 64 chars | 1 | ✅ | 0 |
 
 ---
 *Report generated by Dholera Internal SEO Auditor (100% Free Open-Source Tool).*
