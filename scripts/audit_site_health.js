@@ -162,7 +162,10 @@ async function runAudit() {
       order: [['publishedAt', 'DESC']],
       limit: 15
     });
-    blogUrls = recentPosts.map(p => `${BASE_URL}/blogs/${p.slug}`);
+    blogUrls = recentPosts.map(p => {
+      const slug = p.slug || p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return `${BASE_URL}/blogs/${slug}`;
+    });
     console.log(`[Audit] Ingested ${blogUrls.length} recent flagship blog URLs from database.`);
   } catch (err) {
     console.warn('[Audit] Database load fallback:', err.message);
