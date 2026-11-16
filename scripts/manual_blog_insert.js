@@ -17,7 +17,7 @@ async function insertBlog() {
 <i>Disclaimer: Real estate investments are subject to market risks. Please do your own research before investing.</i>
 <div style="background: #eef2f7; padding: 20px; margin-top: 30px; border-radius: 5px; text-align: center;">
   <h3>Ready to Explore Dholera Smart City?</h3>
-  <p><a href="https://dholeraplatform.com/contact" style="font-weight: bold; font-size: 1.2em; color: #0056b3; text-decoration: none;">📞 Call Now: 8200448270<br>🌐 https://dholerahub.com</a></p>
+  <p><a href="https://dholeraplatform.com/contact" style="font-weight: bold; font-size: 1.2em; color: #0056b3; text-decoration: none;">📞 Call Now: 8200448270<br>🌐 https://dholeraplatform.com</a></p>
 </div>`,
       category: "News",
       published: true,
