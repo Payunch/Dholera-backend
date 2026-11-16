@@ -23,9 +23,9 @@ backups/*.sqlite
 myAgent.js
 
 .envx
-data/database.sqlite-shm
-data/database.sqlite-wal
+data/*.sqlite*
 data/sessions.sqlite
+scripts/indexing_report.json
 uploads/images/
 scripts/upload_*.js
 scripts/uploaded_*.json
